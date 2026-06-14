@@ -266,11 +266,11 @@ private fun SwipeToDeleteRow(
                                 val curPx = with(density) { offsetTarget.toPx() }
                                 val wasOpen = dragStartOffsetPx <= -deleteWidthPx * 0.9f
                                 offsetTarget = when {
-                                    // 已揭开状态下向右拖任意距离 → 直接关闭
+                                    // 已揭开 + 向右拖了一点 → 关闭
                                     wasOpen && curPx > dragStartOffsetPx + 8f -> 0.dp
-                                    // 未揭开状态下，超过 1/3 阈值 → 打开
-                                    !wasOpen && curPx < -deleteWidthPx / 3 -> -deleteWidthDp
-                                    // 已揭开但用户没拖动太多 → 保持打开
+                                    // 未揭开 + 向左拖了一点 → 打开（对称：和关闭一样灵敏）
+                                    !wasOpen && curPx < dragStartOffsetPx - 8f -> -deleteWidthDp
+                                    // 已揭开但没怎么动 → 保持打开
                                     wasOpen -> -deleteWidthDp
                                     // 其他情况 → 关闭
                                     else -> 0.dp
