@@ -1,79 +1,154 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  图标前景：白色 ¥ 符号 + 细圆环 + 底部三颗点缀圆点
-  108×108dp 视口，适合自适应图标 (adaptive icon)
+  前景：白色笔记本（带螺旋装订线、绿色柱状图、橙色对勾）+ 金币 + 铅笔 + 饼图 + 星星
+  108×108 视口，所有元素围绕 54,54 中心
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- 外层细圆环 -->
+    <!-- 左上小星星 1（大） -->
     <path
-        android:pathData="M54,29 A25,25 0 1,1 54,79 A25,25 0 1,1 54,29 Z"
-        android:strokeColor="#FFFFFF"
+        android:pathData="M30,30 L31.5,33 L34.5,33 L32,35 L33,38 L30,36.2 L27,38 L28,35 L25.5,33 L28.5,33 Z"
+        android:fillColor="#FFFFE066" />
+
+    <!-- 左上小星星 2（小） -->
+    <path
+        android:pathData="M40,28 L40.7,29.4 L42.2,29.4 L41,30.4 L41.5,32 L40,31 L38.5,32 L39,30.4 L37.8,29.4 L39.3,29.4 Z"
+        android:fillColor="#FFFFE066" />
+
+    <!-- 笔记本背页（深绿） -->
+    <path
+        android:pathData="M37,46 L37,82 L78,82 L78,46 Z"
+        android:fillColor="#FF1E7E34" />
+
+    <!-- 笔记本主页（白色，带轻微阴影边） -->
+    <path
+        android:pathData="M35,42 L35,78 L76,78 L76,42 Z"
+        android:fillColor="#FFFFFFFF" />
+
+    <!-- 笔记本顶部装饰条 -->
+    <path
+        android:pathData="M35,42 L76,42 L76,46 L35,46 Z"
+        android:fillColor="#FFF1F5F9" />
+
+    <!-- 螺旋装订环 1 -->
+    <path
+        android:pathData="M33,46 m-3,0 a3,3 0 1,1 6,0 a3,3 0 1,1 -6,0"
+        android:fillColor="#FFCBD5E1" />
+    <!-- 螺旋装订环 2 -->
+    <path
+        android:pathData="M33,55 m-3,0 a3,3 0 1,1 6,0 a3,3 0 1,1 -6,0"
+        android:fillColor="#FFCBD5E1" />
+    <!-- 螺旋装订环 3 -->
+    <path
+        android:pathData="M33,64 m-3,0 a3,3 0 1,1 6,0 a3,3 0 1,1 -6,0"
+        android:fillColor="#FFCBD5E1" />
+    <!-- 螺旋装订环 4 -->
+    <path
+        android:pathData="M33,73 m-3,0 a3,3 0 1,1 6,0 a3,3 0 1,1 -6,0"
+        android:fillColor="#FFCBD5E1" />
+
+    <!-- 柱状图 - 矮柱 -->
+    <path
+        android:pathData="M42,62 L46,62 L46,68 L42,68 Z"
+        android:fillColor="#FF22C55E" />
+    <!-- 柱状图 - 中柱 -->
+    <path
+        android:pathData="M48,57 L52,57 L52,68 L48,68 Z"
+        android:fillColor="#FF22C55E" />
+    <!-- 柱状图 - 高柱 -->
+    <path
+        android:pathData="M54,52 L58,52 L58,68 L54,68 Z"
+        android:fillColor="#FF22C55E" />
+
+    <!-- 橙色对勾 ✓ -->
+    <path
+        android:pathData="M62,55 L65,58 L71,52"
+        android:strokeColor="#FFF97316"
         android:strokeWidth="2.5"
-        android:fillColor="#00000000"
-        android:strokeLineCap="round" />
-
-    <!-- 左斜线：左上 → 汇合点 -->
-    <path
-        android:pathData="M40,39 L54,51"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
         android:strokeLineCap="round"
+        android:strokeLineJoin="round"
         android:fillColor="#00000000" />
 
-    <!-- 右斜线：右上 → 汇合点 -->
+    <!-- 笔记本横线 1 -->
     <path
-        android:pathData="M68,39 L54,51"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
+        android:pathData="M62,62 L72,62"
+        android:strokeColor="#FFE2E8F0"
+        android:strokeWidth="1.5"
         android:strokeLineCap="round"
         android:fillColor="#00000000" />
-
-    <!-- 竖线：贯穿上下 -->
+    <!-- 笔记本横线 2 -->
     <path
-        android:pathData="M54,39 L54,67"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
+        android:pathData="M42,72 L72,72"
+        android:strokeColor="#FFE2E8F0"
+        android:strokeWidth="1.5"
         android:strokeLineCap="round"
         android:fillColor="#00000000" />
 
-    <!-- 上横线 -->
+    <!-- 铅笔 - 笔身（橙色） -->
     <path
-        android:pathData="M43,47 L65,47"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000" />
+        android:pathData="M73,32 L82,41 L77,46 L68,37 Z"
+        android:fillColor="#FFF97316" />
+    <!-- 铅笔 - 笔尖（深色） -->
+    <path
+        android:pathData="M68,37 L73,32 L70,29 L65,34 Z"
+        android:fillColor="#FF422006" />
+    <!-- 铅笔 - 橡皮（粉色） -->
+    <path
+        android:pathData="M82,41 L86,45 L82,49 L77,46 Z"
+        android:fillColor="#FFFB7185" />
+    <!-- 铅笔 - 金属环 -->
+    <path
+        android:pathData="M80,42 L83,45 L82,46 L79,43 Z"
+        android:fillColor="#FFFCD34D" />
 
-    <!-- 下横线 -->
+    <!-- 右下饼图（绿色基底） -->
     <path
-        android:pathData="M45,55 L63,55"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000" />
+        android:pathData="M82,58 m-9,0 a9,9 0 1,1 18,0 a9,9 0 1,1 -18,0"
+        android:fillColor="#FF22C55E" />
+    <!-- 饼图扇区（橙色） -->
+    <path
+        android:pathData="M82,58 L82,49 A9,9 0 0,1 91,58 Z"
+        android:fillColor="#FFF97316" />
+    <!-- 饼图扇区（黄色） -->
+    <path
+        android:pathData="M82,58 L91,58 A9,9 0 0,1 86.4,65.8 Z"
+        android:fillColor="#FFFCD34D" />
 
-    <!-- 底部三颗装饰圆点 (代表记录/追踪) -->
+    <!-- 右上小星星 -->
     <path
-        android:pathData="M46,72 L46,72.1"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="4.5"
+        android:pathData="M86,40 L86.7,41.4 L88.2,41.4 L87,42.4 L87.5,44 L86,43 L84.5,44 L85,42.4 L83.8,41.4 L85.3,41.4 Z"
+        android:fillColor="#FFFFE066" />
+
+    <!-- 金币 - 阴影底层 -->
+    <path
+        android:pathData="M64,74 m-11,0 a11,11 0 1,1 22,0 a11,11 0 1,1 -22,0"
+        android:fillColor="#FFD97706" />
+    <!-- 金币 - 上层（亮黄） -->
+    <path
+        android:pathData="M64,72 m-11,0 a11,11 0 1,1 22,0 a11,11 0 1,1 -22,0"
+        android:fillColor="#FFFCD34D" />
+    <!-- 金币 - 内圈 -->
+    <path
+        android:pathData="M64,72 m-8.5,0 a8.5,8.5 0 1,1 17,0 a8.5,8.5 0 1,1 -17,0"
+        android:fillColor="#FFF59E0B" />
+    <!-- 金币 $ 符号 - 竖线 -->
+    <path
+        android:pathData="M64,66 L64,78"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
         android:strokeLineCap="round"
         android:fillColor="#00000000" />
+    <!-- 金币 $ 符号 - S曲线 -->
     <path
-        android:pathData="M54,72 L54,72.1"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="4.5"
+        android:pathData="M67.5,69 C67.5,67.5 66,67 64,67 C62,67 60.5,68 60.5,69.5 C60.5,71 62,71.5 64,72 C66,72.5 67.5,73 67.5,74.5 C67.5,76 66,77 64,77 C62,77 60.5,76.5 60.5,75"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
         android:strokeLineCap="round"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M62,72 L62,72.1"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="4.5"
-        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
         android:fillColor="#00000000" />
 </vector>
