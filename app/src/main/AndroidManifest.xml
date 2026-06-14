@@ -4,6 +4,8 @@
     <application
         android:name=".ExpenseApp"
         android:label="记账助手"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.ExpenseTracker"
         android:supportsRtl="true">
         <activity
