@@ -5,6 +5,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,34 +80,75 @@ class MainActivity : ComponentActivity() {
                     else screen = Screen.Chat
                 }
 
-                // LLM 设置 sub-screen 覆盖在最上层
-                if (subScreen == SubScreen.LlmSettings) {
+                // 主屏幕切换 — Chat ↔ 子页面（Analytics / History / Settings）
+                // Chat 是 "根"（rank=0），其他子页面 rank=1
+                // 进入子页面（rank 增加）：新页面从右滑入，旧页面向左滑出
+                // 返回 Chat（rank 减少）：新页面（Chat）从左滑入，旧页面向右滑出
+                AnimatedContent(
+                    targetState = screen,
+                    transitionSpec = {
+                        val forward = targetState.rank > initialState.rank
+                        val duration = 320
+                        if (forward) {
+                            (slideInHorizontally(
+                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
+                                initialOffsetX = { it },
+                            ) + fadeIn(animationSpec = tween(duration / 2))) togetherWith
+                            (slideOutHorizontally(
+                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
+                                targetOffsetX = { -it / 4 },
+                            ) + fadeOut(animationSpec = tween(duration / 2)))
+                        } else {
+                            (slideInHorizontally(
+                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
+                                initialOffsetX = { -it / 4 },
+                            ) + fadeIn(animationSpec = tween(duration / 2))) togetherWith
+                            (slideOutHorizontally(
+                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
+                                targetOffsetX = { it },
+                            ) + fadeOut(animationSpec = tween(duration / 2)))
+                        }
+                    },
+                    label = "screen-transition",
+                ) { current ->
+                    when (current) {
+                        Screen.Chat -> ChatScreen(
+                            vm = chatVm,
+                            onOpenAnalytics = { screen = Screen.Analytics },
+                            onOpenHistory = { screen = Screen.History },
+                            onOpenSettings = { screen = Screen.Settings },
+                        )
+                        Screen.Analytics -> AnalyticsScreen(
+                            vm = analyticsVm,
+                            onBack = { screen = Screen.Chat },
+                            llmPrefs = llmPrefs,
+                        )
+                        Screen.History -> HistoryScreen(
+                            vm = historyVm,
+                            onBack = { screen = Screen.Chat },
+                        )
+                        Screen.Settings -> SettingsMenuScreen(
+                            onClose = { screen = Screen.Chat },
+                            onOpenLlmSettings = { subScreen = SubScreen.LlmSettings },
+                        )
+                    }
+                }
+
+                // LLM 设置 sub-screen 从右侧滑入覆盖
+                AnimatedVisibility(
+                    visible = subScreen == SubScreen.LlmSettings,
+                    enter = slideInHorizontally(
+                        animationSpec = tween(320, easing = FastOutSlowInEasing),
+                        initialOffsetX = { it },
+                    ) + fadeIn(animationSpec = tween(160)),
+                    exit = slideOutHorizontally(
+                        animationSpec = tween(280, easing = FastOutSlowInEasing),
+                        targetOffsetX = { it },
+                    ) + fadeOut(animationSpec = tween(140)),
+                ) {
                     SettingsScreen(
                         prefs = container.userPrefs,
                         onClose = { subScreen = null },
-                    )
-                    return@AppTheme
-                }
-
-                when (screen) {
-                    Screen.Chat -> ChatScreen(
-                        vm = chatVm,
-                        onOpenAnalytics = { screen = Screen.Analytics },
-                        onOpenHistory = { screen = Screen.History },
-                        onOpenSettings = { screen = Screen.Settings },
-                    )
-                    Screen.Analytics -> AnalyticsScreen(
-                        vm = analyticsVm,
-                        onBack = { screen = Screen.Chat },
-                        llmPrefs = llmPrefs,
-                    )
-                    Screen.History -> HistoryScreen(
-                        vm = historyVm,
-                        onBack = { screen = Screen.Chat },
-                    )
-                    Screen.Settings -> SettingsMenuScreen(
-                        onClose = { screen = Screen.Chat },
-                        onOpenLlmSettings = { subScreen = SubScreen.LlmSettings },
                     )
                 }
             }
@@ -106,10 +156,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private sealed interface Screen {
-        data object Chat : Screen
-        data object Analytics : Screen
-        data object History : Screen
-        data object Settings : Screen
+        // rank 决定切换动画方向：高 rank 从右进，低 rank 从左进
+        val rank: Int
+        data object Chat : Screen { override val rank = 0 }
+        data object Analytics : Screen { override val rank = 1 }
+        data object History : Screen { override val rank = 1 }
+        data object Settings : Screen { override val rank = 1 }
     }
 
     private sealed interface SubScreen {
