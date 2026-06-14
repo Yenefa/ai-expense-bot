@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +65,13 @@ fun CategoryBubbleDialog(
     onDismiss: () -> Unit,
     onSubmit: (amount: Double, note: String) -> Unit,
 ) {
+    // 关键：缓存最后一次非空 category，避免退出动画期间 category=null 导致 !! 崩溃
+    var cachedCategory by remember { mutableStateOf<Category?>(null) }
+    LaunchedEffect(category) {
+        if (category != null) cachedCategory = category
+    }
+    val displayCategory = cachedCategory ?: return
+
     AnimatedVisibility(
         visible = visible && category != null,
         enter = fadeIn(animationSpec = tween(200)) +
@@ -104,7 +112,7 @@ fun CategoryBubbleDialog(
                     .padding(24.dp),
             ) {
                 BubbleContent(
-                    category = category!!,
+                    category = displayCategory,
                     onCancel = onDismiss,
                     onSubmit = onSubmit,
                 )
