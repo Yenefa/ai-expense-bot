@@ -12,8 +12,8 @@ android {
         applicationId = "com.expense.tracker"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -30,6 +30,7 @@ android {
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.10" }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 }
 
 dependencies {

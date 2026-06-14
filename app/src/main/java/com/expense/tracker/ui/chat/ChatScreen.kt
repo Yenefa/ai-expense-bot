@@ -23,11 +23,7 @@ fun ChatScreen(
     val state by vm.uiState.collectAsState()
     Box(modifier = modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(Modifier.fillMaxSize()) {
-            TopBar(
-                onMenuClick = onOpenSettings, // v2: 汉堡菜单打开设置/菜单
-                onEditClick = { /* TODO: 编辑模式 */ },
-                onMoreClick = { /* TODO: 更多选项 */ },
-            )
+            TopBar()
             MessageList(messages = state.messages, modifier = Modifier.weight(1f))
             if (!state.llmEnabled) {
                 TemplateCard(
