@@ -3,8 +3,11 @@ package com.expense.tracker.ui.analytics
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expense.tracker.data.db.ExpenseEntity
+import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.model.Period
+import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.data.repo.ExpenseRepository
+import com.expense.tracker.llm.LlmPrompt
 import com.expense.tracker.util.TimeRanges
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +24,10 @@ data class AnalyticsUiState(
     val lineCounts: List<Int> = emptyList(),
     val pieByCategory: Map<String, Double> = emptyMap(),
     val xLabels: List<String> = emptyList(),
+    val totalAmount: Double = 0.0,
+    val totalCount: Int = 0,
+    val insights: List<String> = emptyList(),
+    val analyzing: Boolean = false,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -28,11 +35,11 @@ class AnalyticsViewModel(
     private val repo: ExpenseRepository,
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
+    private val onRequestInsights: (suspend (String, UserPrefsSnapshot) -> List<String>)? = null,
 ) : ViewModel() {
 
     private val internal = MutableStateFlow(AnalyticsUiState())
     val uiState: StateFlow<AnalyticsUiState> = internal.asStateFlow()
-
     private val periodTrigger = MutableStateFlow(Period.Month)
 
     init {
@@ -52,6 +59,40 @@ class AnalyticsViewModel(
 
     fun selectPeriod(p: Period) {
         periodTrigger.value = p
+    }
+
+    fun requestInsights(prefs: UserPrefsSnapshot) {
+        val state = internal.value
+        if (state.analyzing || state.totalAmount <= 0.0) return
+        val handler = onRequestInsights ?: run {
+            // 本地 fallback
+            internal.update { it.copy(insights = listOf("请先配置 LLM API Key → 设置页面"), analyzing = false) }
+            return
+        }
+        internal.update { it.copy(analyzing = true, insights = emptyList()) }
+
+        // 构建 Top 3 分类
+        val top3 = state.pieByCategory.entries
+            .sortedByDescending { it.value }
+            .take(3)
+            .map { (catId, v) ->
+                (Category.byId(catId)?.emoji + Category.byId(catId)?.displayName ?: catId) to v
+            }
+        val periodName = when (state.period) {
+            Period.Week -> "本周"
+            Period.Month -> "本月"
+            Period.Year -> "本年"
+        }
+        val prompt = LlmPrompt.analyticsPrompt(
+            periodName = periodName,
+            totalAmount = state.totalAmount,
+            count = state.totalCount,
+            topCategories = top3,
+        )
+        viewModelScope.launch {
+            val insights = handler(prompt, prefs)
+            internal.update { it.copy(analyzing = false, insights = insights) }
+        }
     }
 
     private fun aggregate(p: Period, fromMillis: Long, list: List<ExpenseEntity>): AnalyticsUiState {
@@ -76,6 +117,9 @@ class AnalyticsViewModel(
             lineCounts = counts.toList(),
             pieByCategory = byCat,
             xLabels = labels,
+            totalAmount = list.sumOf { it.amount },
+            totalCount = list.size,
+            insights = emptyList(), // 切换周期清除历史洞察
         )
     }
 }

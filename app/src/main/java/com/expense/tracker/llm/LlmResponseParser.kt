@@ -14,19 +14,22 @@ data class ParsedExpense(
     val occurredAtMillis: Long?,
 )
 
+data class LlmParseResult(
+    val reply: String,
+    val expenses: List<ParsedExpense>,
+)
+
 object LlmResponseParser {
 
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
-    fun parse(raw: String): List<ParsedExpense> {
+    fun parse(raw: String): LlmParseResult {
         val payload = try {
             json.decodeFromString(LlmExpensesPayload.serializer(), raw.trim())
         } catch (e: Exception) {
             throw LlmParseException("无法解析 LLM 输出为 JSON：${e.message}", e)
         }
-        if (payload.expenses.isEmpty()) {
-            throw LlmParseException("未识别到支出，请尝试更具体的描述或关闭 AI 用模板记账")
-        }
+        val reply = payload.reply.ifBlank { "已记录" }
         val parsed = payload.expenses
             .filter { it.amount > 0.0 }
             .map { item ->
@@ -37,10 +40,7 @@ object LlmResponseParser {
                     occurredAtMillis = item.occurredAt?.let(::parseOccurredAt),
                 )
             }
-        if (parsed.isEmpty()) {
-            throw LlmParseException("LLM 返回的金额无效")
-        }
-        return parsed
+        return LlmParseResult(reply = reply, expenses = parsed)
     }
 
     private fun parseOccurredAt(iso: String): Long? = runCatching {

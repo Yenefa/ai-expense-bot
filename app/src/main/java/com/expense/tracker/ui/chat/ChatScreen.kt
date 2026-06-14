@@ -16,15 +16,17 @@ import com.expense.tracker.ui.theme.AppColors
 fun ChatScreen(
     vm: ChatViewModel,
     onOpenAnalytics: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by vm.uiState.collectAsState()
     Box(modifier = modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(Modifier.fillMaxSize()) {
             TopBar(
-                onMenuClick = onOpenAnalytics,
-                onEditClick = { /* 第一版不实现 */ },
-                onMoreClick = { /* 第一版不实现 */ },
+                onMenuClick = onOpenSettings, // v2: 汉堡菜单打开设置/菜单
+                onEditClick = { /* TODO: 编辑模式 */ },
+                onMoreClick = { /* TODO: 更多选项 */ },
             )
             MessageList(messages = state.messages, modifier = Modifier.weight(1f))
             if (!state.llmEnabled) {
@@ -38,14 +40,13 @@ fun ChatScreen(
                 llmEnabled = state.llmEnabled,
                 onToggleLlm = vm::toggleLlm,
                 onSend = vm::submitFreeText,
-                onPlusClick = { /* 第一版不实现 */ },
-                placeholder = if (state.llmEnabled) "随便怎么说..." else "回复记账助手",
+                onPlusClick = { /* TODO: image upload */ },
+                placeholder = if (state.llmEnabled) "随便说什么..." else "回复记账助手",
             )
             InteractiveDock(
-                onNew = { /* 第一版不实现 */ },
                 onAnalytics = onOpenAnalytics,
-                onHistory = { /* 第一版不实现 */ },
-                onSettings = { /* 第一版不实现 */ },
+                onHistory = onOpenHistory,
+                onSettings = onOpenSettings,
             )
         }
     }

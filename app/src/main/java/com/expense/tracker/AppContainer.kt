@@ -19,7 +19,7 @@ class AppContainer(context: Context) {
     val chatRepo: ChatRepository by lazy { ChatRepository(db.chatDao()) }
     val llmClient: LlmClient by lazy { LlmClient() }
 
-    /** 给 ChatViewModel 用的 LLM 流程实现。 */
+    /** 对话 LLM：返回 reply（始终展示）+ 写库（如有支出）。 */
     val llmHandler: suspend (String, UserPrefsSnapshot) -> LlmResult = { text, prefs ->
         runCatching {
             val raw = llmClient.chatJson(
@@ -28,25 +28,38 @@ class AppContainer(context: Context) {
                 model = prefs.model,
                 userText = text,
             )
-            val items = LlmResponseParser.parse(raw)
+            val result = LlmResponseParser.parse(raw)
             val now = System.currentTimeMillis()
-            val ids = items.map { item ->
-                expenseRepo.add(
+            val ids = mutableListOf<Long>()
+            result.expenses.forEach { item ->
+                ids += expenseRepo.add(
                     amount = item.amount,
                     categoryId = item.categoryId,
                     note = item.note,
                     occurredAt = item.occurredAtMillis ?: now,
                 )
             }
-            val summary = items.joinToString(" · ") { item ->
-                val cat = com.expense.tracker.data.model.Category.byIdOrOther(item.categoryId)
-                "${cat.emoji} ${cat.displayName} ¥${"%.2f".format(item.amount)}"
-            }
-            val total = items.sumOf { it.amount }
             LlmResult.Ok(
-                replyText = "已为你记录 ${items.size} 笔支出：\n\n$summary\n\n合计 ¥${"%.2f".format(total)}",
+                replyText = result.reply,
                 expenseId = ids.firstOrNull(),
             )
         }.getOrElse { LlmResult.Error(it.message ?: "未知错误") }
+    }
+
+    /** 智核分析：发送当前周期的消费数据提示词，返回洞察列表。 */
+    val analyticsAnalyzer: suspend (String, UserPrefsSnapshot) -> List<String> = { prompt, prefs ->
+        runCatching {
+            val raw = llmClient.chatJson(
+                baseUrl = prefs.baseUrl,
+                apiKey = prefs.apiKey,
+                model = prefs.model,
+                userText = prompt,
+            )
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
+            val insights = json.decodeFromString(
+                com.expense.tracker.llm.AnalyticsInsightsPayload.serializer(), raw.trim()
+            ).insights
+            insights.ifEmpty { listOf("暂无洞察，请再试一次。") }
+        }.getOrElse { listOf("分析失败：${it.message ?: "未知错误"}") }
     }
 }
