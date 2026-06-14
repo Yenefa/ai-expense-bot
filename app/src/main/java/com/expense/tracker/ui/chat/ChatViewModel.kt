@@ -7,6 +7,7 @@ import com.expense.tracker.data.prefs.UserPrefs
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.data.repo.ChatRepository
 import com.expense.tracker.data.repo.ExpenseRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,13 +89,49 @@ class ChatViewModel(
                 internal.update { it.copy(sending = false) }
                 return@launch
             }
+
+            // 思考态 — UI 显示三点跳动动画
+            internal.update { it.copy(thinking = true) }
             val result = runCatching { llmHandler(trimmed, prefs) }
                 .getOrElse { LlmResult.Error("调用失败：${it.message ?: "未知错误"}") }
+            // LLM 已返回，关闭思考态，开始流式打字
+            internal.update { it.copy(thinking = false) }
+
             when (result) {
-                is LlmResult.Ok -> chatRepo.appendAssistant(result.replyText, relatedExpenseId = result.expenseId)
-                is LlmResult.Error -> chatRepo.appendAssistant("⚠️ ${result.message}")
+                is LlmResult.Ok -> {
+                    streamReply(result.replyText)
+                    // 先清流式状态，再写 DB；这样 DB 推回的正式 bubble 替换流式占位时不会重影
+                    internal.update { it.copy(streamingText = null) }
+                    chatRepo.appendAssistant(result.replyText, relatedExpenseId = result.expenseId)
+                }
+                is LlmResult.Error -> {
+                    val errText = "⚠️ ${result.message}"
+                    streamReply(errText)
+                    internal.update { it.copy(streamingText = null) }
+                    chatRepo.appendAssistant(errText)
+                }
             }
             internal.update { it.copy(sending = false) }
+        }
+    }
+
+    /**
+     * 逐字"打字"显示 LLM 回复 — 25ms/字符；空字符串直接跳过。
+     * 完成后调用方负责清理 streamingText 状态（写入 DB 后清空）。
+     */
+    private suspend fun streamReply(fullText: String) {
+        if (fullText.isEmpty()) return
+        val sb = StringBuilder()
+        fullText.forEach { ch ->
+            sb.append(ch)
+            internal.update { it.copy(streamingText = sb.toString()) }
+            // 标点稍微停顿更有节奏感
+            val perCharMs = when (ch) {
+                '。', '！', '？', '.', '!', '?' -> 80L
+                '，', '、', ',', ';' -> 50L
+                else -> 22L
+            }
+            delay(perCharMs)
         }
     }
 }

@@ -51,7 +51,12 @@ fun ChatScreen(
     Box(modifier = modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(Modifier.fillMaxSize()) {
             TopBar()
-            MessageList(messages = state.messages, modifier = Modifier.weight(1f))
+            MessageList(
+                messages = state.messages,
+                thinking = state.thinking,
+                streamingText = state.streamingText,
+                modifier = Modifier.weight(1f),
+            )
             AnimatedVisibility(
                 visible = !state.llmEnabled,
                 enter = fadeIn(animationSpec = tween(350)) +
