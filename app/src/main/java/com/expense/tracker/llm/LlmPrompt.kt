@@ -64,20 +64,3 @@ object LlmPrompt {
     }
 }
 
-
-    /** 智核分析 prompt */
-    fun analyticsPrompt(
-        periodName: String,
-        totalAmount: Double,
-        count: Int,
-        topCategories: List<Pair<String, Double>>,
-    ): String = buildString {
-        appendLine("请帮我分析我的${periodName}支出：")
-        appendLine("总支出 ¥${"%.2f".format(totalAmount)}，共 $count 笔。")
-        append("主要消费在：")
-        appendLine(topCategories.joinToString("、") { "${it.first} ¥${"%.2f".format(it.second)}" })
-        appendLine("请给出 3-5 条简洁的消费洞察（每条不超过 50 字），并用以下 JSON 格式回复：")
-        appendLine("""{"insights": ["洞察1", "洞察2", ...]}""")
-        appendLine("洞察要有针对性，不要泛泛而谈。")
-    }
-}
