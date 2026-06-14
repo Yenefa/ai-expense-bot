@@ -73,7 +73,7 @@ class ChatViewModel(
         }
     }
 
-    /** 开启 LLM 时的自由文本输入。 */
+    /** 自由文本输入：仅在 🧠 开启时调用 LLM；关闭时提示用户改用模板。 */
     fun submitFreeText(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
@@ -81,6 +81,11 @@ class ChatViewModel(
             internal.update { it.copy(sending = true) }
             chatRepo.appendUser(trimmed)
             val prefs = userPrefs.snapshot.first()
+            if (!prefs.llmEnabled) {
+                chatRepo.appendAssistant("⚠️ 大模型已关闭，请点亮 🧠 后再用自然语言记账，或直接选下方分类标签。")
+                internal.update { it.copy(sending = false) }
+                return@launch
+            }
             val result = runCatching { llmHandler(trimmed, prefs) }
                 .getOrElse { LlmResult.Error("调用失败：${it.message ?: "未知错误"}") }
             when (result) {
