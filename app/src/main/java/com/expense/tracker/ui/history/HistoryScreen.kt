@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -164,6 +165,11 @@ private fun ExpenseRow(item: DisplayExpense) {
 /**
  * 向左滑动揭开右侧红色删除按钮；松手未到达阈值则弹回；到达阈值则进入"待确认"展开态。
  * 点击红色按钮触发删除动画（高度收缩 + 淡出 + spring）。
+ *
+ * 设计：
+ * - 红色背景与前景内容大小完全一致（用 matchParentSize），不会比记录大
+ * - 向左拖动灵敏度 ×2（dx * 2），手指轻轻一划就能打开
+ * - 揭开宽度 = 整条记录宽度的一半（揭开后能看清"删除"按钮，又不会全盖）
  */
 @Composable
 private fun SwipeToDeleteRow(
@@ -172,7 +178,10 @@ private fun SwipeToDeleteRow(
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
-    val deleteWidthDp = 72.dp
+    // 揭开时露出的红色区域宽度 — 一半的屏幕宽度比 72dp 自然
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val rowFullWidthDp = configuration.screenWidthDp.dp - 32.dp  // 减去日卡片左右 padding
+    val deleteWidthDp = rowFullWidthDp / 2
     val deleteWidthPx = with(density) { deleteWidthDp.toPx() }
 
     var offsetTarget by remember(key) { mutableStateOf(0.dp) }
@@ -191,28 +200,27 @@ private fun SwipeToDeleteRow(
         exit = shrinkVertically(animationSpec = tween(280)) +
                 androidx.compose.animation.fadeOut(animationSpec = tween(220)),
     ) {
+        // Box 让红色背景通过 matchParentSize 自动等于前景内容高度
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 2.dp),
         ) {
-            // 背景红色删除按钮（始终铺底，前景上滑揭开它）
+            // 1. 红色删除按钮先布局（在底层），matchParentSize 跟随后面前景的高度
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFEF4444)),
+                    .matchParentSize()
+                    .clip(RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 Box(
                     modifier = Modifier
                         .width(deleteWidthDp)
-                        .fillMaxSize()
+                        .fillMaxHeight()
+                        .background(Color(0xFFEF4444))
                         .pointerInput(key) {
                             detectTapGestures(onTap = {
-                                visible = false  // 触发淡出+收缩
-                                // 略微等动画起步后真正删除（DB 删除会让父级重组移除该 key）
+                                visible = false
                                 onDelete()
                             })
                         },
@@ -223,27 +231,33 @@ private fun SwipeToDeleteRow(
                             Icons.Outlined.Delete,
                             contentDescription = "删除",
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(20.dp),
                         )
-                        Spacer(Modifier.width(4.dp))
-                        Text("删除", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "删除",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
                 }
             }
-            // 前景内容：跟手左拉
+            // 2. 前景内容（在红色上方），跟手左拉揭开下面的红色
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .offset(x = animatedOffset)
+                    .background(AppColors.Bg)  // 不透明背景，遮住下方红色
                     .pointerInput(key) {
                         detectHorizontalDragGestures(
                             onHorizontalDrag = { _, dx ->
-                                val newPx = (with(density) { animatedOffset.toPx() } + dx)
-                                    .coerceIn(-deleteWidthPx * 1.4f, 0f)
+                                // 灵敏度 ×2 — 同样手势距离，offset 翻倍
+                                val newPx = (with(density) { animatedOffset.toPx() } + dx * 2f)
+                                    .coerceIn(-deleteWidthPx * 1.2f, 0f)
                                 offsetTarget = with(density) { newPx.toDp() }
                             },
                             onDragEnd = {
-                                offsetTarget = if (with(density) { offsetTarget.toPx() } < -deleteWidthPx / 2) {
+                                offsetTarget = if (with(density) { offsetTarget.toPx() } < -deleteWidthPx / 3) {
                                     -deleteWidthDp
                                 } else {
                                     0.dp

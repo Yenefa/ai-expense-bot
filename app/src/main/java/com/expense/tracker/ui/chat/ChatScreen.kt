@@ -119,6 +119,10 @@ fun ChatScreen(
             visible = bubbleCategoryId != null,
             category = bubbleCategoryId?.let { Category.byId(it) },
             onDismiss = { bubbleCategoryId = null },
+            onSwitchCategory = { id ->
+                vm.selectCategory(id)
+                bubbleCategoryId = id
+            },
             onSubmit = { amount, note ->
                 vm.submitTemplate(amount, note)
                 bubbleCategoryId = null

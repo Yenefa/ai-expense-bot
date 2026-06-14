@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
@@ -41,6 +42,13 @@ import kotlinx.coroutines.launch
 fun SettingsMenuScreen(onClose: () -> Unit, onOpenLlmSettings: () -> Unit) {
     val snackbarHost = remember { SnackbarHostState() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val context = LocalContext.current
+    // 从 PackageManager 读取真实 versionName，避免硬编码不同步
+    val versionName = remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+        }.getOrDefault("?")
+    }
 
     Box(Modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(Modifier.fillMaxSize().padding(20.dp)) {
@@ -69,8 +77,8 @@ fun SettingsMenuScreen(onClose: () -> Unit, onOpenLlmSettings: () -> Unit) {
             MenuRow(emoji = "📊", title = "预算管理", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "🔔", title = "智能提醒", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "📁", title = "数据导出", subtitle = "即将上线", onClick = { /* TODO */ })
-            MenuRow(emoji = "ℹ️", title = "关于记账助手", subtitle = "v1.0 · ChatGPT 风格 · 本地 SQLite", onClick = {
-                scope.launch { snackbarHost.showSnackbar("记账助手 v1.0 — 对话式智能记账") }
+            MenuRow(emoji = "ℹ️", title = "关于记账助手", subtitle = "v$versionName · ChatGPT 风格 · 本地 SQLite", onClick = {
+                scope.launch { snackbarHost.showSnackbar("记账助手 v$versionName — 对话式智能记账") }
             })
 
             Spacer(Modifier.weight(1f))

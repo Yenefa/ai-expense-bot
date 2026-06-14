@@ -1,5 +1,6 @@
 package com.expense.tracker.ui.template
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -8,6 +9,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +27,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -63,6 +69,7 @@ fun CategoryBubbleDialog(
     visible: Boolean,
     category: Category?,
     onDismiss: () -> Unit,
+    onSwitchCategory: (String) -> Unit = {},
     onSubmit: (amount: Double, note: String) -> Unit,
 ) {
     // 关键：缓存最后一次非空 category，避免退出动画期间 category=null 导致 !! 崩溃
@@ -111,11 +118,40 @@ fun CategoryBubbleDialog(
                     )
                     .padding(24.dp),
             ) {
-                BubbleContent(
-                    category = displayCategory,
-                    onCancel = onDismiss,
-                    onSubmit = onSubmit,
-                )
+                // 切换分类时，emoji + 名字部分做 crossfade + 轻微滑动；备注/金额输入保持稳定
+                AnimatedContent(
+                    targetState = displayCategory,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(220)) +
+                            slideInHorizontally(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                                initialOffsetX = { it / 6 },
+                            ) +
+                            scaleIn(
+                                animationSpec = tween(220),
+                                initialScale = 0.85f,
+                            )
+                        ) togetherWith (
+                            fadeOut(animationSpec = tween(160)) +
+                                slideOutHorizontally(
+                                    animationSpec = tween(180),
+                                    targetOffsetX = { -it / 6 },
+                                ) +
+                                scaleOut(animationSpec = tween(160), targetScale = 0.92f)
+                        )
+                    },
+                    label = "category-switch",
+                ) { animatedCategory ->
+                    BubbleContent(
+                        category = animatedCategory,
+                        onCancel = onDismiss,
+                        onSwitchCategory = onSwitchCategory,
+                        onSubmit = onSubmit,
+                    )
+                }
             }
         }
     }
@@ -125,6 +161,7 @@ fun CategoryBubbleDialog(
 private fun BubbleContent(
     category: Category,
     onCancel: () -> Unit,
+    onSwitchCategory: (String) -> Unit,
     onSubmit: (amount: Double, note: String) -> Unit,
 ) {
     var note by remember(category.id) { mutableStateOf("") }
@@ -144,7 +181,33 @@ private fun BubbleContent(
             color = AppColors.TextPrimary,
             fontSize = 22.sp,
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(14.dp))
+
+        // 迷你分类切换条 — 点击其他分类，触发 AnimatedContent crossfade
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(
+                items = Category.ALL,
+                key = { it.id },
+            ) { c ->
+                val selected = c.id == category.id
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (selected) AppColors.TextPrimary else AppColors.ChipFill)
+                        .clickable { if (!selected) onSwitchCategory(c.id) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        text = c.emoji,
+                        fontSize = 16.sp,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
 
         // 备注输入框
         Box(
