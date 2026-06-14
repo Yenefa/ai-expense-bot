@@ -1,11 +1,14 @@
 package com.expense.tracker.ui.chat
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -37,23 +40,40 @@ fun ChatScreen(
             MessageList(messages = state.messages, modifier = Modifier.weight(1f))
             AnimatedVisibility(
                 visible = !state.llmEnabled,
-                enter = fadeIn(animationSpec = tween(250)) +
+                enter = fadeIn(animationSpec = tween(350)) +
                         expandVertically(
-                            animationSpec = tween(300, easing = FastOutSlowInEasing),
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
                             expandFrom = Alignment.Top,
                         ) +
                         slideInVertically(
-                            animationSpec = tween(300, easing = FastOutSlowInEasing),
-                            initialOffsetY = { -it / 3 },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
+                            initialOffsetY = { -it / 4 },
+                        ) +
+                        scaleIn(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
+                            initialScale = 0.92f,
                         ),
                 exit = fadeOut(animationSpec = tween(200)) +
                         shrinkVertically(
-                            animationSpec = tween(250, easing = FastOutSlowInEasing),
+                            animationSpec = tween(250),
                             shrinkTowards = Alignment.Top,
                         ) +
                         slideOutVertically(
-                            animationSpec = tween(250, easing = FastOutSlowInEasing),
-                            targetOffsetY = { -it / 3 },
+                            animationSpec = tween(250),
+                            targetOffsetY = { -it / 4 },
+                        ) +
+                        scaleOut(
+                            animationSpec = tween(200),
+                            targetScale = 0.95f,
                         ),
             ) {
                 TemplateCard(
