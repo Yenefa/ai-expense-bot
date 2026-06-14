@@ -9,6 +9,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,7 +82,11 @@ fun CategoryBubbleDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.35f))
-                .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) },
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    onClick = onDismiss,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             // 阻止气泡内部点击穿透到遮罩
@@ -90,7 +96,11 @@ fun CategoryBubbleDialog(
                     .softShadow(elevation = 12.dp, cornerRadius = 24.dp, spotAlpha = 0.18f)
                     .clip(RoundedCornerShape(24.dp))
                     .background(AppColors.Bg)
-                    .pointerInput(Unit) { detectTapGestures(onTap = { /* swallow */ }) }
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        onClick = { /* swallow — 阻止冒泡到遮罩 */ },
+                    )
                     .padding(24.dp),
             ) {
                 BubbleContent(
@@ -208,15 +218,25 @@ private fun BubbleContent(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-        // 取消文字按钮
+        Spacer(Modifier.height(14.dp))
+        // 取消按钮：1px 灰色边框 + 圆角 + clickable（更高级 + 可靠）
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .pointerInput(onCancel) { detectTapGestures(onTap = { onCancel() }) }
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .clip(RoundedCornerShape(14.dp))
+                .border(
+                    width = 1.dp,
+                    color = AppColors.TextSecondary.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(14.dp),
+                )
+                .clickable { onCancel() }
+                .padding(horizontal = 28.dp, vertical = 10.dp),
         ) {
-            Text("取消", color = AppColors.TextMuted, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "取消",
+                color = AppColors.TextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
         }
     }
 }

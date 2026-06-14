@@ -1,5 +1,6 @@
 package com.expense.tracker.ui.chat
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -41,6 +42,11 @@ fun ChatScreen(
     val state by vm.uiState.collectAsState()
     // 双击分类弹气泡的状态：null = 不显示
     var bubbleCategoryId by remember { mutableStateOf<String?>(null) }
+
+    // 气泡打开时拦截系统返回键，只关气泡，绝不退出 App
+    BackHandler(enabled = bubbleCategoryId != null) {
+        bubbleCategoryId = null
+    }
 
     Box(modifier = modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(Modifier.fillMaxSize()) {
