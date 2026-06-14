@@ -3,26 +3,37 @@ package com.expense.tracker
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import com.expense.tracker.ui.theme.AppColors
+import androidx.activity.viewModels
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.expense.tracker.data.prefs.UserPrefsSnapshot
+import com.expense.tracker.ui.chat.ChatScreen
+import com.expense.tracker.ui.chat.ChatViewModel
+import com.expense.tracker.ui.chat.LlmResult
 import com.expense.tracker.ui.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val chatVm: ChatViewModel by viewModels {
+        val container = (application as ExpenseApp).container
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = ChatViewModel(
+                expenseRepo = container.expenseRepo,
+                chatRepo = container.chatRepo,
+                userPrefs = container.userPrefs,
+                llmHandler = { _: String, _: UserPrefsSnapshot ->
+                    LlmResult.Error("LLM 客户端尚未接入，请关闭 🧠 用模板模式")
+                },
+            ) as T
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             AppTheme {
-                Box(
-                    Modifier.fillMaxSize().background(AppColors.Bg),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("记账助手 — 骨架就绪")
-                }
+                ChatScreen(vm = chatVm, onOpenAnalytics = { /* Part 3 实现 */ })
             }
         }
     }
