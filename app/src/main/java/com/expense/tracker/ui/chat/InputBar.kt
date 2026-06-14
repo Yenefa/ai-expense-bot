@@ -63,18 +63,27 @@ fun InputBar(
             Icon(Icons.Outlined.Add, contentDescription = "新增", tint = AppColors.TextPrimary)
         }
         Box(modifier = Modifier.weight(1f)) {
-            BasicTextField(
-                value = text,
-                onValueChange = { text = it },
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = AppColors.TextPrimary,
-                    fontSize = MaterialTheme.typography.bodyLarge.fontSize,
-                ),
-                cursorBrush = SolidColor(AppColors.TextPrimary),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (text.isEmpty()) {
+            if (llmEnabled) {
+                BasicTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = AppColors.TextPrimary,
+                        fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                    ),
+                    cursorBrush = SolidColor(AppColors.TextPrimary),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (text.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        color = AppColors.TextMuted,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            } else {
+                // 关闭思考模式时禁用输入：占位文本 + 不响应点击 + 不显示光标
                 Text(
                     text = placeholder,
                     color = AppColors.TextMuted,
@@ -87,10 +96,10 @@ fun InputBar(
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
-                .background(AppColors.Accent)
-                .pointerInput(text) {
+                .background(if (llmEnabled) AppColors.Accent else AppColors.Accent.copy(alpha = 0.35f))
+                .pointerInput(text, llmEnabled) {
                     detectTapGestures(onTap = {
-                        if (text.isNotBlank()) {
+                        if (llmEnabled && text.isNotBlank()) {
                             onSend(text); text = ""
                         }
                     })

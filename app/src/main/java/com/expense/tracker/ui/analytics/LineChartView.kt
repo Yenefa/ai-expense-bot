@@ -26,11 +26,26 @@ fun LineChartView(counts: List<Int>, xLabels: List<String>, modifier: Modifier =
     val xFormatter = AxisValueFormatter<AxisPosition.Horizontal.Bottom> { x, _ ->
         xLabels.getOrNull(x.toInt()) ?: ""
     }
+    // 消费次数永远是整数（1, 2, 3 ...）—— 把小数部分截掉
+    val yFormatter = AxisValueFormatter<AxisPosition.Vertical.Start> { y, _ ->
+        y.toInt().toString()
+    }
+    // 最大值决定 Y 轴密度：少时一格一格，多时按比例稀疏
+    val maxCount = counts.maxOrNull() ?: 0
+    val yItemCount = when {
+        maxCount <= 0 -> 2
+        maxCount <= 5 -> maxCount + 1   // 0..maxCount 每个整数一条
+        maxCount <= 10 -> 6
+        else -> 5
+    }
     Chart(
         modifier = modifier.fillMaxWidth().height(220.dp),
         chart = lineChart(),
         chartModelProducer = producer,
-        startAxis = rememberStartAxis(),
+        startAxis = rememberStartAxis(
+            valueFormatter = yFormatter,
+            itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = yItemCount),
+        ),
         bottomAxis = rememberBottomAxis(
             valueFormatter = xFormatter,
             itemPlacer = AxisItemPlacer.Horizontal.default(spacing = if (xLabels.size > 12) 5 else 1),

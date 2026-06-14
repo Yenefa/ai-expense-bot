@@ -21,6 +21,7 @@ fun TemplateCard(
     selectedCategoryId: String,
     onSelectCategory: (String) -> Unit,
     onSubmit: (Double) -> Unit,
+    onDoubleClickCategory: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -29,7 +30,7 @@ fun TemplateCard(
             .padding(horizontal = 18.dp, vertical = 4.dp),
     ) {
         Text(
-            text = "选择分类，然后输入金额",
+            text = "选择分类，然后输入金额（双击分类可填写备注）",
             color = AppColors.TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -43,6 +44,7 @@ fun TemplateCard(
                     category = c,
                     selected = c.id == selectedCategoryId,
                     onClick = { onSelectCategory(c.id) },
+                    onDoubleClick = { onDoubleClickCategory(c.id) },
                 )
             }
         }

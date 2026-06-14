@@ -22,6 +22,7 @@ fun CategoryChip(
     category: Category,
     selected: Boolean,
     onClick: () -> Unit,
+    onDoubleClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val bg = if (selected) AppColors.TextPrimary else AppColors.Bg
@@ -31,7 +32,12 @@ fun CategoryChip(
         modifier = mod
             .clip(RoundedCornerShape(18.dp))
             .background(bg)
-            .pointerInput(onClick) { detectTapGestures(onTap = { onClick() }) }
+            .pointerInput(onClick, onDoubleClick) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onDoubleTap = { onDoubleClick() },
+                )
+            }
             .padding(horizontal = 14.dp, vertical = 7.dp),
     ) {
         Text(

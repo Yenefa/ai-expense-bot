@@ -19,9 +19,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.expense.tracker.data.model.Category
 import com.expense.tracker.ui.dock.InteractiveDock
+import com.expense.tracker.ui.template.CategoryBubbleDialog
 import com.expense.tracker.ui.template.TemplateCard
 import com.expense.tracker.ui.theme.AppColors
 
@@ -34,6 +39,9 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by vm.uiState.collectAsState()
+    // 双击分类弹气泡的状态：null = 不显示
+    var bubbleCategoryId by remember { mutableStateOf<String?>(null) }
+
     Box(modifier = modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(Modifier.fillMaxSize()) {
             TopBar()
@@ -80,6 +88,10 @@ fun ChatScreen(
                     selectedCategoryId = state.selectedCategoryId,
                     onSelectCategory = vm::selectCategory,
                     onSubmit = vm::submitTemplate,
+                    onDoubleClickCategory = { id ->
+                        vm.selectCategory(id)
+                        bubbleCategoryId = id
+                    },
                 )
             }
             InputBar(
@@ -95,5 +107,16 @@ fun ChatScreen(
                 onSettings = onOpenSettings,
             )
         }
+
+        // 气泡 Dialog 浮在最上层（fillMaxSize 内的 Box 顶层）
+        CategoryBubbleDialog(
+            visible = bubbleCategoryId != null,
+            category = bubbleCategoryId?.let { Category.byId(it) },
+            onDismiss = { bubbleCategoryId = null },
+            onSubmit = { amount, note ->
+                vm.submitTemplate(amount, note)
+                bubbleCategoryId = null
+            },
+        )
     }
 }

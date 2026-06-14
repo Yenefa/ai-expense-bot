@@ -33,7 +33,7 @@ data class HistoryUiState(
     val groups: List<DailyGroup> = emptyList(),
 )
 
-class HistoryViewModel(repo: ExpenseRepository) : ViewModel() {
+class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
 
     private val internal = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = internal.asStateFlow()
@@ -46,6 +46,10 @@ class HistoryViewModel(repo: ExpenseRepository) : ViewModel() {
         viewModelScope.launch {
             repo.observeAll().collect { list -> internal.update { aggregate(list) } }
         }
+    }
+
+    fun deleteExpense(id: Long) {
+        viewModelScope.launch { repo.delete(id) }
     }
 
     private fun aggregate(list: List<ExpenseEntity>): HistoryUiState {

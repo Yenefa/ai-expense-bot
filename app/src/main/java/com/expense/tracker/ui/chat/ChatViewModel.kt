@@ -53,20 +53,22 @@ class ChatViewModel(
     }
 
     /** 关闭 LLM 时的快速记账。 */
-    fun submitTemplate(amount: Double) {
+    fun submitTemplate(amount: Double, note: String = "") {
         if (amount <= 0.0) return
         val cat = Category.byIdOrOther(internal.value.selectedCategoryId)
+        val trimmedNote = note.trim()
         viewModelScope.launch {
             internal.update { it.copy(sending = true) }
-            chatRepo.appendUser("[模板] ${cat.emoji} ${cat.displayName} ¥${"%.2f".format(amount)}")
+            val noteSuffix = if (trimmedNote.isNotEmpty()) " · $trimmedNote" else ""
+            chatRepo.appendUser("[模板] ${cat.emoji} ${cat.displayName} ¥${"%.2f".format(amount)}$noteSuffix")
             val expenseId = expenseRepo.add(
                 amount = amount,
                 categoryId = cat.id,
-                note = "",
+                note = trimmedNote,
                 occurredAt = System.currentTimeMillis(),
             )
             chatRepo.appendAssistant(
-                text = "✅ 已记录 · ${cat.emoji} ${cat.displayName} ¥${"%.2f".format(amount)}",
+                text = "✅ 已记录 · ${cat.emoji} ${cat.displayName} ¥${"%.2f".format(amount)}$noteSuffix",
                 relatedExpenseId = expenseId,
             )
             internal.update { it.copy(sending = false) }
