@@ -357,17 +357,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.prefs.UserPrefs
+import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.data.repo.ChatRepository
 import com.expense.tracker.data.repo.ExpenseRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** LLM 调用接口 — 输入用户文本 + 当前 prefs，返回助手要展示的文本。Part 3 任务再实现真实版本。 */
-typealias LlmHandler = suspend (text: String, prefs: com.expense.tracker.data.prefs.UserPrefsSnapshot) -> LlmResult
+typealias LlmHandler = suspend (text: String, prefs: UserPrefsSnapshot) -> LlmResult
 
 sealed interface LlmResult {
     data class Ok(val replyText: String, val expenseId: Long?) : LlmResult
@@ -431,9 +433,7 @@ class ChatViewModel(
         viewModelScope.launch {
             internal.update { it.copy(sending = true) }
             chatRepo.appendUser(trimmed)
-            val prefs = userPrefs.snapshot.let { f ->
-                kotlinx.coroutines.flow.first(f)
-            }
+            val prefs = userPrefs.snapshot.first()
             val result = runCatching { llmHandler(trimmed, prefs) }
                 .getOrElse { LlmResult.Error("调用失败：${it.message ?: "未知错误"}") }
             when (result) {
@@ -444,53 +444,7 @@ class ChatViewModel(
         }
     }
 }
-
-private suspend fun <T> kotlinx.coroutines.flow.first(flow: kotlinx.coroutines.flow.Flow<T>): T =
-    kotlinx.coroutines.flow.first(flow)
 ```
-
-> 修正：用标准库 `first()`：
-
-替换文件末尾两行：
-
-```kotlin
-// 删除最后那个手写 first 工具
-```
-
-并把 `submitFreeText` 中 `userPrefs.snapshot.let { f -> kotlinx.coroutines.flow.first(f) }` 替换为：
-
-```kotlin
-            val prefs = kotlinx.coroutines.flow.first(userPrefs.snapshot)
-```
-
-最终 `ChatViewModel.kt` 的 `submitFreeText` 应是：
-
-```kotlin
-    fun submitFreeText(text: String) {
-        val trimmed = text.trim()
-        if (trimmed.isEmpty()) return
-        viewModelScope.launch {
-            internal.update { it.copy(sending = true) }
-            chatRepo.appendUser(trimmed)
-            val prefs = kotlinx.coroutines.flow.first(userPrefs.snapshot)
-            val result = runCatching { llmHandler(trimmed, prefs) }
-                .getOrElse { LlmResult.Error("调用失败：${it.message ?: "未知错误"}") }
-            when (result) {
-                is LlmResult.Ok -> chatRepo.appendAssistant(result.replyText, relatedExpenseId = result.expenseId)
-                is LlmResult.Error -> chatRepo.appendAssistant("⚠️ ${result.message}")
-            }
-            internal.update { it.copy(sending = false) }
-        }
-    }
-```
-
-并在文件顶部 import：
-
-```kotlin
-import kotlinx.coroutines.flow.first
-```
-
-然后把 `submitFreeText` 中那行简化成 `val prefs = userPrefs.snapshot.first()`，移除 `kotlinx.coroutines.flow.first(...)` 写法。
 
 - [ ] **Step 5: 跑测试确认通过**
 
@@ -828,6 +782,8 @@ git commit -m "feat(ui): liquid-glass toggle button (alpha+shadow only, no metap
 package com.expense.tracker.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -835,10 +791,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material3.BasicTextFieldDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -847,13 +803,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -887,7 +841,8 @@ fun InputBar(
             .pointerInput(onPlusClick) { detectTapGestures(onTap = { onPlusClick() }) }) {
             Icon(Icons.Outlined.Add, contentDescription = "新增", tint = AppColors.TextPrimary)
         }
-        Box(Modifier.weight(1f)) {
+        // 这里使用 RowScope 的 weight 扩展（this 是 RowScope）
+        Box(modifier = Modifier.weight(1f)) {
             BasicTextField(
                 value = text,
                 onValueChange = { text = it },
@@ -896,7 +851,7 @@ fun InputBar(
                     color = AppColors.TextPrimary,
                     fontSize = MaterialTheme.typography.bodyLarge.fontSize,
                 ),
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(AppColors.TextPrimary),
+                cursorBrush = SolidColor(AppColors.TextPrimary),
                 modifier = Modifier.fillMaxWidth(),
             )
             if (text.isEmpty()) {
@@ -923,44 +878,9 @@ fun InputBar(
         }
     }
 }
-
-private fun Modifier.weight(f: Float): Modifier = this.then(
-    androidx.compose.foundation.layout.weight(f, fill = true)
-)
 ```
 
-> **修正：** 不要自己写 `Modifier.weight`，那是 RowScope 的扩展。把 `Box(Modifier.weight(1f))` 改为：
-
-```kotlin
-        androidx.compose.foundation.layout.Row(modifier = Modifier.weight(1f)) {
-            // BasicTextField + placeholder
-        }
-```
-
-完整修正版的 InputBar 中间块（替换 `Box(Modifier.weight(1f)) { ... }` 整段）：
-
-```kotlin
-        androidx.compose.foundation.layout.Box(modifier = Modifier
-            .androidx.compose.foundation.layout.weight(1f, fill = true)) {
-            BasicTextField(
-                value = text,
-                onValueChange = { text = it },
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = AppColors.TextPrimary,
-                    fontSize = MaterialTheme.typography.bodyLarge.fontSize,
-                ),
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(AppColors.TextPrimary),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (text.isEmpty()) {
-                Text(text = placeholder, color = AppColors.TextMuted,
-                    style = MaterialTheme.typography.bodyLarge)
-            }
-        }
-```
-
-并删除文件末尾的 `private fun Modifier.weight(...)` 函数（用 RowScope 内置的）。
+> 注意：`Modifier.weight(1f)` 必须在 `Row { ... }` 块内调用（this 是 RowScope），上面的代码已经在 Row 里所以正确。
 
 - [ ] **Step 2: 编译**
 
