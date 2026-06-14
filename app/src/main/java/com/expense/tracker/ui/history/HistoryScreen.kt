@@ -168,8 +168,9 @@ private fun ExpenseRow(item: DisplayExpense) {
  *
  * 设计：
  * - 红色背景与前景内容大小完全一致（用 matchParentSize），不会比记录大
- * - 向左拖动灵敏度 ×2（dx * 2），手指轻轻一划就能打开
- * - 揭开宽度 = 整条记录宽度的一半（揭开后能看清"删除"按钮，又不会全盖）
+ * - 向左拖动灵敏度 ×2，手指轻轻一划就能打开
+ * - 揭开宽度 = 屏幕的 1/3（适中，不会盖太多记录）
+ * - 双向跟手：揭开后向右拖能滑回去关闭
  */
 @Composable
 private fun SwipeToDeleteRow(
@@ -178,10 +179,10 @@ private fun SwipeToDeleteRow(
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
-    // 揭开时露出的红色区域宽度 — 一半的屏幕宽度比 72dp 自然
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val rowFullWidthDp = configuration.screenWidthDp.dp - 32.dp  // 减去日卡片左右 padding
-    val deleteWidthDp = rowFullWidthDp / 2
+    // 揭开宽度 = 行宽的 1/3（v1.7 是 1/2，缩小 1/3 → ×2/3）
+    val deleteWidthDp = rowFullWidthDp / 3
     val deleteWidthPx = with(density) { deleteWidthDp.toPx() }
 
     var offsetTarget by remember(key) { mutableStateOf(0.dp) }
@@ -249,7 +250,12 @@ private fun SwipeToDeleteRow(
                     .offset(x = animatedOffset)
                     .background(AppColors.Bg)  // 不透明背景，遮住下方红色
                     .pointerInput(key) {
+                        // 记录拖动起始 offset，用于判断"已揭开 → 向右拖"
+                        var dragStartOffsetPx = 0f
                         detectHorizontalDragGestures(
+                            onDragStart = {
+                                dragStartOffsetPx = with(density) { animatedOffset.toPx() }
+                            },
                             onHorizontalDrag = { _, dx ->
                                 // 灵敏度 ×2 — 同样手势距离，offset 翻倍
                                 val newPx = (with(density) { animatedOffset.toPx() } + dx * 2f)
@@ -257,10 +263,17 @@ private fun SwipeToDeleteRow(
                                 offsetTarget = with(density) { newPx.toDp() }
                             },
                             onDragEnd = {
-                                offsetTarget = if (with(density) { offsetTarget.toPx() } < -deleteWidthPx / 3) {
-                                    -deleteWidthDp
-                                } else {
-                                    0.dp
+                                val curPx = with(density) { offsetTarget.toPx() }
+                                val wasOpen = dragStartOffsetPx <= -deleteWidthPx * 0.9f
+                                offsetTarget = when {
+                                    // 已揭开状态下向右拖任意距离 → 直接关闭
+                                    wasOpen && curPx > dragStartOffsetPx + 8f -> 0.dp
+                                    // 未揭开状态下，超过 1/3 阈值 → 打开
+                                    !wasOpen && curPx < -deleteWidthPx / 3 -> -deleteWidthDp
+                                    // 已揭开但用户没拖动太多 → 保持打开
+                                    wasOpen -> -deleteWidthDp
+                                    // 其他情况 → 关闭
+                                    else -> 0.dp
                                 }
                             },
                             onDragCancel = { offsetTarget = 0.dp },
