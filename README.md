@@ -9,6 +9,14 @@
 - **通用对话**：闲聊、提问都支持，AI 只提取有用的支出信息
 - **模板模式**：关闭 AI 后，选分类标签 + 输入金额，秒记账
 
+### 🛠 智能操作（v1.2 新增）
+- **删 / 改 / 查** 三种新能力：用自然语言操作已有支出
+  - 「删掉昨天那笔咖啡」→ 弹卡片让你勾选 + 确认才真删
+  - 「午饭那笔搞错了，应该是 40」→ 卡片预览修改 → 确认
+  - 「我本月吃饭花了多少」→ 直接给聚合数字
+- **确认卡片护栏**：所有破坏性操作必须用户在卡片上点确认才执行，LLM 提议 ≠ 自动执行
+- **设计文档**：[docs/ark/llm-actions.md](docs/ark/llm-actions.md)
+
 ### 📊 支出分析
 - **周/月/年** 三周期切换
 - **柱形图**：每日/每月/每月金额
@@ -82,7 +90,7 @@ app/src/main/java/com/expense/tracker/
 ├── AppContainer.kt          # 手动 DI 容器
 ├── ui/
 │   ├── theme/               # 配色 / 字体 / 投影
-│   ├── chat/                # 对话页 (ChatScreen, ChatViewModel, InputBar, MessageBubble...)
+│   ├── chat/                # 对话页 (ChatScreen, ChatViewModel, ActionCard, MessageBubble...)
 │   ├── dock/                # InteractiveDock + 弹簧动画
 │   ├── template/            # 模板模式 (CategoryChip, AmountInput)
 │   ├── liquidglass/         # 🧠 液态玻璃按钮
@@ -90,12 +98,17 @@ app/src/main/java/com/expense/tracker/
 │   ├── history/             # 历史明细
 │   └── settings/            # 设置菜单 + LLM 配置
 ├── data/
+│   ├── action/              # PendingAction + Resolver（v1.2 LLM 操作流）
 │   ├── db/                  # Room 实体 + DAO + Database
 │   ├── prefs/               # DataStore 用户偏好
 │   ├── repo/                # ExpenseRepository / ChatRepository
 │   └── model/               # Category / Period
-├── llm/                     # OpenAI 兼容客户端 + Prompt + 解析器
+├── llm/                     # OpenAI 兼容客户端 + Prompt + 解析器 + ActionDto
 └── util/                    # TimeRanges 时间区间计算
+
+docs/
+├── ark/                     # 架构与设计决策的"地标文档"（v1.2 起）
+└── superpowers/             # 早期 plan / spec
 ```
 
 ---
@@ -104,6 +117,7 @@ app/src/main/java/com/expense/tracker/
 
 - **v1.0** (2026-06-15) — 首次发布：对话式记账、支出分析、Interactive Dock、LLM 接入
 - **v1.1** (2026-06-15) — 通用 LLM 对话、智核分析、历史明细、设置菜单、Dock 精简、系统返回键
+- **v1.2** (2026-06-15) — **LLM 智能操作**：删 / 改 / 查支出 + 确认卡片护栏；测试覆盖 31 → 50 ([docs/ark/llm-actions.md](docs/ark/llm-actions.md))
 
 ---
 

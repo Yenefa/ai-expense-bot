@@ -2,6 +2,7 @@ package com.expense.tracker.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expense.tracker.data.action.PendingAction
 import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.prefs.UserPrefs
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
@@ -20,7 +21,12 @@ import kotlinx.coroutines.launch
 typealias LlmHandler = suspend (text: String, prefs: UserPrefsSnapshot) -> LlmResult
 
 sealed interface LlmResult {
-    data class Ok(val replyText: String, val expenseId: Long?) : LlmResult
+    data class Ok(
+        val replyText: String,
+        val expenseId: Long?,
+        /** LLM 提议、已 resolve 成候选行的操作卡片。空数组表示无操作。 */
+        val pendingActions: List<PendingAction> = emptyList(),
+    ) : LlmResult
     data class Error(val message: String) : LlmResult
 }
 
@@ -103,6 +109,11 @@ class ChatViewModel(
                     // 先清流式状态，再写 DB；这样 DB 推回的正式 bubble 替换流式占位时不会重影
                     internal.update { it.copy(streamingText = null) }
                     chatRepo.appendAssistant(result.replyText, relatedExpenseId = result.expenseId)
+                    if (result.pendingActions.isNotEmpty()) {
+                        internal.update {
+                            it.copy(pendingActions = it.pendingActions + result.pendingActions)
+                        }
+                    }
                 }
                 is LlmResult.Error -> {
                     val errText = "⚠️ ${result.message}"
@@ -113,6 +124,56 @@ class ChatViewModel(
             }
             internal.update { it.copy(sending = false) }
         }
+    }
+
+    /** 用户在 ActionCard 上点确认 - 删除卡片：批量删 selectedIds，写一条助手气泡，移除卡片。 */
+    fun confirmDelete(actionId: String, selectedIds: Set<Long>) {
+        if (selectedIds.isEmpty()) return
+        val card = internal.value.pendingActions.firstOrNull { it.id == actionId } as? PendingAction.Delete ?: return
+        val rows = card.candidates.filter { it.id in selectedIds }
+        if (rows.isEmpty()) return
+        viewModelScope.launch {
+            rows.forEach { expenseRepo.delete(it.id) }
+            val summary = rows.joinToString(separator = "、") { row ->
+                val cat = Category.byIdOrOther(row.categoryId)
+                "${cat.emoji}${cat.displayName} ¥${"%.2f".format(row.amount)}"
+            }
+            chatRepo.appendAssistant("✅ 已删除 ${rows.size} 笔：$summary")
+            removeAction(actionId)
+        }
+    }
+
+    /** 用户在 ActionCard 上点确认 - 修改卡片：对 selectedIds 批量 patch，写一条助手气泡，移除卡片。 */
+    fun confirmUpdate(actionId: String, selectedIds: Set<Long>) {
+        if (selectedIds.isEmpty()) return
+        val card = internal.value.pendingActions.firstOrNull { it.id == actionId } as? PendingAction.Update ?: return
+        val rows = card.candidates.filter { it.id in selectedIds }
+        if (rows.isEmpty()) return
+        viewModelScope.launch {
+            rows.forEach { row ->
+                expenseRepo.patch(
+                    id = row.id,
+                    amount = card.patchAmount,
+                    categoryId = card.patchCategoryId,
+                    note = card.patchNote,
+                )
+            }
+            val parts = mutableListOf<String>()
+            card.patchAmount?.let { parts += "金额→¥${"%.2f".format(it)}" }
+            card.patchCategoryId?.let { Category.byId(it)?.let { c -> parts += "分类→${c.emoji}${c.displayName}" } }
+            card.patchNote?.let { parts += "备注→$it" }
+            chatRepo.appendAssistant("✅ 已修改 ${rows.size} 笔：${parts.joinToString("，")}")
+            removeAction(actionId)
+        }
+    }
+
+    /** 用户取消卡片（包括 Empty / QueryResult 看完后的"知道了"）。 */
+    fun dismissAction(actionId: String) {
+        removeAction(actionId)
+    }
+
+    private fun removeAction(actionId: String) {
+        internal.update { st -> st.copy(pendingActions = st.pendingActions.filterNot { it.id == actionId }) }
     }
 
     /**

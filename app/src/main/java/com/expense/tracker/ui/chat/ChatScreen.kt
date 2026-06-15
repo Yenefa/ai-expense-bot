@@ -55,6 +55,10 @@ fun ChatScreen(
                 messages = state.messages,
                 thinking = state.thinking,
                 streamingText = state.streamingText,
+                pendingActions = state.pendingActions,
+                onConfirmDelete = vm::confirmDelete,
+                onConfirmUpdate = vm::confirmUpdate,
+                onDismissAction = vm::dismissAction,
                 modifier = Modifier.weight(1f),
             )
             AnimatedVisibility(

@@ -26,6 +26,11 @@ private class FakeExpenseDao : ExpenseDao {
     override suspend fun deleteById(id: Long) {
         state.value = state.value.filterNot { it.id == id }
     }
+    // 新增 — RepositoryTest 不直接调，但接口扩了得实现
+    override suspend fun findByMatch(
+        category: String?, amount: Double?, from: Long?, to: Long?, noteSub: String?,
+    ): List<ExpenseEntity> = emptyList()
+    override suspend fun patchById(id: Long, amount: Double?, cat: String?, note: String?) { }
 }
 
 private class FakeChatDao : ChatMessageDao {

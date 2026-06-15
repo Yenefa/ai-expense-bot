@@ -23,4 +23,17 @@ class ExpenseRepository(private val dao: ExpenseDao) {
     }
 
     suspend fun delete(id: Long) = dao.deleteById(id)
+
+    /** LLM action delete/update/query 用：按 match 条件查候选。详见 [ExpenseDao.findByMatch]。 */
+    suspend fun findByMatch(
+        category: String?,
+        amount: Double?,
+        from: Long?,
+        to: Long?,
+        noteSub: String?,
+    ): List<ExpenseEntity> = dao.findByMatch(category, amount, from, to, noteSub)
+
+    /** LLM action update 用：局部 patch 字段。null 表示不改。 */
+    suspend fun patch(id: Long, amount: Double?, categoryId: String?, note: String?) =
+        dao.patchById(id, amount, categoryId, note)
 }

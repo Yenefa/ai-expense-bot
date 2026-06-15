@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.unit.dp
+import com.expense.tracker.data.action.PendingAction
 import com.expense.tracker.data.db.ChatMessageEntity
 import com.expense.tracker.ui.theme.AppColors
 
@@ -37,12 +38,18 @@ fun MessageList(
     messages: List<ChatMessageEntity>,
     thinking: Boolean = false,
     streamingText: String? = null,
+    pendingActions: List<PendingAction> = emptyList(),
+    onConfirmDelete: (String, Set<Long>) -> Unit = { _, _ -> },
+    onConfirmUpdate: (String, Set<Long>) -> Unit = { _, _ -> },
+    onDismissAction: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
-    // 当消息数变化、思考态变化、流式字符增长时，自动滚到最底
-    LaunchedEffect(messages.size, thinking, streamingText?.length) {
-        val totalItems = messages.size + (if (thinking || streamingText != null) 1 else 0)
+    // 当消息数变化、思考态变化、流式字符增长、卡片变化时，自动滚到最底
+    LaunchedEffect(messages.size, thinking, streamingText?.length, pendingActions.size) {
+        val totalItems = messages.size +
+            (if (thinking || streamingText != null) 1 else 0) +
+            pendingActions.size
         if (totalItems > 0) listState.animateScrollToItem(totalItems - 1)
     }
     LazyColumn(
@@ -63,6 +70,15 @@ fun MessageList(
             item(key = "thinking") {
                 ThinkingIndicator()
             }
+        }
+        // 操作卡片 — 永远在最下方，确认/取消才会消失
+        items(items = pendingActions, key = { "action-${it.id}" }) { action ->
+            ActionCard(
+                action = action,
+                onConfirmDelete = onConfirmDelete,
+                onConfirmUpdate = onConfirmUpdate,
+                onDismiss = onDismissAction,
+            )
         }
     }
 }

@@ -24,6 +24,11 @@ data class ChatCompletionResponse(val choices: List<Choice>)
 data class LlmExpensesPayload(
     val reply: String = "",
     val expenses: List<LlmExpenseItem> = emptyList(),
+    /**
+     * LLM 提议的"操作"（删除/修改/查询）。空数组表示无操作，老协议兼容。
+     * 详见 [LlmAction]。每个 action 会被解析成一张 ActionCard 让用户在 UI 上确认。
+     */
+    val actions: List<LlmAction> = emptyList(),
 )
 
 @Serializable

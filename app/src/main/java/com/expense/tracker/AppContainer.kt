@@ -1,6 +1,7 @@
 package com.expense.tracker
 
 import android.content.Context
+import com.expense.tracker.data.action.PendingActionResolver
 import com.expense.tracker.data.db.AppDatabase
 import com.expense.tracker.data.prefs.UserPrefs
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
@@ -18,8 +19,14 @@ class AppContainer(context: Context) {
     val expenseRepo: ExpenseRepository by lazy { ExpenseRepository(db.expenseDao()) }
     val chatRepo: ChatRepository by lazy { ChatRepository(db.chatDao()) }
     val llmClient: LlmClient by lazy { LlmClient() }
+    val pendingActionResolver: PendingActionResolver by lazy { PendingActionResolver(expenseRepo) }
 
-    /** 对话 LLM：返回 reply（始终展示）+ 写库（如有支出）。 */
+    /**
+     * 对话 LLM：返回 reply（始终展示）+ 写新增支出 + 把"删/改/查"提议解析成待确认卡片。
+     *
+     * 注意 actions 不会立刻写库；UI 拿到 [LlmResult.Ok.pendingActions] 后会渲染 ActionCard，
+     * 用户点确认才会触发 [com.expense.tracker.ui.chat.ChatViewModel.confirmDelete] / confirmUpdate。
+     */
     val llmHandler: suspend (String, UserPrefsSnapshot) -> LlmResult = { text, prefs ->
         runCatching {
             val raw = llmClient.chatJson(
@@ -39,9 +46,11 @@ class AppContainer(context: Context) {
                     occurredAt = item.occurredAtMillis ?: now,
                 )
             }
+            val pending = result.actions.mapNotNull { pendingActionResolver.resolve(it) }
             LlmResult.Ok(
                 replyText = result.reply,
                 expenseId = ids.firstOrNull(),
+                pendingActions = pending,
             )
         }.getOrElse { LlmResult.Error(it.message ?: "未知错误") }
     }

@@ -1,5 +1,6 @@
 package com.expense.tracker.ui.chat
 
+import com.expense.tracker.data.action.PendingAction
 import com.expense.tracker.data.db.ChatMessageEntity
 
 data class ChatUiState(
@@ -11,4 +12,6 @@ data class ChatUiState(
     val thinking: Boolean = false,
     /** LLM 回复正在被逐字"打字"展示；非空时 UI 显示一个临时 assistant 气泡。 */
     val streamingText: String? = null,
+    /** LLM 提议、待用户在卡片上确认/取消的操作。详见 [PendingAction]。 */
+    val pendingActions: List<PendingAction> = emptyList(),
 )

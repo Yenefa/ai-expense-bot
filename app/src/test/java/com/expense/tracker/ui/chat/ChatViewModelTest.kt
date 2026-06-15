@@ -3,6 +3,7 @@ package com.expense.tracker.ui.chat
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
+import com.expense.tracker.data.action.PendingAction
 import com.expense.tracker.data.db.ChatMessageDao
 import com.expense.tracker.data.db.ChatMessageEntity
 import com.expense.tracker.data.db.ExpenseDao
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -30,7 +32,10 @@ class ChatViewModelTest {
     @Before fun setup() = Dispatchers.setMain(UnconfinedTestDispatcher())
     @After fun teardown() = Dispatchers.resetMain()
 
-    private fun makeVm(initialLlm: Boolean = false): Triple<ChatViewModel, FakeExpenseDao, FakeChatDao> {
+    private fun makeVm(
+        initialLlm: Boolean = false,
+        llmHandler: LlmHandler = LlmHandler { _, _ -> error("unused in template mode") },
+    ): Triple<ChatViewModel, FakeExpenseDao, FakeChatDao> {
         val ed = FakeExpenseDao()
         val cd = FakeChatDao()
         val store = FakeStore(initialLlm)
@@ -39,7 +44,7 @@ class ChatViewModelTest {
             expenseRepo = ExpenseRepository(ed),
             chatRepo = ChatRepository(cd),
             userPrefs = prefs,
-            llmHandler = { _, _ -> error("unused in template mode") },
+            llmHandler = llmHandler,
         )
         return Triple(vm, ed, cd)
     }
@@ -69,11 +74,107 @@ class ChatViewModelTest {
         vm.toggleLlm()
         assertThat(vm.uiState.value.llmEnabled).isTrue()
     }
+
+    // === pendingActions 流转 ===
+
+    @Test fun llmReturnsPendingDeleteAction_appearsInState() = runTest {
+        val seedRow = ExpenseEntity(amount = 18.0, categoryId = "drink", note = "咖啡",
+                                    occurredAt = 100L, createdAt = 100L, id = 7)
+        val handler = LlmHandler { _, _ ->
+            LlmResult.Ok(
+                replyText = "准备删除", expenseId = null,
+                pendingActions = listOf(PendingAction.Delete(id = "act-1", candidates = listOf(seedRow))),
+            )
+        }
+        val (vm, _, _) = makeVm(initialLlm = true, llmHandler = handler)
+        vm.submitFreeText("删掉那笔")
+        // streamReply 里 delay 22ms+；advanceUntilIdle 让 runTest 的虚拟时钟跑完所有 delay
+        advanceUntilIdle()
+        assertThat(vm.uiState.value.pendingActions).hasSize(1)
+        assertThat(vm.uiState.value.pendingActions[0].id).isEqualTo("act-1")
+    }
+
+    @Test fun confirmDelete_removesExpenseAndCard() = runTest {
+        val seedRow = ExpenseEntity(amount = 18.0, categoryId = "drink", note = "咖啡",
+                                    occurredAt = 100L, createdAt = 100L, id = 7)
+        val handler = LlmHandler { _, _ ->
+            LlmResult.Ok("准备删除", null,
+                listOf(PendingAction.Delete("act-1", listOf(seedRow))))
+        }
+        val (vm, ed, _) = makeVm(initialLlm = true, llmHandler = handler)
+        ed.seed(seedRow)
+        vm.submitFreeText("删")
+        advanceUntilIdle()
+        vm.confirmDelete("act-1", setOf(7L))
+        advanceUntilIdle()
+        assertThat(ed.deleted).contains(7L)
+        assertThat(vm.uiState.value.pendingActions).isEmpty()
+    }
+
+    @Test fun confirmUpdate_patchesExpenseAndCard() = runTest {
+        val seedRow = ExpenseEntity(amount = 35.0, categoryId = "food", note = "",
+                                    occurredAt = 100L, createdAt = 100L, id = 9)
+        val handler = LlmHandler { _, _ ->
+            LlmResult.Ok("改", null, listOf(
+                PendingAction.Update(
+                    id = "u-1", candidates = listOf(seedRow),
+                    patchAmount = 40.0, patchCategoryId = null, patchNote = null,
+                )
+            ))
+        }
+        val (vm, ed, _) = makeVm(initialLlm = true, llmHandler = handler)
+        ed.seed(seedRow)
+        vm.submitFreeText("改成40")
+        advanceUntilIdle()
+        vm.confirmUpdate("u-1", setOf(9L))
+        advanceUntilIdle()
+        assertThat(ed.patches).contains(Patch(9L, 40.0, null, null))
+        assertThat(vm.uiState.value.pendingActions).isEmpty()
+    }
+
+    @Test fun dismissAction_removesCardWithoutSideEffect() = runTest {
+        val handler = LlmHandler { _, _ ->
+            LlmResult.Ok("没找到", null, listOf(PendingAction.Empty("e-1", "找不到")))
+        }
+        val (vm, ed, _) = makeVm(initialLlm = true, llmHandler = handler)
+        vm.submitFreeText("删")
+        advanceUntilIdle()
+        // 确保卡片真的进了 state，否则下一行的"移除"等于啥也没移除（误通过）
+        assertThat(vm.uiState.value.pendingActions).hasSize(1)
+        vm.dismissAction("e-1")
+        assertThat(vm.uiState.value.pendingActions).isEmpty()
+        assertThat(ed.deleted).isEmpty()
+    }
+
+    @Test fun confirmDeleteWithEmptySelection_doesNothing() = runTest {
+        val seedRow = ExpenseEntity(amount = 18.0, categoryId = "drink", note = "",
+                                    occurredAt = 100L, createdAt = 100L, id = 7)
+        val handler = LlmHandler { _, _ ->
+            LlmResult.Ok("?", null, listOf(PendingAction.Delete("act-1", listOf(seedRow))))
+        }
+        val (vm, ed, _) = makeVm(initialLlm = true, llmHandler = handler)
+        ed.seed(seedRow)
+        vm.submitFreeText("删")
+        advanceUntilIdle()
+        vm.confirmDelete("act-1", emptySet())
+        advanceUntilIdle()
+        // 卡片仍在；DB 没动
+        assertThat(vm.uiState.value.pendingActions).hasSize(1)
+        assertThat(ed.deleted).isEmpty()
+    }
 }
+
+// 便于 lambda mock
+private fun LlmHandler(impl: suspend (String, com.expense.tracker.data.prefs.UserPrefsSnapshot) -> LlmResult): LlmHandler = impl
+
+private data class Patch(val id: Long, val amount: Double?, val cat: String?, val note: String?)
 
 private class FakeExpenseDao : ExpenseDao {
     private val state = MutableStateFlow<List<ExpenseEntity>>(emptyList())
+    val deleted = mutableListOf<Long>()
+    val patches = mutableListOf<Patch>()
     fun snapshot(): List<ExpenseEntity> = state.value
+    fun seed(row: ExpenseEntity) { state.value = state.value + row }
     override suspend fun insert(expense: ExpenseEntity): Long {
         val id = state.value.size + 1L
         state.value = state.value + expense.copy(id = id)
@@ -81,7 +182,13 @@ private class FakeExpenseDao : ExpenseDao {
     }
     override fun observeAll(): Flow<List<ExpenseEntity>> = state
     override fun observeInRange(from: Long, to: Long): Flow<List<ExpenseEntity>> = flowOf(emptyList())
-    override suspend fun deleteById(id: Long) {}
+    override suspend fun deleteById(id: Long) { deleted += id }
+    override suspend fun findByMatch(
+        category: String?, amount: Double?, from: Long?, to: Long?, noteSub: String?,
+    ): List<ExpenseEntity> = emptyList()
+    override suspend fun patchById(id: Long, amount: Double?, cat: String?, note: String?) {
+        patches += Patch(id, amount, cat, note)
+    }
 }
 
 private class FakeChatDao : ChatMessageDao {
