@@ -74,7 +74,7 @@ object LlmResponseParser {
      * 兜底策略：找第一个 '{' 到与之匹配的 '}'（用栈计数花括号深度，跳过字符串里的花括号）。
      * 找不到就返回原文 — 让下游 decode 抛带原始内容的异常，便于日志排查。
      */
-    private fun extractJsonObject(raw: String): String {
+    fun extractJsonObject(raw: String): String {
         val trimmed = raw.trim()
         val start = trimmed.indexOf('{')
         if (start < 0) return trimmed

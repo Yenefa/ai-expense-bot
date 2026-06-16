@@ -85,10 +85,13 @@ class AppContainer(context: Context) {
                 apiKey = prefs.apiKey,
                 model = prefs.model,
                 userText = prompt,
+                history = emptyList(),
+                systemPrompt = com.expense.tracker.llm.LlmPrompt.analyticsSystemPrompt(),
             )
             val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
+            val cleaned = LlmResponseParser.extractJsonObject(raw)
             val insights = json.decodeFromString(
-                com.expense.tracker.llm.AnalyticsInsightsPayload.serializer(), raw.trim()
+                com.expense.tracker.llm.AnalyticsInsightsPayload.serializer(), cleaned
             ).insights
             insights.ifEmpty { listOf("暂无洞察，请再试一次。") }
         }.getOrElse { listOf("分析失败：${it.message ?: "未知错误"}") }

@@ -105,20 +105,38 @@ object LlmPrompt {
         }
     }
 
-    /** 智核分析 prompt */
+    /** 智核分析专用 system prompt — 不要复用记账助手 systemPrompt，避免 reply/expenses/actions 协议污染。 */
+    fun analyticsSystemPrompt(): String = buildString {
+        appendLine("你是一个消费数据分析助手。")
+        appendLine()
+        appendLine("【输出硬约束】")
+        appendLine("1. 你的回答必须是纯 JSON 对象，从 '{' 开始，到 '}' 结束。")
+        appendLine("2. 禁止在 JSON 前后加任何文字、emoji、markdown 围栏。")
+        appendLine("3. 必须严格使用这个 schema：")
+        appendLine("""{"insights": ["洞察1", "洞察2", "洞察3"]}""")
+        appendLine("4. insights 必须 3-5 条，每条不超过 50 字。")
+        appendLine("5. 不要输出 reply / expenses / actions 字段。")
+        appendLine("6. 如果数据很少，也必须基于已有数据给出可执行建议，不要返回空数组。")
+    }
+
+    /** 智核分析 user prompt */
     fun analyticsPrompt(
         periodName: String,
         totalAmount: Double,
         count: Int,
         topCategories: List<Pair<String, Double>>,
     ): String = buildString {
-        appendLine("请帮我分析我的${periodName}支出：")
+        appendLine("请分析我的${periodName}支出：")
         appendLine("总支出 ¥${"%.2f".format(totalAmount)}，共 $count 笔。")
         append("主要消费在：")
         appendLine(topCategories.joinToString("、") { "${it.first} ¥${"%.2f".format(it.second)}" })
-        appendLine("请给出 3-5 条简洁的消费洞察（每条不超过 50 字），并用以下 JSON 格式回复：")
-        appendLine("""{"insights": ["洞察1", "洞察2", ...]}""")
-        appendLine("洞察要有针对性，不要泛泛而谈。")
+        appendLine()
+        appendLine("请给出 3-5 条具体洞察，要求：")
+        appendLine("- 不能泛泛而谈，例如不要只说'注意控制消费'")
+        appendLine("- 必须引用上面的金额、笔数或分类")
+        appendLine("- 至少 1 条指出最大消费类别")
+        appendLine("- 至少 1 条给出下一步建议")
+        appendLine("- 严格按 system 要求输出 JSON")
     }
 }
 
