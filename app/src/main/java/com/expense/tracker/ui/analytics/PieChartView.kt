@@ -22,13 +22,15 @@ import com.expense.tracker.data.model.Category
 
 // 按 Category.id 给每个分类指定固定色 — 颜色和真实业务语义对应
 private val CategoryColors: Map<String, Color> = mapOf(
-    "food"          to Color(0xFFFCD34D), // 餐饮 — 黄色
-    "transport"     to Color(0xFF6B7280), // 交通 — 灰
-    "shopping"     to Color(0xFFEC4899),  // 购物 — 粉
+    "food"          to Color(0xFFFCD34D), // 餐饮 — 黄
+    "transport"     to Color(0xFF2563EB), // 交通 — 蓝（和投资/学习拉开）
+    "shopping"      to Color(0xFFEC4899), // 购物 — 粉
     "drink"         to Color(0xFF7DD3FC), // 饮品 — 浅蓝
     "entertainment" to Color(0xFFA78BFA), // 娱乐 — 紫
     "housing"       to Color(0xFF34D399), // 住房 — 绿
     "medical"       to Color(0xFFF87171), // 医疗 — 红
+    "investment"    to Color(0xFFF97316), // 投资 — 橙
+    "learning"      to Color(0xFF14B8A6), // 学习 — 青绿
     "other"         to Color(0xFFD4D4D4), // 其他 — 浅灰
 )
 private val FallbackColor = Color(0xFF9CA3AF)
