@@ -124,12 +124,12 @@ object LlmPrompt {
         periodName: String,
         totalAmount: Double,
         count: Int,
-        topCategories: List<Pair<String, Double>>,
+        topCategories: List<Triple<String, Double, Int>>,
     ): String = buildString {
         appendLine("请分析我的${periodName}支出：")
         appendLine("总支出 ¥${"%.2f".format(totalAmount)}，共 $count 笔。")
         append("主要消费在：")
-        appendLine(topCategories.joinToString("、") { "${it.first} ¥${"%.2f".format(it.second)}" })
+        appendLine(topCategories.joinToString("、") { "${it.first} ¥${"%.2f".format(it.second)}（${it.third}笔）" })
         appendLine()
         appendLine("请给出 3-5 条具体洞察，要求：")
         appendLine("- 不能泛泛而谈，例如不要只说'注意控制消费'")

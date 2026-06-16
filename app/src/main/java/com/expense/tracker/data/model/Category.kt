@@ -14,6 +14,8 @@ data class Category(
             Category("entertainment", "🎮", "娱乐"),
             Category("housing",       "🏠", "住房"),
             Category("medical",       "💊", "医疗"),
+            Category("investment",    "📈", "投资"),
+            Category("learning",      "📚", "学习"),
             Category("other",         "📦", "其他"),
         )
         private val byIdMap: Map<String, Category> = ALL.associateBy { it.id }

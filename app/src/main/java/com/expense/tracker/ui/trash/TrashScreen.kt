@@ -55,6 +55,7 @@ import com.expense.tracker.ui.theme.softShadow
 fun TrashScreen(vm: TrashViewModel, onBack: () -> Unit) {
     val state by vm.uiState.collectAsState()
     var showEmptyDialog by remember { mutableStateOf(false) }
+    var pendingHardDelete by remember { mutableStateOf<TrashItem?>(null) }
 
     Column(
         modifier = Modifier.fillMaxSize().background(AppColors.Bg),
@@ -104,7 +105,7 @@ fun TrashScreen(vm: TrashViewModel, onBack: () -> Unit) {
                     TrashRow(
                         item = item,
                         onRestore = { vm.restore(item.id) },
-                        onHardDelete = { vm.hardDelete(item.id) },
+                        onHardDelete = { pendingHardDelete = item },
                     )
                 }
             }
@@ -124,6 +125,29 @@ fun TrashScreen(vm: TrashViewModel, onBack: () -> Unit) {
             },
             dismissButton = {
                 TextButton(onClick = { showEmptyDialog = false }) { Text("取消") }
+            },
+        )
+    }
+
+    pendingHardDelete?.let { item ->
+        AlertDialog(
+            onDismissRequest = { pendingHardDelete = null },
+            title = { Text("彻底删除这笔支出？") },
+            text = {
+                Text(
+                    "${item.categoryEmoji}${item.categoryName} ¥${"%.2f".format(item.amount)}" +
+                    (if (item.note.isNotBlank()) " · ${item.note}" else "") +
+                    "\n\n此操作无法撤销。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingHardDelete = null
+                    vm.hardDelete(item.id)
+                }) { Text("彻底删除", color = Color(0xFFE5484D)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingHardDelete = null }) { Text("取消") }
             },
         )
     }

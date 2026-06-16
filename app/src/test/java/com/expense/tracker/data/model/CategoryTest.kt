@@ -4,10 +4,11 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class CategoryTest {
-    @Test fun all8CategoriesExist() {
+    @Test fun all10CategoriesExist() {
         assertThat(Category.ALL.map { it.id })
             .containsExactly("food", "transport", "shopping", "drink",
-                             "entertainment", "housing", "medical", "other")
+                             "entertainment", "housing", "medical",
+                             "investment", "learning", "other")
     }
     @Test fun foodCategoryHasEmoji() {
         assertThat(Category.byId("food")!!.emoji).isEqualTo("🍜")

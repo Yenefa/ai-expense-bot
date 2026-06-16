@@ -23,6 +23,7 @@ data class AnalyticsUiState(
     val barAmounts: List<Double> = emptyList(),
     val lineCounts: List<Int> = emptyList(),
     val pieByCategory: Map<String, Double> = emptyMap(),
+    val categoryCounts: Map<String, Int> = emptyMap(),
     val xLabels: List<String> = emptyList(),
     val totalAmount: Double = 0.0,
     val totalCount: Int = 0,
@@ -72,11 +73,14 @@ class AnalyticsViewModel(
         internal.update { it.copy(analyzing = true, insights = emptyList()) }
 
         // 构建 Top 3 分类
+        val categoryCounts = state.categoryCounts
         val top3 = state.pieByCategory.entries
             .sortedByDescending { it.value }
             .take(3)
             .map { (catId, v) ->
-                (Category.byId(catId)?.emoji + Category.byId(catId)?.displayName ?: catId) to v
+                val c = Category.byId(catId)
+                val label = c?.let { "${it.emoji}${it.displayName}" } ?: catId
+                Triple(label, v, categoryCounts[catId] ?: 0)
             }
         val periodName = when (state.period) {
             Period.Week -> "本周"
@@ -101,6 +105,7 @@ class AnalyticsViewModel(
         val amounts = DoubleArray(n)
         val counts = IntArray(n)
         val byCat = HashMap<String, Double>()
+        val countByCat = HashMap<String, Int>()
 
         list.forEach { e ->
             val idx = TimeRanges.bucketIndex(p, fromMillis, e.occurredAt, zone)
@@ -109,6 +114,7 @@ class AnalyticsViewModel(
                 counts[idx] += 1
             }
             byCat[e.categoryId] = (byCat[e.categoryId] ?: 0.0) + e.amount
+            countByCat[e.categoryId] = (countByCat[e.categoryId] ?: 0) + 1
         }
 
         return AnalyticsUiState(
@@ -116,6 +122,7 @@ class AnalyticsViewModel(
             barAmounts = amounts.toList(),
             lineCounts = counts.toList(),
             pieByCategory = byCat,
+            categoryCounts = countByCat,
             xLabels = labels,
             totalAmount = list.sumOf { it.amount },
             totalCount = list.size,
