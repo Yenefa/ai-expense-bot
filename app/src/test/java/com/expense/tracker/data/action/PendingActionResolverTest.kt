@@ -79,8 +79,10 @@ class PendingActionResolverTest {
             aggregate = "sum",
         )
         val pending = resolver.resolve(action) as PendingAction.QueryResult
-        assertThat(pending.text).contains("57.50")
-        assertThat(pending.text).contains("2 笔")
+        assertThat(pending.totalAmount).isEqualTo(57.5)
+        assertThat(pending.count).isEqualTo(2)
+        assertThat(pending.rows).hasSize(1)
+        assertThat(pending.rows[0].name).isEqualTo("餐饮")
     }
 
     @Test fun unknownOpReturnsNull() = runTest {

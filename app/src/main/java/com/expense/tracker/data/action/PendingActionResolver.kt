@@ -76,11 +76,32 @@ class PendingActionResolver(private val repo: ExpenseRepository) {
         val catLabel = a.matchCategoryId?.let {
             Category.byId(it)?.let { c -> "${c.emoji}${c.displayName}" }
         }
-        val text = when (a.aggregate) {
-            "count" -> "📊 ${catLabel ?: "全部"} 共 $count 笔"
-            else    -> "📊 ${catLabel ?: "全部"} 共 ¥${"%.2f".format(total)}（$count 笔）"
+        val title = when (a.aggregate) {
+            "count" -> "${catLabel ?: "全部"}笔数统计"
+            else -> "${catLabel ?: "全部"}消费统计"
         }
-        return PendingAction.QueryResult(uuid(), text)
+        val breakdown = rows
+            .groupBy { it.categoryId }
+            .map { (catId, items) ->
+                val c = Category.byIdOrOther(catId)
+                val amount = items.sumOf { it.amount }
+                PendingAction.QueryCategoryRow(
+                    categoryId = catId,
+                    emoji = c.emoji,
+                    name = c.displayName,
+                    amount = amount,
+                    count = items.size,
+                    percent = if (total > 0.0) amount / total * 100.0 else 0.0,
+                )
+            }
+            .sortedByDescending { it.amount }
+        return PendingAction.QueryResult(
+            id = uuid(),
+            title = title,
+            totalAmount = total,
+            count = count,
+            rows = breakdown,
+        )
     }
 
     private fun uuid(): String = UUID.randomUUID().toString()

@@ -42,7 +42,7 @@ import java.time.format.DateTimeFormatter
  * 4 种形态：
  *  - Delete   — 候选行 + 复选框，主按钮高亮"删除"
  *  - Update   — 候选行 + 复选框 + patch 预览（"金额→¥40"），主按钮"修改"
- *  - QueryResult — 一句聚合文本 + 单按钮"知道了"
+ *  - QueryResult — 总额/笔数/分类明细统计卡 + 单按钮"知道了"
  *  - Empty    — 一句失败文本 + 单按钮"知道了"
  */
 @Composable
@@ -64,7 +64,7 @@ fun ActionCard(
         when (action) {
             is PendingAction.Delete -> DeleteBody(action, onConfirmDelete, onDismiss)
             is PendingAction.Update -> UpdateBody(action, onConfirmUpdate, onDismiss)
-            is PendingAction.QueryResult -> SimpleBody(action.text, action.id, onDismiss)
+            is PendingAction.QueryResult -> QueryBody(action, onDismiss)
             is PendingAction.Empty -> SimpleBody(action.message, action.id, onDismiss)
         }
     }
@@ -158,6 +158,64 @@ private fun UpdateBody(
             onConfirm = { onConfirm(action.id, selected) },
             onDismiss = onDismiss,
         )
+    }
+}
+
+@Composable
+private fun QueryBody(action: PendingAction.QueryResult, onDismiss: (String) -> Unit) {
+    Column {
+        Text(
+            text = "📊 ${action.title}",
+            color = AppColors.TextPrimary,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f)) {
+                Text("总支出", color = AppColors.TextMuted, style = MaterialTheme.typography.labelSmall)
+                Text(
+                    "¥${"%.2f".format(action.totalAmount)}",
+                    color = AppColors.TextPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("笔数", color = AppColors.TextMuted, style = MaterialTheme.typography.labelSmall)
+                Text("${action.count} 笔", color = AppColors.TextPrimary,
+                     fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+        if (action.rows.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Text("分类明细", color = AppColors.TextSecondary, style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(6.dp))
+            action.rows.take(6).forEach { row ->
+                QueryCategoryRow(row)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            CardButton(label = "知道了", color = AppColors.TextSecondary, onClick = { onDismiss(action.id) })
+        }
+    }
+}
+
+@Composable
+private fun QueryCategoryRow(row: PendingAction.QueryCategoryRow) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("${row.emoji} ${row.name}", color = AppColors.TextPrimary, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.weight(1f))
+        Text("¥${"%.2f".format(row.amount)}", color = AppColors.TextPrimary,
+             fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.width(10.dp))
+        Text("${row.count}笔", color = AppColors.TextSecondary, style = MaterialTheme.typography.labelSmall)
+        Spacer(Modifier.width(10.dp))
+        Text("${"%.1f".format(row.percent)}%", color = AppColors.TextMuted, style = MaterialTheme.typography.labelSmall)
     }
 }
 

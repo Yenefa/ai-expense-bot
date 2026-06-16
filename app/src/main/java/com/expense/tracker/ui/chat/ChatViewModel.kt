@@ -67,7 +67,7 @@ class ChatViewModel(
         viewModelScope.launch {
             internal.update { it.copy(sending = true) }
             val noteSuffix = if (trimmedNote.isNotEmpty()) " · $trimmedNote" else ""
-            chatRepo.appendUser("[模板] ${cat.emoji} ${cat.displayName} ¥${"%.2f".format(amount)}$noteSuffix")
+            chatRepo.appendUser("${cat.emoji} ${cat.displayName} ¥${"%.2f".format(amount)}$noteSuffix")
             val expenseId = expenseRepo.add(
                 amount = amount,
                 categoryId = cat.id,
