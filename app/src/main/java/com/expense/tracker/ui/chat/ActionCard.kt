@@ -64,7 +64,7 @@ fun ActionCard(
         when (action) {
             is PendingAction.Delete -> DeleteBody(action, onConfirmDelete, onDismiss)
             is PendingAction.Update -> UpdateBody(action, onConfirmUpdate, onDismiss)
-            is PendingAction.QueryResult -> QueryBody(action, onDismiss)
+            is PendingAction.QueryResult -> QueryBody(action)
             is PendingAction.Empty -> SimpleBody(action.message, action.id, onDismiss)
         }
     }
@@ -162,7 +162,7 @@ private fun UpdateBody(
 }
 
 @Composable
-private fun QueryBody(action: PendingAction.QueryResult, onDismiss: (String) -> Unit) {
+private fun QueryBody(action: PendingAction.QueryResult) {
     Column {
         Text(
             text = "📊 ${action.title}",
@@ -194,10 +194,6 @@ private fun QueryBody(action: PendingAction.QueryResult, onDismiss: (String) -> 
             action.rows.take(6).forEach { row ->
                 QueryCategoryRow(row)
             }
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            CardButton(label = "知道了", color = AppColors.TextSecondary, onClick = { onDismiss(action.id) })
         }
     }
 }
