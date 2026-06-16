@@ -24,6 +24,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.expense.tracker.ui.analytics.AnalyticsScreen
 import com.expense.tracker.ui.analytics.AnalyticsViewModel
+import com.expense.tracker.ui.calendar.CalendarScreen
+import com.expense.tracker.ui.calendar.CalendarViewModel
 import com.expense.tracker.ui.chat.ChatScreen
 import com.expense.tracker.ui.chat.ChatViewModel
 import com.expense.tracker.ui.history.HistoryScreen
@@ -77,6 +79,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val calendarVm: CalendarViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                CalendarViewModel(repo = container.expenseRepo) as T
+        }
+    }
+
     /**
      * 路由架构（v1.2.1）：
      *
@@ -95,13 +105,15 @@ class MainActivity : ComponentActivity() {
                 var screen by remember { mutableStateOf<Subscreen?>(null) }
                 var llmSettingsOpen by remember { mutableStateOf(false) }
                 var trashOpen by remember { mutableStateOf(false) }
+                var calendarOpen by remember { mutableStateOf(false) }
                 val llmPrefs by container.userPrefs.snapshot.collectAsState(initial = null)
 
                 // 系统返回键：层层退出 — 最深的二级页先关
-                BackHandler(enabled = screen != null || llmSettingsOpen || trashOpen) {
+                BackHandler(enabled = screen != null || llmSettingsOpen || trashOpen || calendarOpen) {
                     when {
                         llmSettingsOpen -> llmSettingsOpen = false
                         trashOpen       -> trashOpen = false
+                        calendarOpen    -> calendarOpen = false
                         screen != null  -> screen = null
                     }
                 }
@@ -137,6 +149,19 @@ class MainActivity : ComponentActivity() {
                         HistoryScreen(
                             vm = historyVm,
                             onBack = { screen = null },
+                            onOpenCalendar = { calendarOpen = true },
+                        )
+                    }
+
+                    // 覆盖层 — 消费日历（从 History 顶栏进入）
+                    AnimatedVisibility(
+                        visible = calendarOpen,
+                        enter = subscreenEnter(),
+                        exit  = subscreenExit(),
+                    ) {
+                        CalendarScreen(
+                            vm = calendarVm,
+                            onBack = { calendarOpen = false },
                         )
                     }
 

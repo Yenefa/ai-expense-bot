@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +56,11 @@ import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
 
 @Composable
-fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
+fun HistoryScreen(
+    vm: HistoryViewModel,
+    onBack: () -> Unit,
+    onOpenCalendar: () -> Unit,
+) {
     val state by vm.uiState.collectAsState()
     val expandedDays = remember { mutableStateMapOf<String, Boolean>() }
 
@@ -78,6 +83,16 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
             ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
             Spacer(Modifier.size(12.dp))
             Text("历史明细", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
+            Spacer(Modifier.weight(1f))
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .iconBtnShadow()
+                    .clip(CircleShape)
+                    .background(AppColors.Bg)
+                    .pointerInput(onOpenCalendar) { detectTapGestures(onTap = { onOpenCalendar() }) },
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Outlined.CalendarMonth, contentDescription = "消费日历", tint = AppColors.TextPrimary) }
         }
 
         if (state.groups.isEmpty()) {

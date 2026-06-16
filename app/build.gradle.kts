@@ -12,8 +12,8 @@ android {
         applicationId = "com.expense.tracker"
         minSdk = 26
         targetSdk = 34
-        versionCode = 14
-        versionName = "2.3"
+        versionCode = 140
+        versionName = "1.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
