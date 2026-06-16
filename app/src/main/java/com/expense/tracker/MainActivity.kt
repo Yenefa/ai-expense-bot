@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -13,12 +12,14 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.expense.tracker.ui.analytics.AnalyticsScreen
@@ -66,105 +67,109 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * 路由架构（v1.2.1）：
+     *
+     * 早期方案用 AnimatedContent 在 Chat ↔ 子页之间整页切换，问题是切换 320ms 内
+     * 新旧两个全屏树同时存活，每个都带 softShadow / LazyColumn / 手势检测器，
+     * 中低端机 GPU 撑不住两份离屏合成 + 平移，返回时掉帧明显。
+     *
+     * 改为：Chat 是**始终存在的根**，所有子页（Analytics / History / Settings / LlmSettings）
+     * 都是 AnimatedVisibility 的浮起覆盖层。返回时只销毁子页一层，Chat 完全不参与动画，
+     * 流畅度等同于 iOS pop。代价：失去 Chat "从左滑入"的视觉效果，但更接近 iOS 标准。
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             AppTheme {
-                var screen by remember { mutableStateOf<Screen>(Screen.Chat) }
-                var subScreen by remember { mutableStateOf<SubScreen?>(null) }
+                var screen by remember { mutableStateOf<Subscreen?>(null) }
+                var llmSettingsOpen by remember { mutableStateOf(false) }
                 val llmPrefs by container.userPrefs.snapshot.collectAsState(initial = null)
 
-                // 系统返回键：非 Chat 时回到 Chat，而不是退出 App
-                BackHandler(enabled = screen != Screen.Chat || subScreen != null) {
-                    if (subScreen != null) subScreen = null
-                    else screen = Screen.Chat
-                }
-
-                // 主屏幕切换 — Chat ↔ 子页面（Analytics / History / Settings）
-                // Chat 是 "根"（rank=0），其他子页面 rank=1
-                // 进入子页面（rank 增加）：新页面从右滑入，旧页面向左滑出
-                // 返回 Chat（rank 减少）：新页面（Chat）从左滑入，旧页面向右滑出
-                AnimatedContent(
-                    targetState = screen,
-                    transitionSpec = {
-                        val forward = targetState.rank > initialState.rank
-                        val duration = 320
-                        if (forward) {
-                            (slideInHorizontally(
-                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
-                                initialOffsetX = { it },
-                            ) + fadeIn(animationSpec = tween(duration / 2))) togetherWith
-                            (slideOutHorizontally(
-                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
-                                targetOffsetX = { -it / 4 },
-                            ) + fadeOut(animationSpec = tween(duration / 2)))
-                        } else {
-                            (slideInHorizontally(
-                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
-                                initialOffsetX = { -it / 4 },
-                            ) + fadeIn(animationSpec = tween(duration / 2))) togetherWith
-                            (slideOutHorizontally(
-                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
-                                targetOffsetX = { it },
-                            ) + fadeOut(animationSpec = tween(duration / 2)))
-                        }
-                    },
-                    label = "screen-transition",
-                ) { current ->
-                    when (current) {
-                        Screen.Chat -> ChatScreen(
-                            vm = chatVm,
-                            onOpenAnalytics = { screen = Screen.Analytics },
-                            onOpenHistory = { screen = Screen.History },
-                            onOpenSettings = { screen = Screen.Settings },
-                        )
-                        Screen.Analytics -> AnalyticsScreen(
-                            vm = analyticsVm,
-                            onBack = { screen = Screen.Chat },
-                            llmPrefs = llmPrefs,
-                        )
-                        Screen.History -> HistoryScreen(
-                            vm = historyVm,
-                            onBack = { screen = Screen.Chat },
-                        )
-                        Screen.Settings -> SettingsMenuScreen(
-                            onClose = { screen = Screen.Chat },
-                            onOpenLlmSettings = { subScreen = SubScreen.LlmSettings },
-                        )
+                // 系统返回键：先关 LLM 设置，再关 Subscreen，最后才退出 App
+                BackHandler(enabled = screen != null || llmSettingsOpen) {
+                    when {
+                        llmSettingsOpen -> llmSettingsOpen = false
+                        screen != null  -> screen = null
                     }
                 }
 
-                // LLM 设置 sub-screen 从右侧滑入覆盖
-                AnimatedVisibility(
-                    visible = subScreen == SubScreen.LlmSettings,
-                    enter = slideInHorizontally(
-                        animationSpec = tween(320, easing = FastOutSlowInEasing),
-                        initialOffsetX = { it },
-                    ) + fadeIn(animationSpec = tween(160)),
-                    exit = slideOutHorizontally(
-                        animationSpec = tween(280, easing = FastOutSlowInEasing),
-                        targetOffsetX = { it },
-                    ) + fadeOut(animationSpec = tween(140)),
-                ) {
-                    SettingsScreen(
-                        prefs = container.userPrefs,
-                        onClose = { subScreen = null },
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // 根：Chat 永远存在
+                    ChatScreen(
+                        vm = chatVm,
+                        onOpenAnalytics = { screen = Subscreen.Analytics },
+                        onOpenHistory   = { screen = Subscreen.History },
+                        onOpenSettings  = { screen = Subscreen.Settings },
                     )
+
+                    // 覆盖层 — Analytics
+                    AnimatedVisibility(
+                        visible = screen == Subscreen.Analytics,
+                        enter = subscreenEnter(),
+                        exit  = subscreenExit(),
+                    ) {
+                        AnalyticsScreen(
+                            vm = analyticsVm,
+                            onBack = { screen = null },
+                            llmPrefs = llmPrefs,
+                        )
+                    }
+
+                    // 覆盖层 — History
+                    AnimatedVisibility(
+                        visible = screen == Subscreen.History,
+                        enter = subscreenEnter(),
+                        exit  = subscreenExit(),
+                    ) {
+                        HistoryScreen(
+                            vm = historyVm,
+                            onBack = { screen = null },
+                        )
+                    }
+
+                    // 覆盖层 — Settings 菜单
+                    AnimatedVisibility(
+                        visible = screen == Subscreen.Settings,
+                        enter = subscreenEnter(),
+                        exit  = subscreenExit(),
+                    ) {
+                        SettingsMenuScreen(
+                            onClose = { screen = null },
+                            onOpenLlmSettings = { llmSettingsOpen = true },
+                        )
+                    }
+
+                    // 覆盖层 — LLM 设置（嵌在 Settings 之上的二级页）
+                    AnimatedVisibility(
+                        visible = llmSettingsOpen,
+                        enter = subscreenEnter(),
+                        exit  = subscreenExit(),
+                    ) {
+                        SettingsScreen(
+                            prefs = container.userPrefs,
+                            onClose = { llmSettingsOpen = false },
+                        )
+                    }
                 }
             }
         }
     }
 
-    private sealed interface Screen {
-        // rank 决定切换动画方向：高 rank 从右进，低 rank 从左进
-        val rank: Int
-        data object Chat : Screen { override val rank = 0 }
-        data object Analytics : Screen { override val rank = 1 }
-        data object History : Screen { override val rank = 1 }
-        data object Settings : Screen { override val rank = 1 }
-    }
-
-    private sealed interface SubScreen {
-        data object LlmSettings : SubScreen
+    private sealed interface Subscreen {
+        data object Analytics : Subscreen
+        data object History   : Subscreen
+        data object Settings  : Subscreen
     }
 }
+
+// 子页统一从右滑入，从右滑出 — iOS push/pop 风格
+private fun subscreenEnter() = slideInHorizontally(
+    animationSpec = tween(280, easing = FastOutSlowInEasing),
+    initialOffsetX = { it },
+) + fadeIn(animationSpec = tween(140))
+
+private fun subscreenExit() = slideOutHorizontally(
+    animationSpec = tween(240, easing = FastOutSlowInEasing),
+    targetOffsetX = { it },
+) + fadeOut(animationSpec = tween(120))
