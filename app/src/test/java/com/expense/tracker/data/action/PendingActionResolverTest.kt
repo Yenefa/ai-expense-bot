@@ -124,6 +124,11 @@ private class FakeMatchDao(vararg rows: ExpenseEntity) : ExpenseDao {
     override suspend fun insert(expense: ExpenseEntity): Long = error("unused")
     override fun observeAll(): Flow<List<ExpenseEntity>> = flowOf(data)
     override fun observeInRange(from: Long, to: Long): Flow<List<ExpenseEntity>> = flowOf(data)
-    override suspend fun deleteById(id: Long) = error("unused")
+    override suspend fun softDeleteById(id: Long, at: Long) = error("unused")
+    override suspend fun restoreById(id: Long) = error("unused")
+    override suspend fun hardDeleteById(id: Long) = error("unused")
+    override suspend fun hardDeleteExpired(before: Long): Int = 0
+    override suspend fun hardDeleteAllTrashed(): Int = 0
+    override fun observeTrashed(): Flow<List<ExpenseEntity>> = flowOf(emptyList())
     override suspend fun patchById(id: Long, amount: Double?, cat: String?, note: String?) = error("unused")
 }

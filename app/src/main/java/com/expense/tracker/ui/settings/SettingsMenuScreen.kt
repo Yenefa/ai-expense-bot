@@ -39,7 +39,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsMenuScreen(onClose: () -> Unit, onOpenLlmSettings: () -> Unit) {
+fun SettingsMenuScreen(
+    onClose: () -> Unit,
+    onOpenLlmSettings: () -> Unit,
+    onOpenTrash: () -> Unit,
+) {
     val snackbarHost = remember { SnackbarHostState() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val context = LocalContext.current
@@ -73,6 +77,7 @@ fun SettingsMenuScreen(onClose: () -> Unit, onOpenLlmSettings: () -> Unit) {
             Spacer(Modifier.size(24.dp))
 
             MenuRow(emoji = "🧠", title = "LLM 设置", subtitle = "配置 API 地址、密钥和模型", onClick = onOpenLlmSettings)
+            MenuRow(emoji = "🗑️", title = "最近删除", subtitle = "已删除的支出可在此恢复（保留 30 天）", onClick = onOpenTrash)
             MenuRow(emoji = "🌗", title = "深色模式", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "📊", title = "预算管理", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "🔔", title = "智能提醒", subtitle = "即将上线", onClick = { /* TODO */ })

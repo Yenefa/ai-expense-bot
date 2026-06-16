@@ -22,11 +22,29 @@ private class FakeExpenseDao : ExpenseDao {
     }
     override fun observeAll(): Flow<List<ExpenseEntity>> = state
     override fun observeInRange(from: Long, to: Long): Flow<List<ExpenseEntity>> =
-        flow { emit(state.value.filter { it.occurredAt in from until to }) }
-    override suspend fun deleteById(id: Long) {
+        flow { emit(state.value.filter { it.deletedAt == null && it.occurredAt in from until to }) }
+    // 软删 — 跟真 DAO 行为一致
+    override suspend fun softDeleteById(id: Long, at: Long) {
+        state.value = state.value.map { if (it.id == id && it.deletedAt == null) it.copy(deletedAt = at) else it }
+    }
+    override suspend fun restoreById(id: Long) {
+        state.value = state.value.map { if (it.id == id) it.copy(deletedAt = null) else it }
+    }
+    override suspend fun hardDeleteById(id: Long) {
         state.value = state.value.filterNot { it.id == id }
     }
-    // 新增 — RepositoryTest 不直接调，但接口扩了得实现
+    override suspend fun hardDeleteExpired(before: Long): Int {
+        val before_count = state.value.size
+        state.value = state.value.filterNot { row -> row.deletedAt?.let { it < before } == true }
+        return before_count - state.value.size
+    }
+    override suspend fun hardDeleteAllTrashed(): Int {
+        val before = state.value.size
+        state.value = state.value.filterNot { it.deletedAt != null }
+        return before - state.value.size
+    }
+    override fun observeTrashed(): Flow<List<ExpenseEntity>> =
+        flow { emit(state.value.filter { it.deletedAt != null }.sortedByDescending { it.deletedAt }) }
     override suspend fun findByMatch(
         category: String?, amount: Double?, from: Long?, to: Long?, noteSub: String?,
     ): List<ExpenseEntity> = emptyList()

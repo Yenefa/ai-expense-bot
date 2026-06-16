@@ -182,7 +182,13 @@ private class FakeExpenseDao : ExpenseDao {
     }
     override fun observeAll(): Flow<List<ExpenseEntity>> = state
     override fun observeInRange(from: Long, to: Long): Flow<List<ExpenseEntity>> = flowOf(emptyList())
-    override suspend fun deleteById(id: Long) { deleted += id }
+    // 软删 — 测试只关心 deleted 列表里有没有出现过此 id
+    override suspend fun softDeleteById(id: Long, at: Long) { deleted += id }
+    override suspend fun restoreById(id: Long) { }
+    override suspend fun hardDeleteById(id: Long) { deleted += id }
+    override suspend fun hardDeleteExpired(before: Long): Int = 0
+    override suspend fun hardDeleteAllTrashed(): Int = 0
+    override fun observeTrashed(): Flow<List<ExpenseEntity>> = flowOf(emptyList())
     override suspend fun findByMatch(
         category: String?, amount: Double?, from: Long?, to: Long?, noteSub: String?,
     ): List<ExpenseEntity> = emptyList()

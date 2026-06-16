@@ -31,6 +31,8 @@ import com.expense.tracker.ui.history.HistoryViewModel
 import com.expense.tracker.ui.settings.SettingsMenuScreen
 import com.expense.tracker.ui.settings.SettingsScreen
 import com.expense.tracker.ui.theme.AppTheme
+import com.expense.tracker.ui.trash.TrashScreen
+import com.expense.tracker.ui.trash.TrashViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -67,6 +69,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val trashVm: TrashViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                TrashViewModel(repo = container.expenseRepo) as T
+        }
+    }
+
     /**
      * 路由架构（v1.2.1）：
      *
@@ -84,12 +94,14 @@ class MainActivity : ComponentActivity() {
             AppTheme {
                 var screen by remember { mutableStateOf<Subscreen?>(null) }
                 var llmSettingsOpen by remember { mutableStateOf(false) }
+                var trashOpen by remember { mutableStateOf(false) }
                 val llmPrefs by container.userPrefs.snapshot.collectAsState(initial = null)
 
-                // 系统返回键：先关 LLM 设置，再关 Subscreen，最后才退出 App
-                BackHandler(enabled = screen != null || llmSettingsOpen) {
+                // 系统返回键：层层退出 — 最深的二级页先关
+                BackHandler(enabled = screen != null || llmSettingsOpen || trashOpen) {
                     when {
                         llmSettingsOpen -> llmSettingsOpen = false
+                        trashOpen       -> trashOpen = false
                         screen != null  -> screen = null
                     }
                 }
@@ -137,6 +149,7 @@ class MainActivity : ComponentActivity() {
                         SettingsMenuScreen(
                             onClose = { screen = null },
                             onOpenLlmSettings = { llmSettingsOpen = true },
+                            onOpenTrash = { trashOpen = true },
                         )
                     }
 
@@ -149,6 +162,18 @@ class MainActivity : ComponentActivity() {
                         SettingsScreen(
                             prefs = container.userPrefs,
                             onClose = { llmSettingsOpen = false },
+                        )
+                    }
+
+                    // 覆盖层 — 最近删除（嵌在 Settings 之上的二级页）
+                    AnimatedVisibility(
+                        visible = trashOpen,
+                        enter = subscreenEnter(),
+                        exit  = subscreenExit(),
+                    ) {
+                        TrashScreen(
+                            vm = trashVm,
+                            onBack = { trashOpen = false },
                         )
                     }
                 }
