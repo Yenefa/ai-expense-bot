@@ -54,9 +54,13 @@ class LlmClient(
             }.getOrElse { error("LLM 响应解析失败：${it.message}") }
             val content = parsed.choices.firstOrNull()?.message?.content
                 ?: error("LLM 响应为空")
-            // logcat：方便用 `adb logcat -s LlmClient` 抓真实输入输出排查
-            Log.i(TAG, "USER: $userText")
-            Log.i(TAG, "RAW : $content")
+            // logcat：只在 debug 包打。userText / content 含财务隐私（金额/分类/备注），
+            // release 包剥离避免被 root 设备 / bug report / 第三方 ROM 日志收集捞走。
+            // 排查 release 包问题时临时改回 debug 包重装即可。
+            if (com.expense.tracker.BuildConfig.DEBUG) {
+                Log.i(TAG, "USER: $userText")
+                Log.i(TAG, "RAW : $content")
+            }
             content
         }
     }
