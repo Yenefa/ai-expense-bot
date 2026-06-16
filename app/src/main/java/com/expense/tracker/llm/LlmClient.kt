@@ -14,25 +14,30 @@ class LlmClient(
 ) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 
-    /** 调用 OpenAI 兼容 chat completions，返回 assistant message content（应为 JSON 字符串）。 */
+    /**
+     * 调用 OpenAI 兼容 chat completions，返回 assistant message content（应为 JSON 字符串）。
+     *
+     * @param history 已有对话历史（按时间正序，user/assistant 交替）。会被拼到 system 之后、当前
+     *                user 之前。这是给 LLM 上下文记忆的关键 — 没有它，LLM 完全不知道"上一句"是什么。
+     */
     suspend fun chatJson(
         baseUrl: String,
         apiKey: String,
         model: String,
         userText: String,
+        history: List<ChatMsg> = emptyList(),
+        systemPrompt: String = LlmPrompt.systemPrompt(),
     ): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "API Key 为空，请到设置中填写" }
 
-        val req = ChatCompletionRequest(
-            model = model,
-            messages = listOf(
-                ChatMsg(role = "system", content = LlmPrompt.systemPrompt()),
-                ChatMsg(role = "user",   content = userText),
-            ),
-        )
+        val messages = buildList {
+            add(ChatMsg(role = "system", content = systemPrompt))
+            addAll(history)
+            add(ChatMsg(role = "user",   content = userText))
+        }
+        val req = ChatCompletionRequest(model = model, messages = messages)
         val body = json.encodeToString(ChatCompletionRequest.serializer(), req)
             .toRequestBody("application/json".toMediaType())
-
         val url = baseUrl.trimEnd('/') + "/chat/completions"
         val request = Request.Builder()
             .url(url)

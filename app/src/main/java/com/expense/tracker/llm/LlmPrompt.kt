@@ -1,6 +1,8 @@
 package com.expense.tracker.llm
 
+import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.model.Category
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -12,12 +14,20 @@ object LlmPrompt {
      *
      * 关键：LLM 是无状态的，自己不知道"现在"是几点几号。所以每次调用都把当前时间显式注入到
      * system prompt，告诉它"now = ..."，它再以此为基准解析"昨天/上周三/3 天前"等相对时间。
+     *
+     * @param recentExpenses 近期已有支出（按时间倒序最多 30 条）。LLM 用 id 引用这些记录来
+     *                        生成 update/delete action。这是"对话能记得已记的支出"的关键 —
+     *                        没有它，用户说"那笔地铁是下午五点的"时 LLM 完全不知道"那笔"指什么。
      */
-    fun systemPrompt(nowMillis: Long = System.currentTimeMillis()): String {
+    fun systemPrompt(
+        nowMillis: Long = System.currentTimeMillis(),
+        recentExpenses: List<ExpenseEntity> = emptyList(),
+    ): String {
         val zone = ZoneId.systemDefault()
         val now = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(nowMillis), zone)
         val dateStr = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
         val weekDay = now.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, Locale.CHINA)
+        val expenseTimeFmt = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 
         return buildString {
             appendLine("你是一个友好的记账助手，可以和用户闲聊，同时也帮助用户记录支出。")
@@ -68,6 +78,21 @@ object LlmPrompt {
             appendLine()
             appendLine("【分类对照】")
             Category.ALL.forEach { appendLine("  ${it.id} → ${it.emoji} ${it.displayName}") }
+
+            // 近期支出快照 — 让 LLM 能"看到"用户已经记了什么，
+            // 这样"那笔咖啡"、"刚才那个肯德基"这类引用才有可能命中
+            if (recentExpenses.isNotEmpty()) {
+                appendLine()
+                appendLine("【近期已有支出（按时间倒序，最多 30 条）】")
+                appendLine("用户说'那笔/刚才那个/上面那个'时，请从这里找。引用某条记录时用它的精确金额+分类+日期写进 match。")
+                recentExpenses.take(30).forEach { e ->
+                    val cat = Category.byIdOrOther(e.categoryId)
+                    val timeStr = LocalDateTime.ofInstant(Instant.ofEpochMilli(e.occurredAt), zone)
+                        .format(expenseTimeFmt)
+                    val noteSuffix = if (e.note.isNotBlank()) " · ${e.note}" else ""
+                    appendLine("  - $timeStr ${cat.emoji}${cat.displayName} ¥${"%.2f".format(e.amount)}$noteSuffix")
+                }
+            }
         }
     }
 
