@@ -1,5 +1,6 @@
 package com.expense.tracker.llm
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -51,12 +52,17 @@ class LlmClient(
             val parsed = runCatching {
                 json.decodeFromString(ChatCompletionResponse.serializer(), text)
             }.getOrElse { error("LLM 响应解析失败：${it.message}") }
-            parsed.choices.firstOrNull()?.message?.content
+            val content = parsed.choices.firstOrNull()?.message?.content
                 ?: error("LLM 响应为空")
+            // logcat：方便用 `adb logcat -s LlmClient` 抓真实输入输出排查
+            Log.i(TAG, "USER: $userText")
+            Log.i(TAG, "RAW : $content")
+            content
         }
     }
 
     companion object {
+        private const val TAG = "LlmClient"
         fun defaultHttpClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)

@@ -42,8 +42,9 @@ object LlmResponseParser {
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
     fun parse(raw: String): LlmParseResult {
+        val cleaned = extractJsonObject(raw)
         val payload = try {
-            json.decodeFromString(LlmExpensesPayload.serializer(), raw.trim())
+            json.decodeFromString(LlmExpensesPayload.serializer(), cleaned)
         } catch (e: Exception) {
             throw LlmParseException("无法解析 LLM 输出为 JSON：${e.message}", e)
         }
@@ -60,6 +61,41 @@ object LlmResponseParser {
             }
         val parsedActions = payload.actions.mapNotNull(::parseAction)
         return LlmParseResult(reply = reply, expenses = parsedExpenses, actions = parsedActions)
+    }
+
+    /**
+     * 从 LLM 原始输出中提取第一个 JSON 对象。
+     *
+     * LLM（特别是 DeepSeek/豆包）经常在 JSON 前后加无关内容，比如：
+     *  - "好的！😊 {\"reply\": ...}"
+     *  - markdown 围栏：```json\n{...}\n```
+     *  - 多个 JSON 顶层（罕见但出现过）
+     *
+     * 兜底策略：找第一个 '{' 到与之匹配的 '}'（用栈计数花括号深度，跳过字符串里的花括号）。
+     * 找不到就返回原文 — 让下游 decode 抛带原始内容的异常，便于日志排查。
+     */
+    private fun extractJsonObject(raw: String): String {
+        val trimmed = raw.trim()
+        val start = trimmed.indexOf('{')
+        if (start < 0) return trimmed
+        var depth = 0
+        var inString = false
+        var escape = false
+        for (i in start until trimmed.length) {
+            val c = trimmed[i]
+            if (escape) { escape = false; continue }
+            if (c == '\\') { escape = true; continue }
+            if (c == '"') { inString = !inString; continue }
+            if (inString) continue
+            when (c) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return trimmed.substring(start, i + 1)
+                }
+            }
+        }
+        return trimmed.substring(start)  // 不平衡，交给 decode 抛错
     }
 
     private fun parseAction(a: LlmAction): ParsedAction? {

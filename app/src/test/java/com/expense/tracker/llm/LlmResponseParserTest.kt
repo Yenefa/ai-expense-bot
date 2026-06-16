@@ -157,4 +157,32 @@ class LlmResponseParserTest {
         val raw = """{"reply":"hi","expenses":[]}"""
         assertThat(LlmResponseParser.parse(raw).actions).isEmpty()
     }
+
+    // === 抠 JSON：LLM 经常在 JSON 前后加废话 ===
+
+    @Test fun extractJsonAfterEmojiPrefix() {
+        // 截图实例：LLM 直接以 emoji 开头
+        val raw = """😅 别担心 {"reply":"ok","expenses":[]}"""
+        val r = LlmResponseParser.parse(raw)
+        assertThat(r.reply).isEqualTo("ok")
+    }
+
+    @Test fun extractJsonFromMarkdownFence() {
+        val raw = "```json\n{\"reply\":\"ok\",\"expenses\":[]}\n```"
+        val r = LlmResponseParser.parse(raw)
+        assertThat(r.reply).isEqualTo("ok")
+    }
+
+    @Test fun extractJsonAfterChinesePreamble() {
+        val raw = """好的，以下是你的支出：{"reply":"ok","expenses":[{"amount":5,"category":"food","note":"","occurred_at":null}]}"""
+        val r = LlmResponseParser.parse(raw)
+        assertThat(r.expenses).hasSize(1)
+    }
+
+    @Test fun nestedBracesInsideStringDontConfuseExtractor() {
+        // note 里包含 } 不应该让花括号计数提前归零
+        val raw = """{"reply":"ok","expenses":[{"amount":1,"category":"food","note":"a}b{c","occurred_at":null}]}"""
+        val r = LlmResponseParser.parse(raw)
+        assertThat(r.expenses[0].note).isEqualTo("a}b{c")
+    }
 }
