@@ -39,7 +39,7 @@ class ChatViewModelTest {
         val ed = FakeExpenseDao()
         val cd = FakeChatDao()
         val store = FakeStore(initialLlm)
-        val prefs = UserPrefs(store)
+        val prefs = UserPrefs(store, FakeSecurePrefs())
         val vm = ChatViewModel(
             expenseRepo = ExpenseRepository(ed),
             chatRepo = ChatRepository(cd),
@@ -220,5 +220,34 @@ private class FakeStore(initialLlm: Boolean) : DataStore<Preferences> {
         val next = transform(state.value)
         state.value = next
         return next
+    }
+}
+
+private class FakeSecurePrefs : android.content.SharedPreferences {
+    private val data = mutableMapOf<String, Any?>()
+    override fun getString(key: String, defValue: String?) = (data[key] as? String) ?: defValue
+    override fun getStringSet(key: String, defValues: MutableSet<String>?) = error("unused")
+    override fun getInt(key: String, defValue: Int) = (data[key] as? Int) ?: defValue
+    override fun getLong(key: String, defValue: Long) = (data[key] as? Long) ?: defValue
+    override fun getFloat(key: String, defValue: Float) = (data[key] as? Float) ?: defValue
+    override fun getBoolean(key: String, defValue: Boolean) = (data[key] as? Boolean) ?: defValue
+    override fun contains(key: String) = data.containsKey(key)
+    override fun edit(): android.content.SharedPreferences.Editor = Ed()
+    override fun registerOnSharedPreferenceChangeListener(l: android.content.SharedPreferences.OnSharedPreferenceChangeListener?) {}
+    override fun unregisterOnSharedPreferenceChangeListener(l: android.content.SharedPreferences.OnSharedPreferenceChangeListener?) {}
+    override fun getAll(): MutableMap<String, *> = data.toMutableMap()
+    private inner class Ed : android.content.SharedPreferences.Editor {
+        private val p = mutableMapOf<String, Any?>()
+        private val rm = mutableSetOf<String>()
+        override fun putString(k: String, v: String?) = apply { p[k] = v }
+        override fun putStringSet(k: String, v: MutableSet<String>?) = apply { p[k] = v }
+        override fun putInt(k: String, v: Int) = apply { p[k] = v }
+        override fun putLong(k: String, v: Long) = apply { p[k] = v }
+        override fun putFloat(k: String, v: Float) = apply { p[k] = v }
+        override fun putBoolean(k: String, v: Boolean) = apply { p[k] = v }
+        override fun remove(k: String) = apply { rm += k }
+        override fun clear() = apply { data.clear() }
+        override fun commit(): Boolean { apply(); return true }
+        override fun apply() { rm.forEach { data.remove(it) }; p.forEach { (k, v) -> if (v == null) data.remove(k) else data[k] = v } }
     }
 }
