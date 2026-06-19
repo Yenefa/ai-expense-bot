@@ -30,6 +30,7 @@ import com.expense.tracker.ui.history.HistoryViewModel
 import com.expense.tracker.ui.settings.DataExportScreen
 import com.expense.tracker.ui.settings.SettingsMenuScreen
 import com.expense.tracker.ui.settings.SettingsScreen
+import com.expense.tracker.ui.settings.UserManualScreen
 import com.expense.tracker.ui.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
@@ -132,6 +133,7 @@ class MainActivity : ComponentActivity() {
                             onClose = { screen = Screen.Chat },
                             onOpenLlmSettings = { subScreen = SubScreen.LlmSettings },
                             onOpenDataExport = { subScreen = SubScreen.DataExport },
+                            onOpenUserManual = { subScreen = SubScreen.UserManual },
                         )
                     }
                 }
@@ -168,6 +170,21 @@ class MainActivity : ComponentActivity() {
                 ) {
                     DataExportScreen(onClose = { subScreen = null })
                 }
+
+                // 软件说明书 sub-screen 从右侧滑入
+                AnimatedVisibility(
+                    visible = subScreen == SubScreen.UserManual,
+                    enter = slideInHorizontally(
+                        animationSpec = tween(320, easing = FastOutSlowInEasing),
+                        initialOffsetX = { it },
+                    ) + fadeIn(animationSpec = tween(160)),
+                    exit = slideOutHorizontally(
+                        animationSpec = tween(280, easing = FastOutSlowInEasing),
+                        targetOffsetX = { it },
+                    ) + fadeOut(animationSpec = tween(140)),
+                ) {
+                    UserManualScreen(onClose = { subScreen = null })
+                }
             }
         }
     }
@@ -184,5 +201,6 @@ class MainActivity : ComponentActivity() {
     private sealed interface SubScreen {
         data object LlmSettings : SubScreen
         data object DataExport : SubScreen
+        data object UserManual : SubScreen
     }
 }
