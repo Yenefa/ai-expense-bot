@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,7 +38,10 @@ import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.softShadow
 
 /**
- * 长按消息后弹出的底部操作 sheet — 复制 / 编辑（assistant 消息只显示复制）。
+ * 长按消息后弹出的底部操作 sheet — 当前只有"复制"。
+ *
+ * 编辑消息已废弃（v2.7 起）：聊天里的消息只是"对话存档"，真正的数据编辑应直接在
+ * 历史明细页对 expense 行操作 → ExpenseEditDialog。
  *
  * 动画：从底部 spring 弹入，半透明遮罩。
  */
@@ -48,7 +50,6 @@ fun MessageActionSheet(
     message: ChatMessageEntity?,
     onDismiss: () -> Unit,
     onCopy: () -> Unit,
-    onEdit: () -> Unit,
 ) {
     val visible = message != null
     AnimatedVisibility(
@@ -97,13 +98,6 @@ fun MessageActionSheet(
                     label = "复制",
                     onClick = onCopy,
                 )
-                if (message?.role == "user") {
-                    ActionRow(
-                        icon = Icons.Outlined.Edit,
-                        label = "编辑",
-                        onClick = onEdit,
-                    )
-                }
                 Spacer(Modifier.size(4.dp))
             }
         }

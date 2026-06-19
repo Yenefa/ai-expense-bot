@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.expense.tracker.data.db.ChatMessageEntity
-import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.model.Category
 import com.expense.tracker.ui.dock.InteractiveDock
 import com.expense.tracker.ui.template.CategoryBubbleDialog
@@ -50,15 +49,12 @@ fun ChatScreen(
     val context = LocalContext.current
     // 双击分类弹气泡的状态：null = 不显示
     var bubbleCategoryId by remember { mutableStateOf<String?>(null) }
-    // 长按消息时弹出"复制/编辑"action sheet
+    // 长按消息时弹出复制 sheet
     var actionSheetTarget by remember { mutableStateOf<ChatMessageEntity?>(null) }
-    // 编辑消息 + 关联 expense 的弹窗状态
-    var editTarget by remember { mutableStateOf<Pair<ChatMessageEntity, ExpenseEntity?>?>(null) }
 
-    // 气泡或 sheet/编辑弹窗打开时拦截系统返回键，只关弹窗，不退出 App
-    BackHandler(enabled = bubbleCategoryId != null || actionSheetTarget != null || editTarget != null) {
+    // 任意弹窗打开时拦截系统返回键，只关弹窗，不退出 App
+    BackHandler(enabled = bubbleCategoryId != null || actionSheetTarget != null) {
         when {
-            editTarget != null -> editTarget = null
             actionSheetTarget != null -> actionSheetTarget = null
             else -> bubbleCategoryId = null
         }
@@ -151,7 +147,7 @@ fun ChatScreen(
             },
         )
 
-        // 长按消息：弹出复制/编辑 action sheet
+        // 长按消息：弹出"复制"sheet（v2.7 起去掉编辑 — 真正的数据编辑在历史明细页）
         MessageActionSheet(
             message = actionSheetTarget,
             onDismiss = { actionSheetTarget = null },
@@ -159,25 +155,6 @@ fun ChatScreen(
                 val msg = actionSheetTarget ?: return@MessageActionSheet
                 copyToClipboard(context, msg.content)
                 actionSheetTarget = null
-            },
-            onEdit = {
-                val msg = actionSheetTarget ?: return@MessageActionSheet
-                actionSheetTarget = null
-                vm.loadEditTarget(msg) { loaded, expense ->
-                    editTarget = loaded to expense
-                }
-            },
-        )
-
-        // 编辑消息 + 关联 expense 的弹窗
-        MessageEditDialog(
-            message = editTarget?.first,
-            linkedExpense = editTarget?.second,
-            onDismiss = { editTarget = null },
-            onSave = { newContent, newExpense ->
-                editTarget?.let { vm.saveEdit(it.first, newContent, newExpense) }
-                editTarget = null
-                Toast.makeText(context, "已保存", Toast.LENGTH_SHORT).show()
             },
         )
     }

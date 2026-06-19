@@ -23,9 +23,12 @@ data class DailyGroup(
 data class DisplayExpense(
     val id: Long,
     val amount: Double,
+    val categoryId: String,
     val categoryEmoji: String,
     val categoryName: String,
     val note: String,
+    val occurredAt: Long,
+    val createdAt: Long,
     val timeLabel: String,  // "14:30"
 )
 
@@ -52,6 +55,21 @@ class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
         viewModelScope.launch { repo.delete(id) }
     }
 
+    /** 把 DisplayExpense 还原为完整的 ExpenseEntity，传给编辑弹窗。 */
+    fun toEntity(d: DisplayExpense): ExpenseEntity = ExpenseEntity(
+        amount = d.amount,
+        categoryId = d.categoryId,
+        note = d.note,
+        occurredAt = d.occurredAt,
+        createdAt = d.createdAt,
+        id = d.id,
+    )
+
+    /** 保存编辑：UPDATE expenses 表的对应 id 行，不会新建记录。 */
+    fun updateExpense(updated: ExpenseEntity) {
+        viewModelScope.launch { repo.update(updated) }
+    }
+
     private fun aggregate(list: List<ExpenseEntity>): HistoryUiState {
         val groups = list
             .sortedByDescending { it.occurredAt }
@@ -67,9 +85,12 @@ class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
                         DisplayExpense(
                             id = e.id,
                             amount = e.amount,
+                            categoryId = e.categoryId,
                             categoryEmoji = cat.emoji,
                             categoryName = cat.displayName,
                             note = e.note,
+                            occurredAt = e.occurredAt,
+                            createdAt = e.createdAt,
                             timeLabel = Instant.ofEpochMilli(e.occurredAt).atZone(zone).format(timeFmt),
                         )
                     },

@@ -1,5 +1,6 @@
 package com.expense.tracker.ui.history
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -50,6 +51,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
@@ -58,71 +60,81 @@ import com.expense.tracker.ui.theme.softShadow
 fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
     val state by vm.uiState.collectAsState()
     val expandedDays = remember { mutableStateMapOf<String, Boolean>() }
+    // 点击明细行打开编辑弹窗：null = 不显示
+    var editTarget by remember { mutableStateOf<ExpenseEntity?>(null) }
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(AppColors.Bg),
-    ) {
-        // 顶部
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    // 弹窗打开时拦截系统返回键
+    BackHandler(enabled = editTarget != null) { editTarget = null }
+
+    Box(modifier = Modifier.fillMaxSize().background(AppColors.Bg)) {
+        Column(
+            modifier = Modifier.fillMaxSize().background(AppColors.Bg),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .iconBtnShadow()
-                    .clip(CircleShape)
-                    .background(AppColors.Bg)
-                    .pointerInput(onBack) { detectTapGestures(onTap = { onBack() }) },
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
-            Spacer(Modifier.size(12.dp))
-            Text("历史明细", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
-        }
-
-        if (state.groups.isEmpty()) {
-            Box(Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-                Text("还没有记录，去记一笔吧 📝", color = AppColors.TextMuted, style = MaterialTheme.typography.bodyLarge)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            // 顶部
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                items(state.groups, key = { it.dateLabel }) { day ->
-                    val expanded = expandedDays[day.dateLabel] ?: false
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .softShadow(elevation = 2.dp, cornerRadius = 16.dp, spotAlpha = 0.06f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(AppColors.Bg)
-                            .clickable { expandedDays[day.dateLabel] = !expanded },
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .iconBtnShadow()
+                        .clip(CircleShape)
+                        .background(AppColors.Bg)
+                        .pointerInput(onBack) { detectTapGestures(onTap = { onBack() }) },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
+                Spacer(Modifier.size(12.dp))
+                Text("历史明细", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
+            }
+
+            if (state.groups.isEmpty()) {
+                Box(Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
+                    Text("还没有记录，去记一笔吧 📝", color = AppColors.TextMuted, style = MaterialTheme.typography.bodyLarge)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(state.groups, key = { it.dateLabel }) { day ->
+                        val expanded = expandedDays[day.dateLabel] ?: false
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .softShadow(elevation = 2.dp, cornerRadius = 16.dp, spotAlpha = 0.06f)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(AppColors.Bg)
+                                .clickable { expandedDays[day.dateLabel] = !expanded },
                         ) {
-                            Text(day.dateLabel, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("¥", style = MaterialTheme.typography.labelSmall, color = AppColors.TextSecondary)
-                                Text(
-                                    "%.2f".format(day.total),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = AppColors.TextPrimary,
-                                )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(day.dateLabel, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("¥", style = MaterialTheme.typography.labelSmall, color = AppColors.TextSecondary)
+                                    Text(
+                                        "%.2f".format(day.total),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = AppColors.TextPrimary,
+                                    )
+                                }
                             }
-                        }
-                        AnimatedVisibility(visible = expanded, enter = expandVertically(), exit = shrinkVertically()) {
-                            Column(Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
-                                day.items.forEach { item ->
-                                    SwipeToDeleteRow(
-                                        key = item.id,
-                                        onDelete = { vm.deleteExpense(item.id) },
-                                    ) {
-                                        ExpenseRow(item)
+                            AnimatedVisibility(visible = expanded, enter = expandVertically(), exit = shrinkVertically()) {
+                                Column(Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
+                                    day.items.forEach { item ->
+                                        SwipeToDeleteRow(
+                                            key = item.id,
+                                            onDelete = { vm.deleteExpense(item.id) },
+                                        ) {
+                                            ExpenseRow(
+                                                item = item,
+                                                onClick = { editTarget = vm.toEntity(item) },
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -131,15 +143,26 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
                 }
             }
         }
+
+        // 编辑明细弹窗
+        ExpenseEditDialog(
+            expense = editTarget,
+            onDismiss = { editTarget = null },
+            onSave = { updated ->
+                vm.updateExpense(updated)
+                editTarget = null
+            },
+        )
     }
 }
 
 @Composable
-private fun ExpenseRow(item: DisplayExpense) {
+private fun ExpenseRow(item: DisplayExpense, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(AppColors.Bg)
+            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
