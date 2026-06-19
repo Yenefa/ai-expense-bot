@@ -2,6 +2,8 @@ package com.expense.tracker.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expense.tracker.data.db.ChatMessageEntity
+import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.prefs.UserPrefs
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
@@ -112,6 +114,32 @@ class ChatViewModel(
                 }
             }
             internal.update { it.copy(sending = false) }
+        }
+    }
+
+    /**
+     * 加载消息以及（若有）关联 expense，准备进入编辑态。
+     * UI 通过观察 uiState 拿到这两个对象后弹出编辑框。
+     */
+    fun loadEditTarget(message: ChatMessageEntity, onLoaded: (ChatMessageEntity, ExpenseEntity?) -> Unit) {
+        viewModelScope.launch {
+            val expense = message.relatedExpenseId?.let { expenseRepo.getById(it) }
+            onLoaded(message, expense)
+        }
+    }
+
+    /**
+     * 保存编辑：
+     * - 更新 chat_messages 表的 content（保留 id/createdAt/role/relatedExpenseId）
+     * - 若 newExpense 不为空，同时更新 expenses 表
+     * 都用 UPDATE，不会新建记录。
+     */
+    fun saveEdit(originalMessage: ChatMessageEntity, newContent: String, newExpense: ExpenseEntity?) {
+        viewModelScope.launch {
+            chatRepo.update(originalMessage.copy(content = newContent))
+            if (newExpense != null) {
+                expenseRepo.update(newExpense)
+            }
         }
     }
 

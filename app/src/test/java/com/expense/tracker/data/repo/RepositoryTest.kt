@@ -20,7 +20,12 @@ private class FakeExpenseDao : ExpenseDao {
         state.value = state.value + expense.copy(id = seq)
         return seq
     }
+    override suspend fun update(expense: ExpenseEntity) {
+        state.value = state.value.map { if (it.id == expense.id) expense else it }
+    }
     override fun observeAll(): Flow<List<ExpenseEntity>> = state
+    override suspend fun getAllOnce(): List<ExpenseEntity> = state.value
+    override suspend fun getById(id: Long): ExpenseEntity? = state.value.firstOrNull { it.id == id }
     override fun observeInRange(from: Long, to: Long): Flow<List<ExpenseEntity>> =
         flow { emit(state.value.filter { it.occurredAt in from until to }) }
     override suspend fun deleteById(id: Long) {
@@ -36,7 +41,12 @@ private class FakeChatDao : ChatMessageDao {
         state.value = state.value + msg.copy(id = seq)
         return seq
     }
+    override suspend fun update(msg: ChatMessageEntity) {
+        state.value = state.value.map { if (it.id == msg.id) msg else it }
+    }
     override fun observeAll(): Flow<List<ChatMessageEntity>> = state
+    override suspend fun getAllOnce(): List<ChatMessageEntity> = state.value
+    override suspend fun getById(id: Long): ChatMessageEntity? = state.value.firstOrNull { it.id == id }
     override suspend fun clearAll() { state.value = emptyList() }
 }
 

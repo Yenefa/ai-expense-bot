@@ -39,7 +39,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsMenuScreen(onClose: () -> Unit, onOpenLlmSettings: () -> Unit) {
+fun SettingsMenuScreen(
+    onClose: () -> Unit,
+    onOpenLlmSettings: () -> Unit,
+    onOpenDataExport: () -> Unit = {},
+) {
     val snackbarHost = remember { SnackbarHostState() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val context = LocalContext.current
@@ -76,7 +80,7 @@ fun SettingsMenuScreen(onClose: () -> Unit, onOpenLlmSettings: () -> Unit) {
             MenuRow(emoji = "🌗", title = "深色模式", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "📊", title = "预算管理", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "🔔", title = "智能提醒", subtitle = "即将上线", onClick = { /* TODO */ })
-            MenuRow(emoji = "📁", title = "数据导出", subtitle = "即将上线", onClick = { /* TODO */ })
+            MenuRow(emoji = "📁", title = "数据导出", subtitle = "JSON / CSV 本地导出", onClick = onOpenDataExport)
             MenuRow(emoji = "ℹ️", title = "关于记账助手", subtitle = "v$versionName · ChatGPT 风格 · 本地 SQLite", onClick = {
                 scope.launch { snackbarHost.showSnackbar("记账助手 v$versionName — 对话式智能记账") }
             })

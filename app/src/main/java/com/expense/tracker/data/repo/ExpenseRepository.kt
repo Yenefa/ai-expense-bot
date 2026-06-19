@@ -23,4 +23,10 @@ class ExpenseRepository(private val dao: ExpenseDao) {
     }
 
     suspend fun delete(id: Long) = dao.deleteById(id)
+
+    suspend fun update(expense: ExpenseEntity) = dao.update(expense)
+
+    suspend fun getById(id: Long): ExpenseEntity? = dao.getById(id)
+
+    suspend fun getAllOnce(): List<ExpenseEntity> = dao.getAllOnce()
 }

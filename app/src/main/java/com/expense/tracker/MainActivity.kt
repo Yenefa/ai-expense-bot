@@ -27,6 +27,7 @@ import com.expense.tracker.ui.chat.ChatScreen
 import com.expense.tracker.ui.chat.ChatViewModel
 import com.expense.tracker.ui.history.HistoryScreen
 import com.expense.tracker.ui.history.HistoryViewModel
+import com.expense.tracker.ui.settings.DataExportScreen
 import com.expense.tracker.ui.settings.SettingsMenuScreen
 import com.expense.tracker.ui.settings.SettingsScreen
 import com.expense.tracker.ui.theme.AppTheme
@@ -130,6 +131,7 @@ class MainActivity : ComponentActivity() {
                         Screen.Settings -> SettingsMenuScreen(
                             onClose = { screen = Screen.Chat },
                             onOpenLlmSettings = { subScreen = SubScreen.LlmSettings },
+                            onOpenDataExport = { subScreen = SubScreen.DataExport },
                         )
                     }
                 }
@@ -151,6 +153,21 @@ class MainActivity : ComponentActivity() {
                         onClose = { subScreen = null },
                     )
                 }
+
+                // 数据导出 sub-screen 同样从右侧滑入
+                AnimatedVisibility(
+                    visible = subScreen == SubScreen.DataExport,
+                    enter = slideInHorizontally(
+                        animationSpec = tween(320, easing = FastOutSlowInEasing),
+                        initialOffsetX = { it },
+                    ) + fadeIn(animationSpec = tween(160)),
+                    exit = slideOutHorizontally(
+                        animationSpec = tween(280, easing = FastOutSlowInEasing),
+                        targetOffsetX = { it },
+                    ) + fadeOut(animationSpec = tween(140)),
+                ) {
+                    DataExportScreen(onClose = { subScreen = null })
+                }
             }
         }
     }
@@ -166,5 +183,6 @@ class MainActivity : ComponentActivity() {
 
     private sealed interface SubScreen {
         data object LlmSettings : SubScreen
+        data object DataExport : SubScreen
     }
 }

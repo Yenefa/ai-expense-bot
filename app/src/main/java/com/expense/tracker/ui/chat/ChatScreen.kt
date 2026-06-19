@@ -1,5 +1,9 @@
 package com.expense.tracker.ui.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -25,6 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.expense.tracker.data.db.ChatMessageEntity
+import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.model.Category
 import com.expense.tracker.ui.dock.InteractiveDock
 import com.expense.tracker.ui.template.CategoryBubbleDialog
@@ -40,12 +47,21 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by vm.uiState.collectAsState()
+    val context = LocalContext.current
     // 双击分类弹气泡的状态：null = 不显示
     var bubbleCategoryId by remember { mutableStateOf<String?>(null) }
+    // 长按消息时弹出"复制/编辑"action sheet
+    var actionSheetTarget by remember { mutableStateOf<ChatMessageEntity?>(null) }
+    // 编辑消息 + 关联 expense 的弹窗状态
+    var editTarget by remember { mutableStateOf<Pair<ChatMessageEntity, ExpenseEntity?>?>(null) }
 
-    // 气泡打开时拦截系统返回键，只关气泡，绝不退出 App
-    BackHandler(enabled = bubbleCategoryId != null) {
-        bubbleCategoryId = null
+    // 气泡或 sheet/编辑弹窗打开时拦截系统返回键，只关弹窗，不退出 App
+    BackHandler(enabled = bubbleCategoryId != null || actionSheetTarget != null || editTarget != null) {
+        when {
+            editTarget != null -> editTarget = null
+            actionSheetTarget != null -> actionSheetTarget = null
+            else -> bubbleCategoryId = null
+        }
     }
 
     Box(modifier = modifier.fillMaxSize().background(AppColors.Bg)) {
@@ -55,6 +71,7 @@ fun ChatScreen(
                 messages = state.messages,
                 thinking = state.thinking,
                 streamingText = state.streamingText,
+                onLongPressMessage = { msg -> actionSheetTarget = msg },
                 modifier = Modifier.weight(1f),
             )
             AnimatedVisibility(
@@ -133,5 +150,41 @@ fun ChatScreen(
                 bubbleCategoryId = null
             },
         )
+
+        // 长按消息：弹出复制/编辑 action sheet
+        MessageActionSheet(
+            message = actionSheetTarget,
+            onDismiss = { actionSheetTarget = null },
+            onCopy = {
+                val msg = actionSheetTarget ?: return@MessageActionSheet
+                copyToClipboard(context, msg.content)
+                actionSheetTarget = null
+            },
+            onEdit = {
+                val msg = actionSheetTarget ?: return@MessageActionSheet
+                actionSheetTarget = null
+                vm.loadEditTarget(msg) { loaded, expense ->
+                    editTarget = loaded to expense
+                }
+            },
+        )
+
+        // 编辑消息 + 关联 expense 的弹窗
+        MessageEditDialog(
+            message = editTarget?.first,
+            linkedExpense = editTarget?.second,
+            onDismiss = { editTarget = null },
+            onSave = { newContent, newExpense ->
+                editTarget?.let { vm.saveEdit(it.first, newContent, newExpense) }
+                editTarget = null
+                Toast.makeText(context, "已保存", Toast.LENGTH_SHORT).show()
+            },
+        )
     }
+}
+
+private fun copyToClipboard(context: Context, text: String) {
+    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    cm?.setPrimaryClip(ClipData.newPlainText("message", text))
+    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
 }

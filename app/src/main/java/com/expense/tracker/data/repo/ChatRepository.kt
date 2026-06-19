@@ -22,5 +22,11 @@ class ChatRepository(private val dao: ChatMessageDao) {
         relatedExpenseId = relatedExpenseId,
     ))
 
+    suspend fun update(msg: ChatMessageEntity) = dao.update(msg)
+
+    suspend fun getById(id: Long): ChatMessageEntity? = dao.getById(id)
+
+    suspend fun getAllOnce(): List<ChatMessageEntity> = dao.getAllOnce()
+
     suspend fun clear() = dao.clearAll()
 }

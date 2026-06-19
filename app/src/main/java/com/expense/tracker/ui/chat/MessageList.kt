@@ -15,14 +15,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -37,14 +39,32 @@ fun MessageList(
     messages: List<ChatMessageEntity>,
     thinking: Boolean = false,
     streamingText: String? = null,
+    onLongPressMessage: (ChatMessageEntity) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val listState = rememberLazyListState()
-    // 当消息数变化、思考态变化、流式字符增长时，自动滚到最底
+    // 关键修复 v2.5：listState 用 rememberSaveable 跨 AnimatedContent 重组持久化，
+    // 返回 ChatScreen 时恢复到之前的滚动位置，避免"从顶滑到底"的冗余动画。
+    val listState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
+
+    // hasComposedOnce: remember 每次 ChatScreen 重新 mount 都会重置为 false
+    // 第一次组合时为 false → 不动画（瞬时定位到底，没有视觉冗余）
+    // 后续因新消息/思考态/流式文字变化触发的 effect → 为 true → 动画到底（自然跟随）
+    val hasComposedOnce = remember { booleanArrayOf(false) }
+
     LaunchedEffect(messages.size, thinking, streamingText?.length) {
         val totalItems = messages.size + (if (thinking || streamingText != null) 1 else 0)
-        if (totalItems > 0) listState.animateScrollToItem(totalItems - 1)
+        if (totalItems == 0) return@LaunchedEffect
+
+        if (!hasComposedOnce[0]) {
+            // 首次组合（含从子页面返回主页面的 remount）：直接瞬时定位到末尾，不动画
+            listState.scrollToItem(totalItems - 1)
+            hasComposedOnce[0] = true
+        } else {
+            // 真正有新内容时才动画
+            listState.animateScrollToItem(totalItems - 1)
+        }
     }
+
     LazyColumn(
         modifier = modifier,
         state = listState,
@@ -52,7 +72,7 @@ fun MessageList(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         items(items = messages, key = { it.id }) { msg ->
-            MessageBubble(msg)
+            MessageBubble(message = msg, onLongPress = { onLongPressMessage(msg) })
         }
         // 流式字符（边收边显），优先于 thinking 显示
         if (streamingText != null) {
