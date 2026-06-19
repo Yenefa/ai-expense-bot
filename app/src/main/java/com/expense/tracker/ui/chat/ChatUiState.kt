@@ -11,4 +11,6 @@ data class ChatUiState(
     val thinking: Boolean = false,
     /** LLM 回复正在被逐字"打字"展示；非空时 UI 显示一个临时 assistant 气泡。 */
     val streamingText: String? = null,
+    /** 输入框草稿 — 由 ViewModel 持有，跨 ChatScreen 重组（包括从子页面返回）不丢失。 */
+    val inputDraft: String = "",
 )

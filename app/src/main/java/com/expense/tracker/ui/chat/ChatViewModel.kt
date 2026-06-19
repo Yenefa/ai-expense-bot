@@ -49,6 +49,11 @@ class ChatViewModel(
         internal.update { it.copy(selectedCategoryId = id) }
     }
 
+    /** 输入框草稿 — 由 ViewModel 持有，跨页面切换不丢。 */
+    fun updateInputDraft(text: String) {
+        internal.update { it.copy(inputDraft = text) }
+    }
+
     fun toggleLlm() {
         viewModelScope.launch { userPrefs.setLlmEnabled(!internal.value.llmEnabled) }
     }
@@ -81,7 +86,7 @@ class ChatViewModel(
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            internal.update { it.copy(sending = true) }
+            internal.update { it.copy(sending = true, inputDraft = "") }
             chatRepo.appendUser(trimmed)
             val prefs = userPrefs.snapshot.first()
             if (!prefs.llmEnabled) {

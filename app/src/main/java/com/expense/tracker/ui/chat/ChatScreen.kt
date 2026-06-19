@@ -119,6 +119,8 @@ fun ChatScreen(
                 )
             }
             InputBar(
+                text = state.inputDraft,
+                onTextChange = vm::updateInputDraft,
                 llmEnabled = state.llmEnabled,
                 onToggleLlm = vm::toggleLlm,
                 onSend = vm::submitFreeText,

@@ -36,6 +36,8 @@ import com.expense.tracker.ui.theme.inputShadow
 
 @Composable
 fun InputBar(
+    text: String,
+    onTextChange: (String) -> Unit,
     llmEnabled: Boolean,
     onToggleLlm: () -> Unit,
     onSend: (String) -> Unit,
@@ -43,7 +45,6 @@ fun InputBar(
     placeholder: String,
     modifier: Modifier = Modifier,
 ) {
-    var text by remember { mutableStateOf("") }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -66,7 +67,7 @@ fun InputBar(
             if (llmEnabled) {
                 BasicTextField(
                     value = text,
-                    onValueChange = { text = it },
+                    onValueChange = onTextChange,
                     singleLine = true,
                     textStyle = TextStyle(
                         color = AppColors.TextPrimary,
@@ -100,7 +101,7 @@ fun InputBar(
                 .pointerInput(text, llmEnabled) {
                     detectTapGestures(onTap = {
                         if (llmEnabled && text.isNotBlank()) {
-                            onSend(text); text = ""
+                            onSend(text)
                         }
                     })
                 },

@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 import java.time.ZoneId
 
 data class AnalyticsUiState(
-    val period: Period = Period.Month,
+    val period: Period = Period.Week,
     val barAmounts: List<Double> = emptyList(),
     val lineCounts: List<Int> = emptyList(),
     val pieByCategory: Map<String, Double> = emptyMap(),
@@ -40,7 +40,7 @@ class AnalyticsViewModel(
 
     private val internal = MutableStateFlow(AnalyticsUiState())
     val uiState: StateFlow<AnalyticsUiState> = internal.asStateFlow()
-    private val periodTrigger = MutableStateFlow(Period.Month)
+    private val periodTrigger = MutableStateFlow(Period.Week)
 
     init {
         viewModelScope.launch {

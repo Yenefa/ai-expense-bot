@@ -34,6 +34,8 @@ data class DisplayExpense(
 
 data class HistoryUiState(
     val groups: List<DailyGroup> = emptyList(),
+    /** 按本地时区聚合每天的金额+笔数，供日历视图使用 */
+    val cellsByDate: Map<java.time.LocalDate, DayCell> = emptyMap(),
 )
 
 class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
@@ -71,16 +73,18 @@ class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
     }
 
     private fun aggregate(list: List<ExpenseEntity>): HistoryUiState {
-        val groups = list
-            .sortedByDescending { it.occurredAt }
-            .groupBy { e ->
-                Instant.ofEpochMilli(e.occurredAt).atZone(zone).toLocalDate()
-            }
+        // 按本地日期 group 一次，重用给 list/calendar 两套 UI
+        val byDate = list.groupBy { e ->
+            Instant.ofEpochMilli(e.occurredAt).atZone(zone).toLocalDate()
+        }
+
+        val groups = byDate.entries
+            .sortedByDescending { it.key }
             .map { (date, items) ->
                 DailyGroup(
                     dateLabel = date.format(fmt),
                     total = items.sumOf { it.amount },
-                    items = items.map { e ->
+                    items = items.sortedByDescending { it.occurredAt }.map { e ->
                         val cat = Category.byIdOrOther(e.categoryId)
                         DisplayExpense(
                             id = e.id,
@@ -96,6 +100,11 @@ class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
                     },
                 )
             }
-        return HistoryUiState(groups = groups)
+
+        val cellsByDate = byDate.mapValues { (date, items) ->
+            DayCell(date = date, total = items.sumOf { it.amount }, count = items.size)
+        }
+
+        return HistoryUiState(groups = groups, cellsByDate = cellsByDate)
     }
 }

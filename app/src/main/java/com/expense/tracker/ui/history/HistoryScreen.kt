@@ -32,7 +32,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -62,6 +64,11 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
     val expandedDays = remember { mutableStateMapOf<String, Boolean>() }
     // 点击明细行打开编辑弹窗：null = 不显示
     var editTarget by remember { mutableStateOf<ExpenseEntity?>(null) }
+    // 视图模式：列表 / 日历
+    var calendarMode by remember { mutableStateOf(false) }
+    val today = remember { java.time.LocalDate.now() }
+    var visibleMonth by remember { mutableStateOf(java.time.YearMonth.from(today)) }
+    var selectedDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
 
     // 弹窗打开时拦截系统返回键
     BackHandler(enabled = editTarget != null) { editTarget = null }
@@ -86,9 +93,93 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
                 ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
                 Spacer(Modifier.size(12.dp))
                 Text("历史明细", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
+                Spacer(Modifier.weight(1f))
+                // 右上角视图切换：列表 ↔ 日历
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .iconBtnShadow()
+                        .clip(CircleShape)
+                        .background(AppColors.Bg)
+                        .clickable { calendarMode = !calendarMode },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (calendarMode) Icons.Outlined.ViewList else Icons.Outlined.CalendarMonth,
+                        contentDescription = if (calendarMode) "列表视图" else "日历视图",
+                        tint = AppColors.TextPrimary,
+                    )
+                }
             }
 
-            if (state.groups.isEmpty()) {
+            if (calendarMode) {
+                // 日历视图
+                Column(modifier = Modifier.weight(1f)) {
+                    MonthCalendarView(
+                        yearMonth = visibleMonth,
+                        today = today,
+                        selected = selectedDate,
+                        cellsByDate = state.cellsByDate,
+                        onPrevMonth = { visibleMonth = visibleMonth.minusMonths(1) },
+                        onNextMonth = { visibleMonth = visibleMonth.plusMonths(1) },
+                        onSelectDate = { date ->
+                            selectedDate = if (selectedDate == date) null else date
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    // 选中日期的明细列表
+                    val day = selectedDate?.let { d ->
+                        state.groups.firstOrNull { g ->
+                            // 把 g.dateLabel ("M月d日") 匹配回 LocalDate 不可靠，直接遍历 items 的 occurredAt 判断
+                            g.items.any { it.occurredAt.let { ts ->
+                                java.time.Instant.ofEpochMilli(ts).atZone(java.time.ZoneId.systemDefault()).toLocalDate() == d
+                            } }
+                        }
+                    }
+                    if (selectedDate != null) {
+                        if (day == null) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "${selectedDate}：当天无消费记录",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppColors.TextMuted,
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                item {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(day.dateLabel, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                        Text("¥%.2f".format(day.total), fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                    }
+                                }
+                                items(day.items, key = { it.id }) { item ->
+                                    SwipeToDeleteRow(
+                                        key = item.id,
+                                        onDelete = { vm.deleteExpense(item.id) },
+                                    ) {
+                                        ExpenseRow(
+                                            item = item,
+                                            onClick = { editTarget = vm.toEntity(item) },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (state.groups.isEmpty()) {
                 Box(Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
                     Text("还没有记录，去记一笔吧 📝", color = AppColors.TextMuted, style = MaterialTheme.typography.bodyLarge)
                 }
