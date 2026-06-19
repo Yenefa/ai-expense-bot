@@ -134,7 +134,7 @@ fun DataExportScreen(onClose: () -> Unit) {
                 onClick = {
                     busy = true
                     scope.launch {
-                        val expenses = container.expenseRepo.getAllOnce()
+                        val expenses = container.expenseRepo.getAllActiveOnce()
                         val chats = container.chatRepo.getAllOnce()
                         val nowMs = System.currentTimeMillis()
                         val isoNow = Instant.ofEpochMilli(nowMs).toString()
@@ -158,7 +158,7 @@ fun DataExportScreen(onClose: () -> Unit) {
                 onClick = {
                     busy = true
                     scope.launch {
-                        val expenses = container.expenseRepo.getAllOnce()
+                        val expenses = container.expenseRepo.getAllActiveOnce()
                         val nowMs = System.currentTimeMillis()
                         val csv = DataExporter.toCsv(expenses)
                         pendingPayload = "text/csv" to csv

@@ -20,13 +20,14 @@ class LlmClient(
         apiKey: String,
         model: String,
         userText: String,
+        systemPrompt: String = LlmPrompt.systemPrompt(),
     ): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "API Key 为空，请到设置中填写" }
 
         val req = ChatCompletionRequest(
             model = model,
             messages = listOf(
-                ChatMsg(role = "system", content = LlmPrompt.systemPrompt()),
+                ChatMsg(role = "system", content = systemPrompt),
                 ChatMsg(role = "user",   content = userText),
             ),
         )

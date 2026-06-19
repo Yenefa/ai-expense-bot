@@ -23,14 +23,23 @@ private class FakeExpenseDao : ExpenseDao {
     override suspend fun update(expense: ExpenseEntity) {
         state.value = state.value.map { if (it.id == expense.id) expense else it }
     }
-    override fun observeAll(): Flow<List<ExpenseEntity>> = state
-    override suspend fun getAllOnce(): List<ExpenseEntity> = state.value
+    override fun observeActive(): Flow<List<ExpenseEntity>> = state
+    override suspend fun getAllActiveOnce(): List<ExpenseEntity> = state.value.filter { it.deletedAt == null }
     override suspend fun getById(id: Long): ExpenseEntity? = state.value.firstOrNull { it.id == id }
     override fun observeInRange(from: Long, to: Long): Flow<List<ExpenseEntity>> =
-        flow { emit(state.value.filter { it.occurredAt in from until to }) }
+        flow { emit(state.value.filter { it.occurredAt in from until to && it.deletedAt == null }) }
+    override fun observeDeleted(): Flow<List<ExpenseEntity>> =
+        flow { emit(state.value.filter { it.deletedAt != null }) }
+    override suspend fun softDeleteById(id: Long, deletedAtMillis: Long) {
+        state.value = state.value.map { if (it.id == id) it.copy(deletedAt = deletedAtMillis) else it }
+    }
+    override suspend fun restoreById(id: Long) {
+        state.value = state.value.map { if (it.id == id) it.copy(deletedAt = null) else it }
+    }
     override suspend fun deleteById(id: Long) {
         state.value = state.value.filterNot { it.id == id }
     }
+    override suspend fun purgeOlderThan(cutoffMillis: Long) {}
 }
 
 private class FakeChatDao : ChatMessageDao {
@@ -55,7 +64,7 @@ class RepositoryTest {
         val repo = ExpenseRepository(FakeExpenseDao())
         val id = repo.add(amount = 35.0, categoryId = "food", note = "午饭", occurredAt = 1L)
         assertThat(id).isGreaterThan(0L)
-        val all = repo.observeAll().first()
+        val all = repo.observeActive().first()
         assertThat(all).hasSize(1)
         assertThat(all[0].amount).isEqualTo(35.0)
     }

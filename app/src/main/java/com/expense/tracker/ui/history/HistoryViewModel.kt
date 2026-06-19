@@ -49,12 +49,13 @@ class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
 
     init {
         viewModelScope.launch {
-            repo.observeAll().collect { list -> internal.update { aggregate(list) } }
+            repo.observeActive().collect { list -> internal.update { aggregate(list) } }
         }
     }
 
+    /** v2.9: 软删除 — 标记 deletedAt，在最近删除列表可恢复 */
     fun deleteExpense(id: Long) {
-        viewModelScope.launch { repo.delete(id) }
+        viewModelScope.launch { repo.softDelete(id) }
     }
 
     /** 把 DisplayExpense 还原为完整的 ExpenseEntity，传给编辑弹窗。 */

@@ -17,6 +17,8 @@ data class ParsedExpense(
 data class LlmParseResult(
     val reply: String,
     val expenses: List<ParsedExpense>,
+    /** v2.9: LLM 可以返回 actions 数组来删除/修改已有的 expense */
+    val actions: List<ParsedAction> = emptyList(),
 )
 
 object LlmResponseParser {
@@ -26,27 +28,18 @@ object LlmResponseParser {
     /**
      * 解析 LLM 输出。
      *
-     * 容错策略：
-     * 1. 如果整段是合法 JSON 对象 → 按预期 schema 解析
-     * 2. 如果整段不是 JSON，但能从中提取出第一个 {...} 块 → 用提取出的 JSON 解析
-     * 3. 如果完全没 JSON（模型直接返回纯文本闲聊）→ 把整段当作 reply，expenses 为空
-     *
-     * 这样即使模型偶尔不遵守 system prompt，用户也不会看到红色报错。
+     * v2.9 扩展：除了 reply + expenses，还能解析 actions 字段。
      */
     fun parse(raw: String): LlmParseResult {
         val trimmed = raw.trim()
 
         // 1) 直接尝试整段解析
-        runCatching {
-            return parseStrict(trimmed)
-        }
+        runCatching { return parseStrict(trimmed) }
 
         // 2) 尝试从中间抽取第一个 {...} JSON 块
         val extracted = extractFirstJsonObject(trimmed)
         if (extracted != null) {
-            runCatching {
-                return parseStrict(extracted)
-            }
+            runCatching { return parseStrict(extracted) }
         }
 
         // 3) 完全失败 → 当作纯文本闲聊回复
@@ -56,6 +49,8 @@ object LlmResponseParser {
     private fun parseStrict(jsonText: String): LlmParseResult {
         val payload = json.decodeFromString(LlmExpensesPayload.serializer(), jsonText)
         val reply = payload.reply.ifBlank { "已记录" }
+
+        // 解析新增
         val parsed = payload.expenses
             .filter { it.amount > 0.0 }
             .map { item ->
@@ -66,7 +61,27 @@ object LlmResponseParser {
                     occurredAtMillis = item.occurredAt?.let(::parseOccurredAt),
                 )
             }
-        return LlmParseResult(reply = reply, expenses = parsed)
+
+        // 解析 actions（v2.9）
+        val actions = payload.actions.mapNotNull { a ->
+            when (a.action) {
+                "delete" -> ParsedAction.Delete(a.expenseId)
+                "update" -> {
+                    if (a.expenseId <= 0) return@mapNotNull null
+                    val categoryId = a.category?.let { Category.byId(it)?.id }
+                    ParsedAction.Update(
+                        expenseId = a.expenseId,
+                        amount = a.amount?.let { if (it > 0) it else null },
+                        categoryId = categoryId,
+                        note = a.note,
+                        occurredAtMillis = a.occurredAt?.let(::parseOccurredAt),
+                    )
+                }
+                else -> null
+            }
+        }
+
+        return LlmParseResult(reply = reply, expenses = parsed, actions = actions)
     }
 
     /**
