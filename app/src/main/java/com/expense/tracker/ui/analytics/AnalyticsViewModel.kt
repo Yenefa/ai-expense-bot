@@ -102,7 +102,12 @@ class AnalyticsViewModel(
         val counts = IntArray(n)
         val byCat = HashMap<String, Double>()
 
-        list.forEach { e ->
+        // 投资类不计入消费分析图表（短线很快收回，不算真实开销）
+        val consumptionList = list.filter { e ->
+            !(Category.byId(e.categoryId)?.isInvestment ?: false)
+        }
+
+        consumptionList.forEach { e ->
             val idx = TimeRanges.bucketIndex(p, fromMillis, e.occurredAt, zone)
             if (idx in 0 until n) {
                 amounts[idx] += e.amount
@@ -117,8 +122,8 @@ class AnalyticsViewModel(
             lineCounts = counts.toList(),
             pieByCategory = byCat,
             xLabels = labels,
-            totalAmount = list.sumOf { it.amount },
-            totalCount = list.size,
+            totalAmount = consumptionList.sumOf { it.amount },
+            totalCount = consumptionList.size,
             insights = emptyList(), // 切换周期清除历史洞察
         )
     }

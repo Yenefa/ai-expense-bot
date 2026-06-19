@@ -4,6 +4,8 @@ data class Category(
     val id: String,
     val emoji: String,
     val displayName: String,
+    /** true = 投资类（短线/股票/基金等），不计入消费分析图表，避免扭曲洞察 */
+    val isInvestment: Boolean = false,
 ) {
     companion object {
         val ALL: List<Category> = listOf(
@@ -14,6 +16,7 @@ data class Category(
             Category("entertainment", "🎮", "娱乐"),
             Category("housing",       "🏠", "住房"),
             Category("medical",       "💊", "医疗"),
+            Category("investment",    "💹", "投资", isInvestment = true),
             Category("other",         "📦", "其他"),
         )
         private val byIdMap: Map<String, Category> = ALL.associateBy { it.id }

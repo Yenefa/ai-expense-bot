@@ -29,6 +29,7 @@ private val CategoryColors: Map<String, Color> = mapOf(
     "entertainment" to Color(0xFFA78BFA), // 娱乐 — 紫
     "housing"       to Color(0xFF34D399), // 住房 — 绿
     "medical"       to Color(0xFFF87171), // 医疗 — 红
+    "investment"    to Color(0xFF14B8A6), // 投资 — 青绿（不会在饼图出现，只是兜底）
     "other"         to Color(0xFFD4D4D4), // 其他 — 浅灰
 )
 private val FallbackColor = Color(0xFF9CA3AF)

@@ -51,11 +51,18 @@ class LlmResponseParserTest {
         assertThat(result.expenses).isEmpty()
     }
 
-    @Test fun garbageThrowsParseException() {
-        try {
-            LlmResponseParser.parse("not json")
-            assert(false) { "应抛 LlmParseException" }
-        } catch (_: LlmParseException) { /* ok */ }
+    @Test fun garbageReturnsAsPlainTextReply() {
+        // v2.4 起：不再抛异常，纯文本当作闲聊回复
+        val result = LlmResponseParser.parse("你好呀！今天过得怎么样？")
+        assertThat(result.reply).isEqualTo("你好呀！今天过得怎么样？")
+        assertThat(result.expenses).isEmpty()
+    }
+
+    @Test fun extractsJsonFromMixedText() {
+        // 模型偶尔会在 JSON 前后加废话，应该能被抽取
+        val raw = """好的，这是回复：{"reply":"已记 ¥35","expenses":[]} 希望能帮到你"""
+        val result = LlmResponseParser.parse(raw)
+        assertThat(result.reply).isEqualTo("已记 ¥35")
     }
 
     @Test fun emptyExpensesReturnsReply() {
