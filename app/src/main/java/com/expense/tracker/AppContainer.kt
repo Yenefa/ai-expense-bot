@@ -27,10 +27,10 @@ class AppContainer(context: Context) {
     /** 对话 LLM：新增记账 + 删除/修改已有记录（v2.9） */
     val llmHandler: suspend (String, UserPrefsSnapshot) -> LlmResult = { text, prefs ->
         runCatching {
-            // 拉最近 7 天活跃记录注入提示词，让 LLM 能做查改
+            // 拉最近 3 天活跃记录注入提示词，数量小、精确度高、LLM 更容易匹配
             val now = System.currentTimeMillis()
-            val sevenDaysAgo = now - 7 * 24 * 3600_000L
-            val recentByFlow = expenseRepo.observeInRange(sevenDaysAgo, now)
+            val threeDaysAgo = now - 3 * 24 * 3600_000L
+            val recentByFlow = expenseRepo.observeInRange(threeDaysAgo, now)
             // 取一次 snapshot
             val recentRecords = recentByFlow.first()
             val raw = llmClient.chatJson(

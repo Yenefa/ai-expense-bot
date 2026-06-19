@@ -10,13 +10,7 @@ import java.util.Locale
 
 object LlmPrompt {
     /**
-     * 生成系统提示词。
-     *
-     * 关键：LLM 是无状态的，自己不知道"现在"是几点几号。所以每次调用都把当前时间显式注入到
-     * system prompt，告诉它"now = ..."，它再以此为基准解析"昨天/上周三/3 天前"等相对时间。
-     *
-     * v2.9 扩展：注入最近 7 天消费记录列表（每个带上 id + 金额 + 分类 + 备注 + 时间），
-     * 让 LLM 可以通过 actions 字段删除/修改已有记录。
+     * v3.0 重写 system prompt — 删改优先级放在新增之前，缩小注入范围到 3 天。
      */
     fun systemPrompt(
         nowMillis: Long = System.currentTimeMillis(),
@@ -29,55 +23,58 @@ object LlmPrompt {
         val timeFmt = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 
         return buildString {
-            appendLine("你是一个友好的记账助手，可以和用户闲聊，同时也帮助用户记录支出/删除/修改已有的消费记录。")
+            appendLine("你是记账助手。你的唯一输出格式是 JSON：{\"reply\":\"...\",\"expenses\":[...],\"actions\":[...]}。")
+            appendLine("不要在 JSON 外加任何文字。")
             appendLine()
-            appendLine("【最重要的规则】")
-            appendLine("无论用户说什么，你的回复必须**只是一个合法 JSON 对象**。绝不能在 JSON 前后加任何额外文字、表情或 markdown 代码块。")
-            appendLine("即使是闲聊问候，也要包装成 JSON：把闲聊的话放在 reply 字段里。")
+            appendLine("当前时间：$dateStr（$weekDay）")
             appendLine()
-            appendLine("【当前时间（基准）】")
-            appendLine("$dateStr（$weekDay）")
-            appendLine("以上是用户提交此条消息的真实时间。一切相对时间（昨天 / 前天 / 上周三 / 3 天前 / 上个月）必须以此为基准计算，禁止自己猜。")
+            appendLine("=== 第一步（优先）：判断用户是否想删除/修改 ===")
+            appendLine("先检查用户意图。如果用户表达了\"删除 / 取消 / 不要了 / 改成 / 修改\"的意思，你必须：")
+            appendLine("1. 在下方【你的记录】中找到最匹配的那一行")
+            appendLine("2. 输出对应的 action，格式：")
+            appendLine("""   {"action":"delete","expense_id":<记录ID>}""")
+            appendLine("""   {"action":"update","expense_id":<记录ID>,"amount":<新金额|null>,"category":"<新分类|null>"...}""")
+            appendLine("3. 只在 reply 里确认操作结果，不新增 expense")
             appendLine()
-            appendLine("【输出格式 — 必须严格 JSON】")
-            appendLine("""{"reply":"简短回复","expenses":[...],"actions":[...]}""")
+            appendLine("=== 第二步：如果没有删改意图，再看是否有新增 ===")
+            appendLine("新增 expense 格式：{\"amount\":<数字>,\"category\":\"<分类>\",\"note\":\"<备注>\",\"occurred_at\":<ISO时间|null>}")
+            appendLine("分类：${Category.ALL.joinToString { it.id }}")
             appendLine()
-            appendLine("【规则】")
-            appendLine("1. reply 字段：友好简短回复。闲聊就直接回复；记到了支出就顺带确认；删改了消费就确认删改。")
-            appendLine("2. expenses 字段：新增支出，每笔一个对象：")
-            appendLine("""   {"amount":<number>,"category":"<string>","note":"<string>","occurred_at":"<string|null>"}""")
-            appendLine("3. actions 字段：删除/修改已有记录，每项一个对象：")
-            appendLine("""   {"action":"delete","expense_id":<long>}    ← 删除指定记录""")
-            appendLine("""   {"action":"update","expense_id":<long>,"amount":<number|null>,"category":"<string|null>","note":"<string|null>","occurred_at":"<string|null>"}""")
-            appendLine("4. **删除规则（极其重要）**：")
-            appendLine("   - 用户说\"删了那笔XX / 取消XX / XX不要了\" → 从下方【最近记录】中找与金额/分类/备注最匹配的，输出对应的 expens_id 删除")
-            appendLine("   - 如果有多个相似的，选**最近的一笔**，在 reply 里确认：\"已删除 ¥XX （分类名）\"")
-            appendLine("   - 找不到匹配 → 在 reply 里如实回复：\"没找到你说的那笔记录，是最近7天的吗？\"")
-            appendLine("5. **修改规则**：")
-            appendLine("   - 用户说\"把XX改成YY\" → 从下方找到 expens_id 对应的记录，action=update，只改用户提到的字段")
-            appendLine("   - 没提到的字段保持不动（amount/category/note/occurred_at 对应字段输出相同值或 null）")
-            appendLine("6. **禁止删除/修改不在下方列表中的 expire_id** — 找不到就回复'没找到'")
-            appendLine("7. category 必须是以下之一：${Category.ALL.joinToString { it.id }}")
-            appendLine("8. amount 单位是元（人民币），保留 2 位小数。")
-            appendLine("9. 用户没提到增删改 → expenses 和 actions 都返回空数组 []。")
-            appendLine("10. 用户说了相对时间 → 基于【当前时间】算出绝对时间")
-            appendLine("11. 投资类（买股票/买基金/做短线/打新等）使用 category=\"investment\"")
+            appendLine("=== 第三步：既无删改也无新增 ===")
+            appendLine("闲聊 → expenses=[], actions=[]，reply 是闲谈回复。")
             appendLine()
-            appendLine("【分类对照】")
-            Category.ALL.forEach { appendLine("  ${it.id} → ${it.emoji} ${it.displayName}") }
+            appendLine("=== 关键规则 ===")
+            appendLine("- 用户没指定时间 → occurred_at=null")
+            appendLine("- 用户指定了相对时间（昨天/上周三/3天前）→ 基于当前时间算出 ISO 本地时间")
+            appendLine("- 投资类 → category=investment")
+            appendLine("- reply ≤100 字")
+            appendLine("- **只能操作下方【你的记录】中出现的 expense_id，找不到就回复\"没找到\"**")
+            appendLine()
+            appendLine("=== 例1：删除 ===")
+            appendLine("用户：菠萝百香果不要了")
+            appendLine("假设记录里有 42|06-20 21:00|☕饮品|¥7.59|菠萝百香果")
+            appendLine("""输出：{"reply":"已删除饮品 ¥7.59 菠萝百香果","expenses":[],"actions":[{"action":"delete","expense_id":42}]}""")
+            appendLine()
+            appendLine("=== 例2：修改 ===")
+            appendLine("用户：晚饭改成 10 块")
+            appendLine("假设记录里有 41|06-20 21:00|🍜餐饮|¥6.80|晚饭米饭")
+            appendLine("""输出：{"reply":"晚饭已改为 ¥10.00","expenses":[],"actions":[{"action":"update","expense_id":41,"amount":10}]}""")
+            appendLine()
+            appendLine("=== 例3：新增 ===")
+            appendLine("用户：午饭35")
+            appendLine("""输出：{"reply":"已记 ¥35 餐饮","expenses":[{"amount":35,"category":"food","note":"午饭","occurred_at":null}],"actions":[]}""")
+            appendLine()
+            appendLine("【分类对照】${Category.ALL.joinToString { c -> "${c.id}→${c.emoji}${c.displayName}" }}")
             appendLine()
 
-            // v2.9: 注入最近 7 天记录，让 LLM 能做查改
             if (recentRecords.isNotEmpty()) {
-                appendLine("【最近 7 天消费记录（你能且只能操作这些）】")
-                appendLine("每行格式：expense_id | 时间 | 分类 | ¥金额 | 备注")
+                appendLine("【你的记录 — 只能操作这些 ID】")
                 recentRecords.forEach { e ->
                     val ts = Instant.ofEpochMilli(e.occurredAt).atZone(zone).format(timeFmt)
                     val cat = Category.byIdOrOther(e.categoryId)
                     val noteStr = if (e.note.isNotBlank()) e.note else "-"
-                    appendLine("  ${e.id} | $ts | ${cat.emoji}${cat.displayName} | ¥${"%.2f".format(e.amount)} | $noteStr")
+                    appendLine("${e.id}|$ts|${cat.emoji}${cat.displayName}|¥${"%.2f".format(e.amount)}|$noteStr")
                 }
-                appendLine()
             }
         }
     }
