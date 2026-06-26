@@ -174,9 +174,13 @@ fun AnalyticsScreen(
         )
 
         Spacer(Modifier.height(28.dp))
-        SectionTitle("🥧 分类占比（扇形图）")
-        PieChartView(
-            byCategory = state.pieByCategory,
+        SectionTitle("🥧 分类占比（甜甜圈图）")
+        DonutChartView(
+            subPeriods = state.subPeriods,
+            subPeriodLabels = state.xLabels,
+            outerByCategory = state.pieByCategory,
+            selectedIndex = state.selectedSubPeriodIndex,
+            onSelectSubPeriod = vm::selectSubPeriod,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
 
