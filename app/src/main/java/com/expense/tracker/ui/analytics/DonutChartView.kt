@@ -87,7 +87,7 @@ fun DonutChartView(
                             val dx = press.position.x - cx
                             val dy = press.position.y - cy
                             val dist = kotlin.math.sqrt(dx * dx + dy * dy)
-                            val maxR = size.minDimension / 2f
+                            val maxR = minOf(size.width, size.height) / 2f
 
                             // 检测是否点击在中心区域（返回按钮）
                             val centerR = maxR * innerRadiusRatio * 0.5f
