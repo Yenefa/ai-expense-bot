@@ -127,14 +127,16 @@ class AnalyticsViewModel(
             byCat[e.categoryId] = (byCat[e.categoryId] ?: 0.0) + e.amount
         }
 
+        // 单次遍历：按桶索引分组，避免 O(n*m) 重复计算 bucketIndex
+        val bucketed = consumptionList.groupBy { e ->
+            val idx = TimeRanges.bucketIndex(p, fromMillis, e.occurredAt, zone)
+            if (idx in 0 until n) idx else -1
+        }
         val subPeriodDetails = (0 until n).map { idx ->
-            val filtered = consumptionList.filter { e ->
-                val eIdx = TimeRanges.bucketIndex(p, fromMillis, e.occurredAt, zone)
-                eIdx == idx
-            }
+            val entries = bucketed[idx] ?: emptyList()
             SubPeriodDetail(
-                totalAmount = filtered.sumOf { it.amount },
-                byCategory = filtered.groupBy({ it.categoryId }, { it.amount })
+                totalAmount = entries.sumOf { it.amount },
+                byCategory = entries.groupBy({ it.categoryId }, { it.amount })
                     .mapValues { (_, amounts) -> amounts.sum() },
             )
         }
