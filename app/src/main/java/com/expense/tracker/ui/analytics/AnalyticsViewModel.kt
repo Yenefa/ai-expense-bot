@@ -18,6 +18,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.ZoneId
 
+data class SubPeriodDetail(
+    val totalAmount: Double,
+    val byCategory: Map<String, Double>,
+)
+
 data class AnalyticsUiState(
     val period: Period = Period.Week,
     val barAmounts: List<Double> = emptyList(),
@@ -28,6 +33,8 @@ data class AnalyticsUiState(
     val totalCount: Int = 0,
     val insights: List<String> = emptyList(),
     val analyzing: Boolean = false,
+    val subPeriods: List<SubPeriodDetail> = emptyList(),
+    val selectedSubPeriodIndex: Int? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -59,6 +66,10 @@ class AnalyticsViewModel(
 
     fun selectPeriod(p: Period) {
         periodTrigger.value = p
+    }
+
+    fun selectSubPeriod(index: Int?) {
+        internal.update { it.copy(selectedSubPeriodIndex = index) }
     }
 
     fun requestInsights(prefs: UserPrefsSnapshot) {
@@ -116,6 +127,18 @@ class AnalyticsViewModel(
             byCat[e.categoryId] = (byCat[e.categoryId] ?: 0.0) + e.amount
         }
 
+        val subPeriodDetails = (0 until n).map { idx ->
+            val filtered = consumptionList.filter { e ->
+                val eIdx = TimeRanges.bucketIndex(p, fromMillis, e.occurredAt, zone)
+                eIdx == idx
+            }
+            SubPeriodDetail(
+                totalAmount = filtered.sumOf { it.amount },
+                byCategory = filtered.groupBy({ it.categoryId }, { it.amount })
+                    .mapValues { (_, amounts) -> amounts.sum() },
+            )
+        }
+
         return AnalyticsUiState(
             period = p,
             barAmounts = amounts.toList(),
@@ -125,6 +148,8 @@ class AnalyticsViewModel(
             totalAmount = consumptionList.sumOf { it.amount },
             totalCount = consumptionList.size,
             insights = emptyList(), // 切换周期清除历史洞察
+            subPeriods = subPeriodDetails,
+            selectedSubPeriodIndex = null,
         )
     }
 }
