@@ -23,6 +23,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.expense.tracker.ui.analytics.AnalyticsScreen
 import com.expense.tracker.ui.analytics.AnalyticsViewModel
+import com.expense.tracker.ui.analytics.InsightsScreen
 import com.expense.tracker.ui.chat.ChatScreen
 import com.expense.tracker.ui.chat.ChatViewModel
 import com.expense.tracker.ui.history.HistoryScreen
@@ -124,7 +125,7 @@ class MainActivity : ComponentActivity() {
                         Screen.Analytics -> AnalyticsScreen(
                             vm = analyticsVm,
                             onBack = { screen = Screen.Chat },
-                            llmPrefs = llmPrefs,
+                            onOpenInsights = { subScreen = SubScreen.Insights },
                         )
                         Screen.History -> HistoryScreen(
                             vm = historyVm,
@@ -205,6 +206,25 @@ class MainActivity : ComponentActivity() {
                 ) {
                     UserManualScreen(onClose = { subScreen = null })
                 }
+
+                // 智核分析 sub-screen 从右侧滑入
+                AnimatedVisibility(
+                    visible = subScreen == SubScreen.Insights,
+                    enter = slideInHorizontally(
+                        animationSpec = tween(320, easing = FastOutSlowInEasing),
+                        initialOffsetX = { it },
+                    ) + fadeIn(animationSpec = tween(160)),
+                    exit = slideOutHorizontally(
+                        animationSpec = tween(280, easing = FastOutSlowInEasing),
+                        targetOffsetX = { it },
+                    ) + fadeOut(animationSpec = tween(140)),
+                ) {
+                    InsightsScreen(
+                        vm = analyticsVm,
+                        llmPrefs = llmPrefs,
+                        onBack = { subScreen = null },
+                    )
+                }
             }
         }
     }
@@ -223,5 +243,6 @@ class MainActivity : ComponentActivity() {
         data object DataExport : SubScreen
         data object DeletedItems : SubScreen
         data object UserManual : SubScreen
+        data object Insights : SubScreen
     }
 }

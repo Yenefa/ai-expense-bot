@@ -5,7 +5,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,8 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,8 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.expense.tracker.data.prefs.UserPrefsSnapshot
+import com.expense.tracker.data.model.Period
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
@@ -48,7 +43,7 @@ import com.expense.tracker.ui.theme.softShadow
 fun AnalyticsScreen(
     vm: AnalyticsViewModel,
     onBack: () -> Unit,
-    llmPrefs: UserPrefsSnapshot?,
+    onOpenInsights: () -> Unit,
 ) {
     val state by vm.uiState.collectAsState()
     Column(
@@ -80,18 +75,15 @@ fun AnalyticsScreen(
             modifier = Modifier.padding(horizontal = 16.dp),
         )
 
-        // 智核分析按钮
+        // 智核分析按钮（点击跳转到独立页面）
         Spacer(Modifier.height(12.dp))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Button(
-                onClick = {
-                    val prefs = llmPrefs ?: return@Button
-                    vm.requestInsights(prefs)
-                },
-                enabled = !state.analyzing && state.totalAmount > 0.0,
+                onClick = onOpenInsights,
+                enabled = state.totalAmount > 0.0,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AppColors.TextPrimary,
                     contentColor = Color.White,
@@ -99,49 +91,13 @@ fun AnalyticsScreen(
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.weight(1f),
             ) {
-                if (state.analyzing) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(if (state.analyzing) "分析中..." else "🧠 智核分析")
+                Text("🧠 智核分析")
             }
         }
-
-        // 分析结果卡片
-        if (state.insights.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(state.insights) { insight ->
-                    Box(
-                        modifier = Modifier
-                            .width(280.dp)
-                            .softShadow(elevation = 2.dp, cornerRadius = 14.dp, spotAlpha = 0.06f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(AppColors.Bg)
-                            .padding(16.dp),
-                    ) {
-                        Text(
-                            insight,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AppColors.TextPrimary,
-                            lineHeight = 22.sp,
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
 
         // 汇总卡片
         if (state.totalAmount > 0.0) {
+            Spacer(Modifier.height(16.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
