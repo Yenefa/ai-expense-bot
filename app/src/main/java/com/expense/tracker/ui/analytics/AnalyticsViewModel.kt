@@ -52,14 +52,15 @@ class AnalyticsViewModel(
     init {
         viewModelScope.launch {
             periodTrigger.flatMapLatest { p ->
-                val (from, to) = TimeRanges.rangeOf(p, nowProvider(), zone)
+                val now = nowProvider()
+                val (from, to) = TimeRanges.rangeOf(p, now, zone)
                 kotlinx.coroutines.flow.combine(
                     repo.observeInRange(from, to),
-                    kotlinx.coroutines.flow.flowOf(Triple(p, from, to)),
+                    kotlinx.coroutines.flow.flowOf(Triple(p, from, now)),
                 ) { list, t -> t to list }
             }.collect { (triple, list) ->
-                val (p, from, _) = triple
-                internal.update { aggregate(p, from, list) }
+                val (p, from, now) = triple
+                internal.update { aggregate(p, from, now, list) }
             }
         }
     }
@@ -87,7 +88,8 @@ class AnalyticsViewModel(
             .sortedByDescending { it.value }
             .take(3)
             .map { (catId, v) ->
-                (Category.byId(catId)?.emoji + Category.byId(catId)?.displayName ?: catId) to v
+                val cat = Category.byId(catId)
+                (if (cat != null) "${cat.emoji} ${cat.displayName}" else catId) to v
             }
         val periodName = when (state.period) {
             Period.Week -> "本周"
@@ -106,9 +108,23 @@ class AnalyticsViewModel(
         }
     }
 
-    private fun aggregate(p: Period, fromMillis: Long, list: List<ExpenseEntity>): AnalyticsUiState {
+    private fun aggregate(p: Period, fromMillis: Long, nowMillis: Long, list: List<ExpenseEntity>): AnalyticsUiState {
         val labels = TimeRanges.bucketLabels(p, fromMillis, zone)
         val n = labels.size
+
+        // 自动选择默认子周期：月→当天，年→当月，周→总览
+        val nowDate = java.time.LocalDate.ofInstant(java.time.Instant.ofEpochMilli(nowMillis), zone)
+        val defaultSubIndex: Int? = when (p) {
+            Period.Month -> {
+                val today = nowDate.dayOfMonth - 1
+                if (today in 0 until n) today else null
+            }
+            Period.Year -> {
+                val thisMonth = nowDate.monthValue - 1
+                if (thisMonth in 0 until n) thisMonth else null
+            }
+            Period.Week -> null
+        }
         val amounts = DoubleArray(n)
         val counts = IntArray(n)
         val byCat = HashMap<String, Double>()
@@ -151,7 +167,7 @@ class AnalyticsViewModel(
             totalCount = consumptionList.size,
             insights = emptyList(), // 切换周期清除历史洞察
             subPeriods = subPeriodDetails,
-            selectedSubPeriodIndex = null,
+            selectedSubPeriodIndex = defaultSubIndex,
         )
     }
 }

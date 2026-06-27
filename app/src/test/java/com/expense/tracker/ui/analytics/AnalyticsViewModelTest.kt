@@ -131,9 +131,9 @@ class AnalyticsViewModelTest {
         vm.selectSubPeriod(0)
         assertThat(vm.uiState.value.selectedSubPeriodIndex).isEqualTo(0)
 
-        // 切换周期应重置
+        // 切换周期应重置，月视图自动选中当天（6/9 → index 8）
         vm.selectPeriod(Period.Month)
         vm.uiState.first { it.period == Period.Month && it.subPeriods.isNotEmpty() }
-        assertThat(vm.uiState.value.selectedSubPeriodIndex).isNull()
+        assertThat(vm.uiState.value.selectedSubPeriodIndex).isEqualTo(8)
     }
 }

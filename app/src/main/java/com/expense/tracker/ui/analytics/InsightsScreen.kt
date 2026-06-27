@@ -46,7 +46,6 @@ import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 
-/** 每条洞察配一个 emoji 前缀 */
 private fun insightEmoji(index: Int): String = when (index % 5) {
     0 -> "💡"
     1 -> "📊"
@@ -88,6 +87,13 @@ fun InsightsScreen(
             Text("🧠 智核分析", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
         }
 
+        // 周期切换
+        PeriodSelector(
+            current = state.period,
+            onSelect = vm::selectPeriod,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+
         // 加载中
         AnimatedVisibility(
             visible = state.analyzing,
@@ -106,7 +112,7 @@ fun InsightsScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "正在分析你的消费习惯...",
+                        "正在分析${when(state.period){Period.Week->"本周";Period.Month->"本月";Period.Year->"本年"}}消费习惯...",
                         style = MaterialTheme.typography.bodyLarge,
                         color = AppColors.TextSecondary,
                     )
@@ -114,9 +120,8 @@ fun InsightsScreen(
             }
         }
 
-        // 洞察结果（非加载时显示）
+        // 洞察结果
         if (!state.analyzing) {
-            // 错误状态：有 insights 但第一条是错误信息
             val isError = state.insights.size == 1 && (
                     state.insights.first().startsWith("分析失败") ||
                             state.insights.first().startsWith("请先配置")
@@ -124,7 +129,6 @@ fun InsightsScreen(
 
             if (state.insights.isNotEmpty()) {
                 if (isError) {
-                    // 错误卡片
                     Spacer(Modifier.height(32.dp))
                     Card(
                         modifier = Modifier
@@ -158,7 +162,6 @@ fun InsightsScreen(
                         }
                     }
                 } else {
-                    // 正常洞察列表 — 纵向卡片
                     Spacer(Modifier.height(16.dp))
                     state.insights.forEachIndexed { index, insight ->
                         Card(
@@ -173,10 +176,7 @@ fun InsightsScreen(
                                 modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.Top,
                             ) {
-                                Text(
-                                    insightEmoji(index),
-                                    fontSize = 22.sp,
-                                )
+                                Text(insightEmoji(index), fontSize = 22.sp)
                                 Spacer(Modifier.width(12.dp))
                                 Text(
                                     insight,
@@ -188,8 +188,7 @@ fun InsightsScreen(
                         }
                     }
                 }
-            } else if (!state.analyzing && state.totalAmount > 0.0) {
-                // 从未点击过分析按钮 — 显示引导
+            } else if (state.totalAmount > 0.0) {
                 Spacer(Modifier.height(60.dp))
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
@@ -221,7 +220,6 @@ fun InsightsScreen(
                 modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // 周期摘要
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -242,7 +240,6 @@ fun InsightsScreen(
 
                 Spacer(Modifier.height(16.dp))
 
-                // 分析按钮
                 Button(
                     onClick = {
                         val prefs = llmPrefs ?: return@Button
