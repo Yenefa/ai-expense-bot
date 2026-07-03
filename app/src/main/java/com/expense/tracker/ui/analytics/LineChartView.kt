@@ -39,7 +39,7 @@ fun LineChartView(counts: List<Int>, xLabels: List<String>, modifier: Modifier =
         else -> 5
     }
     Chart(
-        modifier = modifier.fillMaxWidth().height(220.dp),
+        modifier = modifier.fillMaxWidth().height(260.dp),
         chart = lineChart(),
         chartModelProducer = producer,
         startAxis = rememberStartAxis(

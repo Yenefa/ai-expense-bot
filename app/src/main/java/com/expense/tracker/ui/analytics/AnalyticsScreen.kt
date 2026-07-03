@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.expense.tracker.data.model.Period
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
@@ -130,13 +129,9 @@ fun AnalyticsScreen(
         )
 
         Spacer(Modifier.height(28.dp))
-        SectionTitle("🥧 分类占比（甜甜圈图）")
-        DonutChartView(
-            subPeriods = state.subPeriods,
-            subPeriodLabels = state.xLabels,
-            outerByCategory = state.pieByCategory,
-            selectedIndex = state.selectedSubPeriodIndex,
-            onSelectSubPeriod = vm::selectSubPeriod,
+        SectionTitle("🧾 分类占比")
+        CategoryBreakdownList(
+            byCategory = state.pieByCategory,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
 

@@ -26,11 +26,17 @@ fun BarChartView(amounts: List<Double>, xLabels: List<String>, modifier: Modifie
     val xFormatter = AxisValueFormatter<AxisPosition.Horizontal.Bottom> { x, _ ->
         xLabels.getOrNull(x.toInt()) ?: ""
     }
+    val yFormatter = AxisValueFormatter<AxisPosition.Vertical.Start> { y, _ ->
+        "¥" + y.toInt().toString()
+    }
     Chart(
-        modifier = modifier.fillMaxWidth().height(220.dp),
+        modifier = modifier.fillMaxWidth().height(260.dp),
         chart = columnChart(),
         chartModelProducer = producer,
-        startAxis = rememberStartAxis(),
+        startAxis = rememberStartAxis(
+            valueFormatter = yFormatter,
+            itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = 4),
+        ),
         bottomAxis = rememberBottomAxis(
             valueFormatter = xFormatter,
             itemPlacer = AxisItemPlacer.Horizontal.default(spacing = if (xLabels.size > 12) 5 else 1),
