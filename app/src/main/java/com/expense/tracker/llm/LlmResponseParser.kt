@@ -46,6 +46,24 @@ object LlmResponseParser {
         return LlmParseResult(reply = trimmed.ifBlank { "（空回复）" }, expenses = emptyList())
     }
 
+    /**
+     * 解析智核分析的 LLM 输出为洞察列表。
+     * 容忍模型在 JSON 外加废话 / ```json 代码块（对齐 parse() 的抽取兜底，根因 A）。
+     * 完全无法解析时返回空列表，由调用方做 ifEmpty 兜底。
+     */
+    fun parseInsights(raw: String): List<String> {
+        val trimmed = raw.trim()
+        runCatching { return parseInsightsStrict(trimmed) }
+        val extracted = extractFirstJsonObject(trimmed)
+        if (extracted != null) {
+            runCatching { return parseInsightsStrict(extracted) }
+        }
+        return emptyList()
+    }
+
+    private fun parseInsightsStrict(jsonText: String): List<String> =
+        json.decodeFromString(AnalyticsInsightsPayload.serializer(), jsonText).insights
+
     private fun parseStrict(jsonText: String): LlmParseResult {
         val payload = json.decodeFromString(LlmExpensesPayload.serializer(), jsonText)
         val reply = payload.reply.ifBlank { "已记录" }

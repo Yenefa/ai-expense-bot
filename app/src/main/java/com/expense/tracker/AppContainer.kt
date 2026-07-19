@@ -24,6 +24,11 @@ class AppContainer(context: Context) {
     val expenseRepo: ExpenseRepository by lazy { ExpenseRepository(db.expenseDao()) }
     val chatRepo: ChatRepository by lazy { ChatRepository(db.chatDao()) }
     val llmClient: LlmClient by lazy { LlmClient() }
+    val ocrRecognizer: com.expense.tracker.ocr.OcrRecognizer by lazy {
+        com.expense.tracker.ocr.MlKitOcrRecognizer()
+    }
+    val billImportHandler: suspend (String, UserPrefsSnapshot) -> com.expense.tracker.llm.BillImportResult =
+        { ocrText, prefs -> com.expense.tracker.llm.importFromBillText(llmClient, prefs, ocrText) }
 
     companion object { private const val TAG = "LLM" }
 
@@ -110,18 +115,6 @@ class AppContainer(context: Context) {
 
     /** 智核分析：发送当前周期的消费数据提示词，返回洞察列表。 */
     val analyticsAnalyzer: suspend (String, UserPrefsSnapshot) -> List<String> = { prompt, prefs ->
-        runCatching {
-            val raw = llmClient.chatJson(
-                baseUrl = prefs.baseUrl,
-                apiKey = prefs.apiKey,
-                model = prefs.model,
-                userText = prompt,
-            )
-            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
-            val insights = json.decodeFromString(
-                com.expense.tracker.llm.AnalyticsInsightsPayload.serializer(), raw.trim()
-            ).insights
-            insights.ifEmpty { listOf("暂无洞察，请再试一次。") }
-        }.getOrElse { listOf("分析失败：${it.message ?: "未知错误"}") }
+        com.expense.tracker.llm.analyzeInsights(llmClient, prefs, prompt)
     }
 }

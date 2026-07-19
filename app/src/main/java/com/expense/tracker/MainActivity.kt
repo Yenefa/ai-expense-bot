@@ -24,6 +24,8 @@ import androidx.lifecycle.ViewModelProvider
 import com.expense.tracker.ui.analytics.AnalyticsScreen
 import com.expense.tracker.ui.analytics.AnalyticsViewModel
 import com.expense.tracker.ui.analytics.InsightsScreen
+import com.expense.tracker.ui.billimport.BillImportScreen
+import com.expense.tracker.ui.billimport.BillImportViewModel
 import com.expense.tracker.ui.chat.ChatScreen
 import com.expense.tracker.ui.chat.ChatViewModel
 import com.expense.tracker.ui.history.HistoryScreen
@@ -58,6 +60,18 @@ class MainActivity : ComponentActivity() {
                 AnalyticsViewModel(
                     repo = container.expenseRepo,
                     onRequestInsights = container.analyticsAnalyzer,
+                ) as T
+        }
+    }
+
+    private val billImportVm: BillImportViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                BillImportViewModel(
+                    importHandler = container.billImportHandler,
+                    expenseRepo = container.expenseRepo,
+                    chatRepo = container.chatRepo,
                 ) as T
         }
     }
@@ -121,6 +135,7 @@ class MainActivity : ComponentActivity() {
                             onOpenAnalytics = { screen = Screen.Analytics },
                             onOpenHistory = { screen = Screen.History },
                             onOpenSettings = { screen = Screen.Settings },
+                            onOpenBillImport = { subScreen = SubScreen.BillImport },
                         )
                         Screen.Analytics -> AnalyticsScreen(
                             vm = analyticsVm,
@@ -225,6 +240,27 @@ class MainActivity : ComponentActivity() {
                         onBack = { subScreen = null },
                     )
                 }
+
+                // 截图记账 sub-screen 从右侧滑入
+                AnimatedVisibility(
+                    visible = subScreen == SubScreen.BillImport,
+                    enter = slideInHorizontally(
+                        animationSpec = tween(320, easing = FastOutSlowInEasing),
+                        initialOffsetX = { it },
+                    ) + fadeIn(animationSpec = tween(160)),
+                    exit = slideOutHorizontally(
+                        animationSpec = tween(280, easing = FastOutSlowInEasing),
+                        targetOffsetX = { it },
+                    ) + fadeOut(animationSpec = tween(140)),
+                ) {
+                    BillImportScreen(
+                        vm = billImportVm,
+                        ocrRecognizer = container.ocrRecognizer,
+                        llmPrefs = llmPrefs,
+                        onBack = { subScreen = null },
+                        onDone = { subScreen = null },
+                    )
+                }
             }
         }
     }
@@ -244,5 +280,6 @@ class MainActivity : ComponentActivity() {
         data object DeletedItems : SubScreen
         data object UserManual : SubScreen
         data object Insights : SubScreen
+        data object BillImport : SubScreen
     }
 }

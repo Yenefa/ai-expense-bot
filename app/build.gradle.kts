@@ -64,6 +64,9 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
+    // OCR (截图录账 - 中文账单)
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.0")
+
     // Charts
     implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")
 

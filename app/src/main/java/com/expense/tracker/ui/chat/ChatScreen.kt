@@ -43,6 +43,7 @@ fun ChatScreen(
     onOpenAnalytics: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenBillImport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by vm.uiState.collectAsState()
@@ -124,7 +125,10 @@ fun ChatScreen(
                 llmEnabled = state.llmEnabled,
                 onToggleLlm = vm::toggleLlm,
                 onSend = vm::submitFreeText,
-                onPlusClick = { /* TODO: image upload */ },
+                onPlusClick = {
+                    if (state.llmEnabled) onOpenBillImport()
+                    else Toast.makeText(context, "请先开启 🧠 再用截图记账", Toast.LENGTH_SHORT).show()
+                },
                 placeholder = if (state.llmEnabled) "随便说什么..." else "回复记账助手",
             )
             InteractiveDock(

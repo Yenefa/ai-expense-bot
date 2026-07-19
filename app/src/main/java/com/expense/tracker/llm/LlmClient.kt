@@ -9,13 +9,13 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-class LlmClient(
+open class LlmClient(
     private val httpClient: OkHttpClient = defaultHttpClient(),
 ) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 
     /** 调用 OpenAI 兼容 chat completions，返回 assistant message content（应为 JSON 字符串）。 */
-    suspend fun chatJson(
+    open suspend fun chatJson(
         baseUrl: String,
         apiKey: String,
         model: String,
