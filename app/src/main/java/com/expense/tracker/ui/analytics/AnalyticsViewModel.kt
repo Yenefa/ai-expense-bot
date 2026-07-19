@@ -80,10 +80,16 @@ class AnalyticsViewModel(
         refOverride.value = null
     }
 
-    /** 选具体参考时段（如"2024 年 5 月""2024 年第 20 周"），用于罗盘选具体值。 */
+    /** 选具体参考时段（如"2024 年 5 月""2024 年第 20 周"），用于翻页选具体时段。 */
     fun selectPeriodAndRef(p: Period, refMillis: Long) {
         periodTrigger.value = p
         refOverride.value = refMillis
+    }
+
+    /** 翻页：当前参考时段向前(-1)/向后(+1)移一个 period；ref 为 null 时从"本X"出发。 */
+    fun stepRef(delta: Int) {
+        val cur = refOverride.value ?: nowProvider()
+        refOverride.value = TimeRanges.shiftedRef(periodTrigger.value, cur, delta, zone)
     }
 
     fun selectSubPeriod(index: Int?) {

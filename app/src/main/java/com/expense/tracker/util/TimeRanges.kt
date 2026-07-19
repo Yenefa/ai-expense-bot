@@ -80,4 +80,15 @@ object TimeRanges {
             }
         }
     }
+
+    /** 翻页：从 refMillis 出发向前/向后移 delta 个 period，返回新时段的中段参考点（避免月末溢出）。 */
+    fun shiftedRef(period: Period, refMillis: Long, delta: Int, zone: ZoneId): Long {
+        val d = LocalDateTime.ofInstant(Instant.ofEpochMilli(refMillis), zone).toLocalDate()
+        val newDate = when (period) {
+            Period.Week -> d.plusWeeks(delta.toLong())
+            Period.Month -> d.plusMonths(delta.toLong()).withDayOfMonth(15)
+            Period.Year -> d.plusYears(delta.toLong()).withMonth(7).withDayOfMonth(1)
+        }
+        return newDate.atStartOfDay(zone).toInstant().toEpochMilli()
+    }
 }

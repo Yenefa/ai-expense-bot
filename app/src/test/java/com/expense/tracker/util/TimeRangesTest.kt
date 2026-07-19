@@ -77,4 +77,19 @@ class TimeRangesTest {
         assertThat(from).isEqualTo(millis(2024, 5, 1))
         assertThat(to).isEqualTo(millis(2024, 6, 1))
     }
+
+    @Test fun shiftedRefPrevMonth() {
+        // 2024-05-15 上一月 -> 2024-04-15
+        assertThat(TimeRanges.shiftedRef(Period.Month, millis(2024, 5, 15), -1, zone)).isEqualTo(millis(2024, 4, 15))
+    }
+
+    @Test fun shiftedRefNextYear() {
+        // 2024-07-01 下一年 -> 2025-07-01
+        assertThat(TimeRanges.shiftedRef(Period.Year, millis(2024, 7, 1), 1, zone)).isEqualTo(millis(2025, 7, 1))
+    }
+
+    @Test fun shiftedRefPrevWeek() {
+        // 2025-06-12（周四）上一周 -> 2025-06-05（周四）
+        assertThat(TimeRanges.shiftedRef(Period.Week, millis(2025, 6, 12), -1, zone)).isEqualTo(millis(2025, 6, 5))
+    }
 }

@@ -172,4 +172,30 @@ class AnalyticsViewModelTest {
         vm.uiState.first { it.refLabel == null }
         assertThat(vm.uiState.value.refLabel).isNull()
     }
+
+    @Test
+    fun `stepRef moves month backward and sets refLabel`() = runTest {
+        val dao = FakeExpenseDaoForAnalytics()
+        val repo = ExpenseRepository(dao)
+        val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(10) }) // 2025-06-10
+        vm.uiState.first { it.subPeriods.isNotEmpty() }
+        vm.selectPeriod(Period.Month)
+        vm.uiState.first { it.period == Period.Month }
+
+        vm.stepRef(-1) // 上个月
+        val state = vm.uiState.first { it.refLabel != null }
+        assertThat(state.refLabel).isEqualTo("2025 年 5 月")
+    }
+
+    @Test
+    fun `stepRef from null ref starts at current week`() = runTest {
+        val dao = FakeExpenseDaoForAnalytics()
+        val repo = ExpenseRepository(dao)
+        val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(10) }) // 2025-06-10 周二
+        vm.uiState.first { it.subPeriods.isNotEmpty() }
+
+        vm.stepRef(-1) // 上一周：2025-06-03 周二 -> ISO 第 23 周
+        val state = vm.uiState.first { it.refLabel != null }
+        assertThat(state.refLabel).isEqualTo("2025 年第 23 周")
+    }
 }

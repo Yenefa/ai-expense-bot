@@ -1,15 +1,7 @@
 package com.expense.tracker.ui.analytics
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,12 +20,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -49,14 +44,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.expense.tracker.data.model.Period
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.temporal.WeekFields
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyticsScreen(
     vm: AnalyticsViewModel,
@@ -64,14 +57,7 @@ fun AnalyticsScreen(
     onOpenInsights: () -> Unit,
 ) {
     val state by vm.uiState.collectAsState()
-    var showPeriodSheet by remember { mutableStateOf(false) }
-    var showDial by remember { mutableStateOf(false) }
-
-    val today = remember { LocalDate.now() }
-    val zone = remember { ZoneId.systemDefault() }
-    // 年环用 ISO weekBasedYear，跨年周归属正确（如 2025-12-29 属 2026 第 1 周）
-    val initialYear = remember { today.get(WeekFields.ISO.weekBasedYear()) }
-    val initialWeek = remember { today.get(WeekFields.ISO.weekOfWeekBasedYear()) }
+    var showSheet by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(
@@ -96,17 +82,14 @@ fun AnalyticsScreen(
                 Spacer(Modifier.size(12.dp))
                 Text("支出分析", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
                 Spacer(Modifier.weight(1f))
-                // 右上角日历入口：短按=胶囊选粒度，长按=同心罗盘选具体值
+                // 右上角日历入口：点开弹时段翻页器，翻到任意时段看支出分析
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .iconBtnShadow()
                         .clip(CircleShape)
                         .background(AppColors.Bg)
-                        .combinedClickable(
-                            onClick = { showPeriodSheet = true },
-                            onLongClick = { showDial = true },
-                        ),
+                        .pointerInput(Unit) { detectTapGestures(onTap = { showSheet = true }) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(Icons.Outlined.CalendarMonth, contentDescription = "时段选择", tint = AppColors.TextPrimary)
@@ -119,7 +102,7 @@ fun AnalyticsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
 
-            // 罗盘选具体值时显示当前参考时段
+            // 当前看的参考时段（翻页后显示，如"2024 年 5 月"）
             state.refLabel?.let { label ->
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -192,62 +175,85 @@ fun AnalyticsScreen(
             Spacer(Modifier.height(40.dp))
         }
 
-        // 长按：背景虚化 scrim
-        AnimatedVisibility(
-            visible = showDial,
-            enter = fadeIn(),
-            exit = fadeOut(),
-        ) {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
-        }
-
-        // 长按：同心罗盘 overlay（弹性伸缩动效）
-        AnimatedVisibility(
-            visible = showDial,
-            enter = scaleIn(initialScale = 0.6f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
-            exit = scaleOut(targetScale = 0.6f) + fadeOut(),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) { detectTapGestures { showDial = false } }
-                    .padding(vertical = 60.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                ConcentricDialSelector(
-                    initialYear = initialYear,
-                    initialMonth = today.monthValue,
-                    initialWeek = initialWeek,
-                    zone = zone,
-                    onSelect = { period, refMillis ->
-                        vm.selectPeriodAndRef(period, refMillis)
-                        showDial = false
-                    },
-                    onDismiss = { showDial = false },
-                )
-            }
-        }
-
-        // 短按：胶囊选粒度 BottomSheet
-        if (showPeriodSheet) {
+        // 时段翻页器：选粒度 + ◀▶ 翻到任意时段 + 回到本周/月/年
+        if (showSheet) {
             ModalBottomSheet(
-                onDismissRequest = { showPeriodSheet = false },
+                onDismissRequest = { showSheet = false },
                 sheetState = rememberModalBottomSheetState(),
             ) {
+                val periodName = when (state.period) {
+                    Period.Week -> "周"
+                    Period.Month -> "月"
+                    Period.Year -> "年"
+                }
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("选择粒度", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
+                    Text("选择时段", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
                     Spacer(Modifier.height(16.dp))
                     PeriodSelector(
                         current = state.period,
-                        onSelect = { p ->
-                            vm.selectPeriod(p)
-                            showPeriodSheet = false
-                        },
+                        onSelect = vm::selectPeriod,
                     )
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .iconBtnShadow()
+                                .clip(CircleShape)
+                                .background(AppColors.Bg)
+                                .clickable { vm.stepRef(-1) },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Outlined.ChevronLeft, contentDescription = "上一$periodName", tint = AppColors.TextPrimary) }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                state.refLabel ?: "本$periodName",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AppColors.TextPrimary,
+                            )
+                            Text(
+                                "点 ◀ ▶ 翻到任意时段",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppColors.TextMuted,
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .iconBtnShadow()
+                                .clip(CircleShape)
+                                .background(AppColors.Bg)
+                                .clickable { vm.stepRef(1) },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Outlined.ChevronRight, contentDescription = "下一$periodName", tint = AppColors.TextPrimary) }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = { vm.selectPeriod(state.period) },
+                            modifier = Modifier.weight(1f),
+                        ) { Text("回到本$periodName") }
+                        Button(
+                            onClick = { showSheet = false },
+                            modifier = Modifier.weight(1.4f),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AppColors.TextPrimary,
+                                contentColor = Color.White,
+                            ),
+                        ) { Text("完成") }
+                    }
+                    Spacer(Modifier.height(28.dp))
                 }
             }
         }
