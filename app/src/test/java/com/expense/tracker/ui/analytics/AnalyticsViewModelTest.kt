@@ -136,4 +136,40 @@ class AnalyticsViewModelTest {
         vm.uiState.first { it.period == Period.Month && it.subPeriods.isNotEmpty() }
         assertThat(vm.uiState.value.selectedSubPeriodIndex).isEqualTo(8)
     }
+
+    @Test
+    fun `selectPeriodAndRef views specific month and sets refLabel`() = runTest {
+        val dao = FakeExpenseDaoForAnalytics()
+        val repo = ExpenseRepository(dao)
+        val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(10) })
+        vm.uiState.first { it.subPeriods.isNotEmpty() }
+
+        // 选 2024 年 5 月（ref 用该月中任一时刻）
+        val refMay2024 = LocalDate.of(2024, 5, 15).atStartOfDay(zone).toInstant().toEpochMilli()
+        vm.selectPeriodAndRef(Period.Month, refMay2024)
+        val state = vm.uiState.first { it.refLabel != null }
+
+        assertThat(state.period).isEqualTo(Period.Month)
+        assertThat(state.refLabel).isEqualTo("2024 年 5 月")
+        // 2024 年 5 月有 31 天
+        assertThat(state.subPeriods).hasSize(31)
+    }
+
+    @Test
+    fun `selectPeriod clears refLabel back to current`() = runTest {
+        val dao = FakeExpenseDaoForAnalytics()
+        val repo = ExpenseRepository(dao)
+        val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(10) })
+        vm.uiState.first { it.subPeriods.isNotEmpty() }
+
+        val ref = LocalDate.of(2024, 5, 15).atStartOfDay(zone).toInstant().toEpochMilli()
+        vm.selectPeriodAndRef(Period.Month, ref)
+        vm.uiState.first { it.refLabel != null }
+        assertThat(vm.uiState.value.refLabel).isEqualTo("2024 年 5 月")
+
+        // selectPeriod 回到"本月"，refLabel 清空
+        vm.selectPeriod(Period.Month)
+        vm.uiState.first { it.refLabel == null }
+        assertThat(vm.uiState.value.refLabel).isNull()
+    }
 }

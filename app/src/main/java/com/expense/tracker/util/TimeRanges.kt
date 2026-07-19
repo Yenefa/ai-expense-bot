@@ -8,6 +8,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
+import java.time.temporal.WeekFields
 
 object TimeRanges {
 
@@ -59,4 +60,24 @@ object TimeRanges {
 
     fun bucketCount(period: Period, anchorMillis: Long, zone: ZoneId): Int =
         bucketLabels(period, anchorMillis, zone).size
+
+    /** ISO 周所属年 + 第几周（跨年周归属正确，如 2025-12-29 属于 2026 第 1 周）。 */
+    fun isoWeek(refMillis: Long, zone: ZoneId): Pair<Int, Int> {
+        val d = LocalDateTime.ofInstant(Instant.ofEpochMilli(refMillis), zone).toLocalDate()
+        val wf = WeekFields.ISO
+        return d.get(wf.weekBasedYear()) to d.get(wf.weekOfWeekBasedYear())
+    }
+
+    /** 参考时段的可读标签，用于 UI 提示当前看的是哪个具体时段（如"2024 年 5 月"）。 */
+    fun refLabel(period: Period, refMillis: Long, zone: ZoneId): String {
+        val d = LocalDateTime.ofInstant(Instant.ofEpochMilli(refMillis), zone).toLocalDate()
+        return when (period) {
+            Period.Year -> "${d.year} 年"
+            Period.Month -> "${d.year} 年 ${d.monthValue} 月"
+            Period.Week -> {
+                val (wby, week) = isoWeek(refMillis, zone)
+                "$wby 年第 $week 周"
+            }
+        }
+    }
 }

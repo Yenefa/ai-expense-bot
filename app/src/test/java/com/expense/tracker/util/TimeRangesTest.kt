@@ -51,4 +51,30 @@ class TimeRangesTest {
             "1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"
         ).inOrder()
     }
+
+    @Test fun refLabelForYear() {
+        assertThat(TimeRanges.refLabel(Period.Year, millis(2024, 6, 15), zone)).isEqualTo("2024 年")
+    }
+
+    @Test fun refLabelForMonth() {
+        assertThat(TimeRanges.refLabel(Period.Month, millis(2024, 5, 15), zone)).isEqualTo("2024 年 5 月")
+    }
+
+    @Test fun refLabelForWeek() {
+        // 2025-06-09 周一，ISO 第 24 周
+        assertThat(TimeRanges.refLabel(Period.Week, millis(2025, 6, 9), zone)).isEqualTo("2025 年第 24 周")
+    }
+
+    @Test fun isoWeekCrossYear() {
+        // 2025-12-29 周一，属于 ISO 2026 第 1 周
+        val (wby, week) = TimeRanges.isoWeek(millis(2025, 12, 29), zone)
+        assertThat(wby).isEqualTo(2026)
+        assertThat(week).isEqualTo(1)
+    }
+
+    @Test fun rangeOfHonorsArbitraryRefMillis() {
+        val (from, to) = TimeRanges.rangeOf(Period.Month, millis(2024, 5, 15), zone)
+        assertThat(from).isEqualTo(millis(2024, 5, 1))
+        assertThat(to).isEqualTo(millis(2024, 6, 1))
+    }
 }

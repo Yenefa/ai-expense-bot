@@ -13,6 +13,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -35,6 +36,7 @@ data class AnalyticsUiState(
     val analyzing: Boolean = false,
     val subPeriods: List<SubPeriodDetail> = emptyList(),
     val selectedSubPeriodIndex: Int? = null,
+    val refLabel: String? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -48,25 +50,40 @@ class AnalyticsViewModel(
     private val internal = MutableStateFlow(AnalyticsUiState())
     val uiState: StateFlow<AnalyticsUiState> = internal.asStateFlow()
     private val periodTrigger = MutableStateFlow(Period.Week)
+    // 罗盘选具体值时设的非空参考时刻；null = 回到"本X"（nowProvider 决定）
+    private val refOverride = MutableStateFlow<Long?>(null)
 
     init {
         viewModelScope.launch {
-            periodTrigger.flatMapLatest { p ->
-                val now = nowProvider()
-                val (from, to) = TimeRanges.rangeOf(p, now, zone)
-                kotlinx.coroutines.flow.combine(
-                    repo.observeInRange(from, to),
-                    kotlinx.coroutines.flow.flowOf(Triple(p, from, now)),
-                ) { list, t -> t to list }
-            }.collect { (triple, list) ->
-                val (p, from, now) = triple
-                internal.update { aggregate(p, from, now, list) }
-            }
+            combine(periodTrigger, refOverride) { p, ref -> p to ref }
+                .flatMapLatest { (p, ref) ->
+                    val now = ref ?: nowProvider()
+                    val (from, to) = TimeRanges.rangeOf(p, now, zone)
+                    kotlinx.coroutines.flow.combine(
+                        repo.observeInRange(from, to),
+                        kotlinx.coroutines.flow.flowOf(Triple(p, from, now)),
+                    ) { list, t -> t to list }
+                }.collect { (triple, list) ->
+                    val (p, from, now) = triple
+                    val ref = refOverride.value
+                    internal.update {
+                        aggregate(p, from, now, list).copy(
+                            refLabel = ref?.let { TimeRanges.refLabel(p, it, zone) },
+                        )
+                    }
+                }
         }
     }
 
     fun selectPeriod(p: Period) {
         periodTrigger.value = p
+        refOverride.value = null
+    }
+
+    /** 选具体参考时段（如"2024 年 5 月""2024 年第 20 周"），用于罗盘选具体值。 */
+    fun selectPeriodAndRef(p: Period, refMillis: Long) {
+        periodTrigger.value = p
+        refOverride.value = refMillis
     }
 
     fun selectSubPeriod(index: Int?) {
