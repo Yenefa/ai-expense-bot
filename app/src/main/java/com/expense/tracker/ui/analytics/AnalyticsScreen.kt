@@ -3,6 +3,7 @@ package com.expense.tracker.ui.analytics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,9 @@ import com.expense.tracker.data.model.Period
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
+import com.expense.tracker.util.TimeRanges
+import java.time.LocalDate
+import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +62,8 @@ fun AnalyticsScreen(
 ) {
     val state by vm.uiState.collectAsState()
     var showSheet by remember { mutableStateOf(false) }
+    val today = remember { LocalDate.now() }
+    val zone = remember { ZoneId.systemDefault() }
 
     Box(modifier = Modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(
@@ -82,7 +88,7 @@ fun AnalyticsScreen(
                 Spacer(Modifier.size(12.dp))
                 Text("支出分析", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
                 Spacer(Modifier.weight(1f))
-                // 右上角日历入口：点开弹时段翻页器，翻到任意时段看支出分析
+                // 右上角日历入口：点开弹三级时段选择器（年 ▶ 月 ▶ 该月的周）
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -91,9 +97,7 @@ fun AnalyticsScreen(
                         .background(AppColors.Bg)
                         .pointerInput(Unit) { detectTapGestures(onTap = { showSheet = true }) },
                     contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Outlined.CalendarMonth, contentDescription = "时段选择", tint = AppColors.TextPrimary)
-                }
+                ) { Icon(Icons.Outlined.CalendarMonth, contentDescription = "时段选择", tint = AppColors.TextPrimary) }
             }
 
             PeriodSelector(
@@ -102,7 +106,6 @@ fun AnalyticsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
 
-            // 当前看的参考时段（翻页后显示，如"2024 年 5 月"）
             state.refLabel?.let { label ->
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -175,72 +178,86 @@ fun AnalyticsScreen(
             Spacer(Modifier.height(40.dp))
         }
 
-        // 时段翻页器：选粒度 + ◀▶ 翻到任意时段 + 回到本周/月/年
+        // 三级时段选择器：年 ◀▶ / 月 ◀▶ / 该月的周点选（周一归属月）
         if (showSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showSheet = false },
                 sheetState = rememberModalBottomSheetState(),
             ) {
+                var selYear by remember { mutableStateOf(today.year) }
+                var selMonth by remember { mutableStateOf(today.monthValue) }
+                val mondays = remember(selYear, selMonth) { TimeRanges.weekMondaysOfMonth(selYear, selMonth) }
                 val periodName = when (state.period) {
                     Period.Week -> "周"
                     Period.Month -> "月"
                     Period.Year -> "年"
                 }
+
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text("选择时段", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
-                    Spacer(Modifier.height(16.dp))
-                    PeriodSelector(
-                        current = state.period,
-                        onSelect = vm::selectPeriod,
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        state.refLabel ?: "本$periodName",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = AppColors.Accent,
                     )
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(14.dp))
+
+                    // 年：翻年即看该年分析
+                    PagerRow(label = "$selYear 年", onPrev = {
+                        selYear--
+                        vm.selectPeriodAndRef(Period.Year, LocalDate.of(selYear, 7, 1).atStartOfDay(zone).toInstant().toEpochMilli())
+                    }, onNext = {
+                        selYear++
+                        vm.selectPeriodAndRef(Period.Year, LocalDate.of(selYear, 7, 1).atStartOfDay(zone).toInstant().toEpochMilli())
+                    })
+                    Spacer(Modifier.height(10.dp))
+
+                    // 月：翻月即看该月分析
+                    PagerRow(label = "$selMonth 月", onPrev = {
+                        if (selMonth == 1) { selMonth = 12; selYear-- } else selMonth--
+                        vm.selectPeriodAndRef(Period.Month, LocalDate.of(selYear, selMonth, 15).atStartOfDay(zone).toInstant().toEpochMilli())
+                    }, onNext = {
+                        if (selMonth == 12) { selMonth = 1; selYear++ } else selMonth++
+                        vm.selectPeriodAndRef(Period.Month, LocalDate.of(selYear, selMonth, 15).atStartOfDay(zone).toInstant().toEpochMilli())
+                    })
+                    Spacer(Modifier.height(14.dp))
+
+                    // 周：该月的周（周一在本月），点选看那周分析
+                    Text("选周（周一在本月的周）", style = MaterialTheme.typography.labelMedium, color = AppColors.TextSecondary)
+                    Spacer(Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .iconBtnShadow()
-                                .clip(CircleShape)
-                                .background(AppColors.Bg)
-                                .clickable { vm.stepRef(-1) },
-                            contentAlignment = Alignment.Center,
-                        ) { Icon(Icons.Outlined.ChevronLeft, contentDescription = "上一$periodName", tint = AppColors.TextPrimary) }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                state.refLabel ?: "本$periodName",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AppColors.TextPrimary,
-                            )
-                            Text(
-                                "点 ◀ ▶ 翻到任意时段",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppColors.TextMuted,
-                            )
+                        mondays.forEach { monday ->
+                            val sunday = monday.plusDays(6)
+                            val label = "${monday.monthValue}/${monday.dayOfMonth}-${sunday.monthValue}/${sunday.dayOfMonth}"
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(AppColors.ChipFill)
+                                    .clickable {
+                                        val ref = monday.plusDays(3).atStartOfDay(zone).toInstant().toEpochMilli()
+                                        vm.selectPeriodAndRef(Period.Week, ref)
+                                        showSheet = false
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                            ) { Text(label, style = MaterialTheme.typography.bodySmall, color = AppColors.TextPrimary) }
                         }
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .iconBtnShadow()
-                                .clip(CircleShape)
-                                .background(AppColors.Bg)
-                                .clickable { vm.stepRef(1) },
-                            contentAlignment = Alignment.Center,
-                        ) { Icon(Icons.Outlined.ChevronRight, contentDescription = "下一$periodName", tint = AppColors.TextPrimary) }
                     }
                     Spacer(Modifier.height(20.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
-                            onClick = { vm.selectPeriod(state.period) },
+                            onClick = {
+                                selYear = today.year
+                                selMonth = today.monthValue
+                                vm.selectPeriod(state.period)
+                            },
                             modifier = Modifier.weight(1f),
                         ) { Text("回到本$periodName") }
                         Button(
@@ -257,6 +274,25 @@ fun AnalyticsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PagerRow(label: String, onPrev: () -> Unit, onNext: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp).clip(CircleShape).background(AppColors.ChipFill).clickable(onClick = onPrev),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Outlined.ChevronLeft, contentDescription = "上一个", tint = AppColors.TextPrimary) }
+        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+        Box(
+            modifier = Modifier.size(40.dp).clip(CircleShape).background(AppColors.ChipFill).clickable(onClick = onNext),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Outlined.ChevronRight, contentDescription = "下一个", tint = AppColors.TextPrimary) }
     }
 }
 

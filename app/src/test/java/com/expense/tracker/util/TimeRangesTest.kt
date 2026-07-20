@@ -3,6 +3,7 @@ package com.expense.tracker.util
 import com.expense.tracker.data.model.Period
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -91,5 +92,20 @@ class TimeRangesTest {
     @Test fun shiftedRefPrevWeek() {
         // 2025-06-12（周四）上一周 -> 2025-06-05（周四）
         assertThat(TimeRanges.shiftedRef(Period.Week, millis(2025, 6, 12), -1, zone)).isEqualTo(millis(2025, 6, 5))
+    }
+
+    @Test fun weekMondaysOfMonthReturnsMondaysInMonth() {
+        // 2025-06-01 是周日，第一个周一 6/2；周一归属：6/2,6/9,6/16,6/23,6/30
+        val mondays = TimeRanges.weekMondaysOfMonth(2025, 6)
+        assertThat(mondays).hasSize(5)
+        assertThat(mondays.first()).isEqualTo(LocalDate.of(2025, 6, 2))
+        assertThat(mondays.last()).isEqualTo(LocalDate.of(2025, 6, 30))
+    }
+
+    @Test fun weekMondaysSkipsFirstDaysWhenMonthStartsAfterMonday() {
+        // 2025-05-01 周四，第一个周一 5/5；1-4 号所在周周一在上月，不归本月
+        val mondays = TimeRanges.weekMondaysOfMonth(2025, 5)
+        assertThat(mondays.first()).isEqualTo(LocalDate.of(2025, 5, 5))
+        assertThat(mondays.last()).isEqualTo(LocalDate.of(2025, 5, 26))
     }
 }

@@ -91,4 +91,18 @@ object TimeRanges {
         }
         return newDate.atStartOfDay(zone).toInstant().toEpochMilli()
     }
+
+    /** 该月所有"周一归属该月"的周，返回各周的周一日期（周一在哪个月，那周就归哪个月）。 */
+    fun weekMondaysOfMonth(year: Int, month: Int): List<LocalDate> {
+        val first = LocalDate.of(year, month, 1)
+        val last = first.withDayOfMonth(first.lengthOfMonth())
+        val result = mutableListOf<LocalDate>()
+        var d = first
+        while (d.dayOfWeek != DayOfWeek.MONDAY) d = d.plusDays(1) // 跳到该月第一个周一
+        while (d <= last) {
+            result.add(d)
+            d = d.plusWeeks(1)
+        }
+        return result
+    }
 }
