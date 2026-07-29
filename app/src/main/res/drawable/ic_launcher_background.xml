@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  自适应图标背景：纯色 #0C0612（与新前景 PNG 边缘色一致，
+  自适应图标背景：纯色 #2B1A3B（与新前景 PNG 边缘色一致，
   系统遮罩裁剪外圈时边缘过渡自然）。
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -9,6 +9,6 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#0C0612"
+        android:fillColor="#2B1A3B"
         android:pathData="M0,0h108v108h-108z" />
 </vector>
