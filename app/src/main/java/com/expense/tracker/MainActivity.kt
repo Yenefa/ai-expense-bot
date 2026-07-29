@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.expense.tracker.data.prefs.ThemeMode
 import com.expense.tracker.ui.analytics.AnalyticsScreen
 import com.expense.tracker.ui.analytics.AnalyticsViewModel
 import com.expense.tracker.ui.analytics.InsightsScreen
@@ -73,10 +75,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            AppTheme {
+            val prefs by container.userPrefs.snapshot.collectAsState(initial = null)
+            val isDark = when (prefs?.themeMode ?: ThemeMode.SYSTEM) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+            AppTheme(darkTheme = isDark) {
                 var screen by remember { mutableStateOf<Screen>(Screen.Chat) }
                 var subScreen by remember { mutableStateOf<SubScreen?>(null) }
-                val llmPrefs by container.userPrefs.snapshot.collectAsState(initial = null)
 
                 // 系统返回键：非 Chat 时回到 Chat，而不是退出 App
                 BackHandler(enabled = screen != Screen.Chat || subScreen != null) {
@@ -137,6 +144,7 @@ class MainActivity : ComponentActivity() {
                             onOpenDataExport = { subScreen = SubScreen.DataExport },
                             onOpenDeletedItems = { subScreen = SubScreen.DeletedItems },
                             onOpenUserManual = { subScreen = SubScreen.UserManual },
+                            prefs = container.userPrefs,
                         )
                     }
                 }
@@ -221,7 +229,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     InsightsScreen(
                         vm = analyticsVm,
-                        llmPrefs = llmPrefs,
+                        llmPrefs = prefs,
                         onBack = { subScreen = null },
                     )
                 }

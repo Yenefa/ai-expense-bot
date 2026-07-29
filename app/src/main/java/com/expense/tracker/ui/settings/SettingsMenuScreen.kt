@@ -24,7 +24,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +36,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.expense.tracker.data.prefs.ThemeMode
+import com.expense.tracker.data.prefs.UserPrefs
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
@@ -45,10 +51,14 @@ fun SettingsMenuScreen(
     onOpenDataExport: () -> Unit = {},
     onOpenDeletedItems: () -> Unit = {},
     onOpenUserManual: () -> Unit = {},
+    prefs: UserPrefs,
 ) {
     val snackbarHost = remember { SnackbarHostState() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val context = LocalContext.current
+    val snap by prefs.snapshot.collectAsState(initial = null)
+    val themeMode = snap?.themeMode ?: ThemeMode.SYSTEM
+    var showThemePicker by remember { mutableStateOf(false) }
     // 从 PackageManager 读取真实 versionName，避免硬编码不同步
     val versionName = remember {
         runCatching {
@@ -79,7 +89,7 @@ fun SettingsMenuScreen(
             Spacer(Modifier.size(24.dp))
 
             MenuRow(emoji = "🧠", title = "LLM 设置", subtitle = "配置 API 地址、密钥和模型", onClick = onOpenLlmSettings)
-            MenuRow(emoji = "🌗", title = "深色模式", subtitle = "即将上线", onClick = { /* TODO */ })
+            MenuRow(emoji = "🌗", title = "深色模式", subtitle = themeMode.label, onClick = { showThemePicker = true })
             MenuRow(emoji = "📊", title = "预算管理", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "🔔", title = "智能提醒", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "📁", title = "数据导出", subtitle = "JSON / CSV 本地导出", onClick = onOpenDataExport)
@@ -95,6 +105,17 @@ fun SettingsMenuScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = AppColors.TextMuted,
                 modifier = Modifier.padding(bottom = 16.dp),
+            )
+        }
+
+        if (showThemePicker) {
+            ThemePickerDialog(
+                current = themeMode,
+                onSelect = { mode ->
+                    scope.launch { prefs.setThemeMode(mode) }
+                    showThemePicker = false
+                },
+                onDismiss = { showThemePicker = false },
             )
         }
 

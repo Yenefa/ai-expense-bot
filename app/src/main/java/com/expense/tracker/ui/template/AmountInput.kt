@@ -82,7 +82,7 @@ fun AmountInput(onSubmit: (Double) -> Unit, modifier: Modifier = Modifier) {
             Icon(
                 Icons.Outlined.ArrowUpward,
                 contentDescription = "提交",
-                tint = Color.White,
+                tint = AppColors.Bg,
             )
         }
     }

@@ -285,7 +285,7 @@ private fun BubbleContent(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Outlined.ArrowUpward, contentDescription = "提交", tint = Color.White)
+                Icon(Icons.Outlined.ArrowUpward, contentDescription = "提交", tint = AppColors.Bg)
             }
         }
 

@@ -30,6 +30,7 @@ class UserPrefsTest {
         assertThat(s.baseUrl).isEqualTo("https://api.openai.com/v1")
         assertThat(s.apiKey).isEmpty()
         assertThat(s.model).isEqualTo("gpt-4o-mini")
+        assertThat(s.themeMode).isEqualTo(ThemeMode.SYSTEM)
     }
 
     @Test fun setLlmEnabledPersists() = runBlocking {
@@ -47,5 +48,25 @@ class UserPrefsTest {
         assertThat(s.baseUrl).isEqualTo("https://x.com/v1")
         assertThat(s.apiKey).isEqualTo("sk-1")
         assertThat(s.model).isEqualTo("claude")
+    }
+
+    @Test fun themeModeDefaultsToSystem() = runBlocking {
+        val prefs = UserPrefs(fakeStore())
+        assertThat(prefs.snapshot.first().themeMode).isEqualTo(ThemeMode.SYSTEM)
+    }
+
+    @Test fun setThemeModePersists() = runBlocking {
+        val prefs = UserPrefs(fakeStore())
+        prefs.setThemeMode(ThemeMode.DARK)
+        assertThat(prefs.snapshot.first().themeMode).isEqualTo(ThemeMode.DARK)
+        prefs.setThemeMode(ThemeMode.LIGHT)
+        assertThat(prefs.snapshot.first().themeMode).isEqualTo(ThemeMode.LIGHT)
+        prefs.setThemeMode(ThemeMode.SYSTEM)
+        assertThat(prefs.snapshot.first().themeMode).isEqualTo(ThemeMode.SYSTEM)
+    }
+
+    @Test fun themeModeRecoversFromCorruptedStoredValue() = runBlocking {
+        val prefs = UserPrefs(fakeStore(mutablePreferencesOf(UserPrefs.THEME_MODE to "GARBAGE")))
+        assertThat(prefs.snapshot.first().themeMode).isEqualTo(ThemeMode.SYSTEM)
     }
 }

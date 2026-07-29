@@ -135,7 +135,7 @@ fun InsightsScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
                         shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF5F5)),
+                        colors = CardDefaults.cardColors(containerColor = AppColors.ErrorBg),
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp),
@@ -153,7 +153,7 @@ fun InsightsScreen(
                                 onClick = { llmPrefs?.let { vm.requestInsights(it) } },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = AppColors.TextPrimary,
-                                    contentColor = Color.White,
+                                    contentColor = AppColors.Bg,
                                 ),
                                 shape = RoundedCornerShape(12.dp),
                             ) {
@@ -169,7 +169,7 @@ fun InsightsScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = AppColors.Bg),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         ) {
                             Row(
@@ -255,7 +255,7 @@ fun InsightsScreen(
                 ) {
                     if (state.analyzing) {
                         CircularProgressIndicator(
-                            color = Color.White,
+                            color = AppColors.Bg,
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(18.dp),
                         )

@@ -85,7 +85,7 @@ fun AnalyticsScreen(
                 enabled = state.totalAmount > 0.0,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AppColors.TextPrimary,
-                    contentColor = Color.White,
+                    contentColor = AppColors.Bg,
                 ),
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.weight(1f),

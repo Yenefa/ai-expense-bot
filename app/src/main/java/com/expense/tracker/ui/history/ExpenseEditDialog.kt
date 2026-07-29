@@ -354,13 +354,13 @@ private fun EditContent(
                     Icon(
                         Icons.Outlined.Check,
                         contentDescription = "保存",
-                        tint = Color.White,
+                        tint = AppColors.Bg,
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.size(6.dp))
                     Text(
                         "保存",
-                        color = Color.White,
+                        color = AppColors.Bg,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                     )

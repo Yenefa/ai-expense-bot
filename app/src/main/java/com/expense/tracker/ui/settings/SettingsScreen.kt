@@ -108,7 +108,7 @@ fun SettingsScreen(prefs: UserPrefs, onClose: () -> Unit) {
             },
             colors = ButtonDefaults.buttonColors(
                 containerColor = AppColors.TextPrimary,
-                contentColor = Color.White,
+                contentColor = AppColors.Bg,
             ),
             shape = RoundedCornerShape(14.dp),
             modifier = Modifier.fillMaxWidth(),
