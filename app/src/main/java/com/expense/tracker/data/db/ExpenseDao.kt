@@ -11,6 +11,9 @@ interface ExpenseDao {
     @Insert
     suspend fun insert(expense: ExpenseEntity): Long
 
+    @Insert
+    suspend fun insertAll(expenses: List<ExpenseEntity>): List<Long>
+
     @Update
     suspend fun update(expense: ExpenseEntity)
 
@@ -20,6 +23,9 @@ interface ExpenseDao {
 
     @Query("SELECT * FROM expenses WHERE deletedAt IS NULL ORDER BY occurredAt ASC")
     suspend fun getAllActiveOnce(): List<ExpenseEntity>
+
+    @Query("SELECT * FROM expenses ORDER BY id ASC")
+    suspend fun getAllOnce(): List<ExpenseEntity>
 
     @Query("SELECT * FROM expenses WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): ExpenseEntity?

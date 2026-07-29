@@ -79,11 +79,14 @@ private class FakeExpenseDao : ExpenseDao {
         state.value = state.value + expense.copy(id = id)
         return id
     }
+    override suspend fun insertAll(expenses: List<ExpenseEntity>): List<Long> =
+        expenses.map { insert(it) }
     override suspend fun update(expense: ExpenseEntity) {
         state.value = state.value.map { if (it.id == expense.id) expense else it }
     }
     override fun observeActive(): Flow<List<ExpenseEntity>> = state
     override suspend fun getAllActiveOnce(): List<ExpenseEntity> = state.value.filter { it.deletedAt == null }
+    override suspend fun getAllOnce(): List<ExpenseEntity> = state.value
     override suspend fun getById(id: Long): ExpenseEntity? = state.value.firstOrNull { it.id == id }
     override fun observeInRange(from: Long, to: Long): Flow<List<ExpenseEntity>> = flowOf(emptyList())
     override fun observeDeleted(): Flow<List<ExpenseEntity>> = flowOf(emptyList())

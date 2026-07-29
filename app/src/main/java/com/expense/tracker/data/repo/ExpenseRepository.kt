@@ -2,7 +2,13 @@ package com.expense.tracker.data.repo
 
 import com.expense.tracker.data.db.ExpenseDao
 import com.expense.tracker.data.db.ExpenseEntity
+import com.expense.tracker.data.importer.ImportedExpense
 import kotlinx.coroutines.flow.Flow
+
+data class ExpenseImportSummary(
+    val inserted: Int,
+    val skippedDuplicates: Int,
+)
 
 class ExpenseRepository(private val dao: ExpenseDao) {
 
@@ -47,4 +53,47 @@ class ExpenseRepository(private val dao: ExpenseDao) {
 
     /** 一次拉取全部活跃记录（给导出用）。 */
     suspend fun getAllActiveOnce(): List<ExpenseEntity> = dao.getAllActiveOnce()
+
+    suspend fun importExpenses(rows: List<ImportedExpense>): ExpenseImportSummary {
+        val seen = dao.getAllOnce().mapTo(HashSet()) { it.importKey() }
+        val toInsert = ArrayList<ExpenseEntity>(rows.size)
+        var skipped = 0
+
+        rows.forEach { row ->
+            val entity = ExpenseEntity(
+                amount = row.amount,
+                categoryId = row.categoryId,
+                note = row.note,
+                occurredAt = row.occurredAt,
+                createdAt = row.createdAt,
+            )
+            if (seen.add(entity.importKey())) {
+                toInsert += entity
+            } else {
+                skipped++
+            }
+        }
+
+        if (toInsert.isNotEmpty()) dao.insertAll(toInsert)
+        return ExpenseImportSummary(
+            inserted = toInsert.size,
+            skippedDuplicates = skipped,
+        )
+    }
+
+    private data class ImportKey(
+        val amount: Double,
+        val categoryId: String,
+        val note: String,
+        val occurredAt: Long,
+        val createdAt: Long,
+    )
+
+    private fun ExpenseEntity.importKey() = ImportKey(
+        amount = amount,
+        categoryId = categoryId,
+        note = note,
+        occurredAt = occurredAt,
+        createdAt = createdAt,
+    )
 }

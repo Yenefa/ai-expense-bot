@@ -4,6 +4,7 @@ import com.expense.tracker.data.db.ChatMessageDao
 import com.expense.tracker.data.db.ChatMessageEntity
 import com.expense.tracker.data.db.ExpenseDao
 import com.expense.tracker.data.db.ExpenseEntity
+import com.expense.tracker.data.importer.ImportedExpense
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,11 +21,14 @@ private class FakeExpenseDao : ExpenseDao {
         state.value = state.value + expense.copy(id = seq)
         return seq
     }
+    override suspend fun insertAll(expenses: List<ExpenseEntity>): List<Long> =
+        expenses.map { insert(it) }
     override suspend fun update(expense: ExpenseEntity) {
         state.value = state.value.map { if (it.id == expense.id) expense else it }
     }
     override fun observeActive(): Flow<List<ExpenseEntity>> = state
     override suspend fun getAllActiveOnce(): List<ExpenseEntity> = state.value.filter { it.deletedAt == null }
+    override suspend fun getAllOnce(): List<ExpenseEntity> = state.value
     override suspend fun getById(id: Long): ExpenseEntity? = state.value.firstOrNull { it.id == id }
     override fun observeInRange(from: Long, to: Long): Flow<List<ExpenseEntity>> =
         flow { emit(state.value.filter { it.occurredAt in from until to && it.deletedAt == null }) }
@@ -76,5 +80,29 @@ class RepositoryTest {
         val all = repo.observeAll().first()
         assertThat(all).hasSize(2)
         assertThat(all[1].relatedExpenseId).isEqualTo(7L)
+    }
+
+    @Test fun expenseImportSkipsExistingAndWithinFileDuplicates() = runBlocking {
+        val dao = FakeExpenseDao()
+        dao.insert(
+            ExpenseEntity(
+                amount = 9.0,
+                categoryId = "drink",
+                note = "菠萝百香果",
+                occurredAt = 100L,
+                createdAt = 101L,
+            )
+        )
+        val repo = ExpenseRepository(dao)
+        val duplicate = ImportedExpense(9.0, "drink", "菠萝百香果", 100L, 101L)
+        val newRow = ImportedExpense(35.0, "food", "午饭", 200L, 201L)
+
+        val result = repo.importExpenses(listOf(duplicate, newRow, newRow))
+
+        assertThat(result.inserted).isEqualTo(1)
+        assertThat(result.skippedDuplicates).isEqualTo(2)
+        val all = repo.observeActive().first()
+        assertThat(all).hasSize(2)
+        assertThat(all.last().createdAt).isEqualTo(201L)
     }
 }

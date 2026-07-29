@@ -1,6 +1,5 @@
 package com.expense.tracker.ui.settings
 
-import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,10 +21,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.expense.tracker.ExpenseApp
 import com.expense.tracker.data.export.DataExporter
+import com.expense.tracker.data.importer.CsvExpenseImporter
+import com.expense.tracker.data.importer.CsvImportResult
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
@@ -53,9 +56,10 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 数据导出页 — 入口在 SettingsMenuScreen 的 "📁 数据导出"。
+ * 数据导入与导出页 — 入口在 SettingsMenuScreen 的 "📁 数据导入与导出"。
  *
- * 提供两个选项：
+ * 提供三个选项：
+ * - 导入 CSV：读取本应用导出的记账 CSV，预览后写入并跳过重复记录
  * - JSON：完整数据（expenses + chat_messages），后续可用于跨设备迁移
  * - CSV：仅 expenses 表，便于 Excel 处理
  *
@@ -67,6 +71,8 @@ fun DataExportScreen(onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     val container = remember { (context.applicationContext as ExpenseApp).container }
     var busy by remember { mutableStateOf(false) }
+    var busyLabel by remember { mutableStateOf("处理中…") }
+    var pendingImport by remember { mutableStateOf<CsvImportResult?>(null) }
 
     // 待导出的内容缓存 — 用户点了选项后，等系统文件选择器回调时把内容写入
     var pendingPayload by remember { mutableStateOf<Pair<String, String>?>(null) } // (mime, content)
@@ -98,6 +104,34 @@ fun DataExportScreen(onClose: () -> Unit) {
         }
     }
 
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        busy = true
+        busyLabel = "读取 CSV…"
+        scope.launch {
+            val parsed = runCatching {
+                withContext(Dispatchers.IO) {
+                    val csv = context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader(Charsets.UTF_8)
+                        ?.use { it.readText() }
+                        ?: error("无法读取所选文件")
+                    CsvExpenseImporter.parse(csv)
+                }
+            }
+            busy = false
+            parsed.onSuccess { pendingImport = it }
+                .onFailure {
+                    Toast.makeText(
+                        context,
+                        "导入失败：${it.message ?: "CSV 格式不正确"}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(Modifier.fillMaxSize().padding(20.dp)) {
             // 顶部栏
@@ -115,24 +149,37 @@ fun DataExportScreen(onClose: () -> Unit) {
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
                 Spacer(Modifier.size(12.dp))
-                Text("数据导出", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
+                Text("数据导入与导出", style = MaterialTheme.typography.titleLarge, color = AppColors.TextPrimary)
             }
             Spacer(Modifier.size(16.dp))
 
             Text(
-                "将本地记账数据导出为文件。所有数据不会上传到任何云端，仅写入你选择的本地位置。",
+                "从 CSV 恢复记账，或将本地数据导出为文件。所有操作都在手机本地完成，不会上传云端。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = AppColors.TextSecondary,
             )
             Spacer(Modifier.size(20.dp))
 
-            ExportOption(
+            DataOption(
+                emoji = "📥",
+                title = "导入 CSV",
+                subtitle = "选择本应用导出的 CSV，自动跳过重复账目",
+                enabled = !busy,
+                onClick = {
+                    importLauncher.launch(
+                        arrayOf("text/*", "application/csv", "application/vnd.ms-excel"),
+                    )
+                },
+            )
+            Spacer(Modifier.size(10.dp))
+            DataOption(
                 emoji = "🗂",
                 title = "导出 JSON（完整）",
                 subtitle = "包含全部记账 + 聊天消息，便于跨设备迁移",
                 enabled = !busy,
                 onClick = {
                     busy = true
+                    busyLabel = "准备导出…"
                     scope.launch {
                         val expenses = container.expenseRepo.getAllActiveOnce()
                         val chats = container.chatRepo.getAllOnce()
@@ -150,13 +197,14 @@ fun DataExportScreen(onClose: () -> Unit) {
                 },
             )
             Spacer(Modifier.size(10.dp))
-            ExportOption(
+            DataOption(
                 emoji = "📊",
                 title = "导出 CSV（仅记账）",
                 subtitle = "仅 expenses 表，常用于 Excel 打开",
                 enabled = !busy,
                 onClick = {
                     busy = true
+                    busyLabel = "准备导出…"
                     scope.launch {
                         val expenses = container.expenseRepo.getAllActiveOnce()
                         val nowMs = System.currentTimeMillis()
@@ -174,7 +222,7 @@ fun DataExportScreen(onClose: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.size(8.dp))
-                    Text("导出中…", style = MaterialTheme.typography.bodyMedium, color = AppColors.TextSecondary)
+                    Text(busyLabel, style = MaterialTheme.typography.bodyMedium, color = AppColors.TextSecondary)
                 }
             }
 
@@ -186,11 +234,91 @@ fun DataExportScreen(onClose: () -> Unit) {
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
+
+        val preview = pendingImport
+        if (preview != null) {
+            AlertDialog(
+                onDismissRequest = { if (!busy) pendingImport = null },
+                title = { Text("确认导入 CSV") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "可导入 ${preview.expenses.size} 笔记账",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        val from = preview.minOccurredAt
+                        val to = preview.maxOccurredAt
+                        if (from != null && to != null) {
+                            Text(
+                                "日期范围：${displayDate(from)} 至 ${displayDate(to)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppColors.TextSecondary,
+                            )
+                        }
+                        Text(
+                            if (preview.issues.isEmpty()) {
+                                "未发现无效记录"
+                            } else {
+                                "另有 ${preview.issues.size} 条无效记录，将不会导入"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppColors.TextSecondary,
+                        )
+                        Text(
+                            "已有账目和文件内重复账目会自动跳过。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AppColors.TextMuted,
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = preview.expenses.isNotEmpty() && !busy,
+                        onClick = {
+                            pendingImport = null
+                            busy = true
+                            busyLabel = "正在导入…"
+                            scope.launch {
+                                val result = runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        container.expenseRepo.importExpenses(preview.expenses)
+                                    }
+                                }
+                                busy = false
+                                result.onSuccess { summary ->
+                                    val invalid = preview.issues.size
+                                    val message = buildString {
+                                        append("已导入 ${summary.inserted} 笔")
+                                        if (summary.skippedDuplicates > 0) {
+                                            append("，跳过 ${summary.skippedDuplicates} 笔重复账目")
+                                        }
+                                        if (invalid > 0) append("，忽略 $invalid 条无效记录")
+                                    }
+                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                }.onFailure {
+                                    Toast.makeText(
+                                        context,
+                                        "导入失败：${it.message ?: "无法写入记账数据"}",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            }
+                        },
+                    ) { Text("导入") }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !busy,
+                        onClick = { pendingImport = null },
+                    ) { Text("取消") }
+                },
+            )
+        }
     }
 }
 
 @Composable
-private fun ExportOption(
+private fun DataOption(
     emoji: String,
     title: String,
     subtitle: String,
@@ -228,4 +356,9 @@ private fun ExportOption(
 private fun defaultStamp(nowMs: Long): String {
     val fmt = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
     return fmt.format(Date(nowMs))
+}
+
+private fun displayDate(timeMs: Long): String {
+    val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    return fmt.format(Date(timeMs))
 }

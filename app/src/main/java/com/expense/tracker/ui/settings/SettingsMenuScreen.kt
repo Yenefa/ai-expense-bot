@@ -92,7 +92,12 @@ fun SettingsMenuScreen(
             MenuRow(emoji = "🌗", title = "深色模式", subtitle = themeMode.label, onClick = { showThemePicker = true })
             MenuRow(emoji = "📊", title = "预算管理", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "🔔", title = "智能提醒", subtitle = "即将上线", onClick = { /* TODO */ })
-            MenuRow(emoji = "📁", title = "数据导出", subtitle = "JSON / CSV 本地导出", onClick = onOpenDataExport)
+            MenuRow(
+                emoji = "📁",
+                title = "数据导入与导出",
+                subtitle = "CSV 导入 · JSON / CSV 本地导出",
+                onClick = onOpenDataExport,
+            )
             MenuRow(emoji = "🗑", title = "最近删除", subtitle = "30 天内可恢复的已删除记录", onClick = onOpenDeletedItems)
             MenuRow(emoji = "📖", title = "软件说明书", subtitle = "了解所有功能与交互细节", onClick = onOpenUserManual)
             MenuRow(emoji = "ℹ️", title = "关于记账助手", subtitle = "v$versionName · ChatGPT 风格 · 本地 SQLite", onClick = {
