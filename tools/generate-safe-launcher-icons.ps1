@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$SourceImage,
-    [string]$ResourcesDir
+    [string]$ResourcesDir,
+    [ValidateRange(0.01, 1.0)]
+    [double]$Scale = 0.43
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,7 +18,6 @@ if (-not (Test-Path -LiteralPath $SourceImage)) {
 }
 
 $background = [System.Drawing.ColorTranslator]::FromHtml('#2B1A3B')
-$scale = 0.43
 $targets = [ordered]@{
     'drawable-mdpi' = 108
     'drawable-hdpi' = 162
@@ -33,7 +34,7 @@ try {
 
     foreach ($target in $targets.GetEnumerator()) {
         $canvasSize = [int]$target.Value
-        $artSize = [int][Math]::Round($canvasSize * $scale)
+        $artSize = [int][Math]::Round($canvasSize * $Scale)
         $offset = [int][Math]::Floor(($canvasSize - $artSize) / 2)
         $outputDir = Join-Path $ResourcesDir $target.Key
         $outputPath = Join-Path $outputDir 'ic_launcher_foreground.png'
