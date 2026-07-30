@@ -52,14 +52,17 @@ $themesRelativePath = 'app\src\main\res\values\themes.xml'
 $startingThemes = @($themes.SelectNodes('/resources/style[@name="Theme.ExpenseTracker.Starting"]'))
 if (
     $startingThemes.Count -ne 1 -or
-    $startingThemes[0].GetAttribute('parent') -cne 'Theme.SplashScreen'
+    $startingThemes[0].GetAttribute('parent') -cne 'Theme.SplashScreen.IconBackground'
 ) {
-    throw 'Expected Theme.ExpenseTracker.Starting to inherit from Theme.SplashScreen'
+    throw (
+        'Expected Theme.ExpenseTracker.Starting to inherit from ' +
+        'Theme.SplashScreen.IconBackground'
+    )
 }
 
 $expectedThemeItems = [ordered]@{
     'windowSplashScreenBackground' = '@color/splash_background'
-    'windowSplashScreenAnimatedIcon' = '@mipmap/ic_launcher'
+    'windowSplashScreenAnimatedIcon' = '@drawable/ic_launcher_foreground'
     'windowSplashScreenIconBackgroundColor' = '@color/splash_background'
     'postSplashScreenTheme' = '@style/Theme.ExpenseTracker'
     'android:statusBarColor' = '@color/splash_background'
@@ -119,6 +122,20 @@ if ($startingThemeAssignments.Count -ne 1) {
 $mainActivityRelativePath = 'app\src\main\java\com\expense\tracker\MainActivity.kt'
 $mainActivity = Read-ProjectText $mainActivityRelativePath
 $mainActivityWithoutComments = Remove-BlockAndLineComments $mainActivity
+$requiredSplashImport = (
+    'import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen'
+)
+$activeImports = @(
+    [regex]::Matches(
+        $mainActivityWithoutComments,
+        '(?m)^[ \t]*import[ \t]+[^\r\n]+$'
+    ) |
+        ForEach-Object { $_.Value.Trim() }
+)
+if ($activeImports -cnotcontains $requiredSplashImport) {
+    throw "Expected active Kotlin import: $requiredSplashImport"
+}
+
 $onCreateSplashPattern = (
     'override\s+fun\s+onCreate\s*' +
     '\(\s*savedInstanceState\s*:\s*Bundle\?\s*\)\s*\{\s*' +

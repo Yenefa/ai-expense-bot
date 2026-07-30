@@ -67,8 +67,8 @@ $startingTheme = @($themesXml.resources.style) |
 if ($null -eq $startingTheme) {
     throw 'Missing Theme.ExpenseTracker.Starting'
 }
-if ($startingTheme.parent -ne 'Theme.SplashScreen') {
-    throw 'Starting theme must inherit Theme.SplashScreen'
+if ($startingTheme.parent -ne 'Theme.SplashScreen.IconBackground') {
+    throw 'Starting theme must inherit Theme.SplashScreen.IconBackground'
 }
 
 $themeItems = @{}
@@ -78,7 +78,7 @@ foreach ($item in @($startingTheme.item)) {
 
 $expectedThemeItems = @{
     'windowSplashScreenBackground' = '@color/splash_background'
-    'windowSplashScreenAnimatedIcon' = '@mipmap/ic_launcher'
+    'windowSplashScreenAnimatedIcon' = '@drawable/ic_launcher_foreground'
     'windowSplashScreenIconBackgroundColor' = '@color/splash_background'
     'postSplashScreenTheme' = '@style/Theme.ExpenseTracker'
     'android:statusBarColor' = '@color/splash_background'
@@ -169,9 +169,9 @@ Replace `app/src/main/res/values/themes.xml` with:
 <resources>
     <style name="Theme.ExpenseTracker" parent="android:Theme.Material.Light.NoActionBar" />
 
-    <style name="Theme.ExpenseTracker.Starting" parent="Theme.SplashScreen">
+    <style name="Theme.ExpenseTracker.Starting" parent="Theme.SplashScreen.IconBackground">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
         <item name="windowSplashScreenIconBackgroundColor">@color/splash_background</item>
         <item name="postSplashScreenTheme">@style/Theme.ExpenseTracker</item>
         <item name="android:statusBarColor">@color/splash_background</item>
