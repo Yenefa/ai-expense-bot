@@ -122,6 +122,7 @@ if ($startingThemeAssignments.Count -ne 1) {
 $mainActivityRelativePath = 'app\src\main\java\com\expense\tracker\MainActivity.kt'
 $mainActivity = Read-ProjectText $mainActivityRelativePath
 $mainActivityWithoutComments = Remove-BlockAndLineComments $mainActivity
+$mainActivityWithoutComments = $mainActivityWithoutComments -replace '\r\n?', "`n"
 $requiredSplashImport = (
     'import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen'
 )
