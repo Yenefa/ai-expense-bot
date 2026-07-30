@@ -73,7 +73,7 @@ fun MonthCalendarView(
                     .size(32.dp)
                     .iconBtnShadow()
                     .clip(CircleShape)
-                    .background(AppColors.Bg)
+                    .background(AppColors.CardBg)
                     .clickable { onPrevMonth() },
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Outlined.ChevronLeft, contentDescription = "上月", tint = AppColors.TextPrimary, modifier = Modifier.size(20.dp)) }
@@ -90,7 +90,7 @@ fun MonthCalendarView(
                     .size(32.dp)
                     .iconBtnShadow()
                     .clip(CircleShape)
-                    .background(AppColors.Bg)
+                    .background(AppColors.CardBg)
                     .clickable { onNextMonth() },
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Outlined.ChevronRight, contentDescription = "下月", tint = AppColors.TextPrimary, modifier = Modifier.size(20.dp)) }

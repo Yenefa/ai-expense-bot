@@ -79,7 +79,7 @@ fun InsightsScreen(
                     .size(36.dp)
                     .iconBtnShadow()
                     .clip(CircleShape)
-                    .background(AppColors.Bg)
+                    .background(AppColors.CardBg)
                     .pointerInput(onBack) { detectTapGestures(onTap = { onBack() }) },
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }

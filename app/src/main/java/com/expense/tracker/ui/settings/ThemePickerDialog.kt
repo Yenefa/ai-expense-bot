@@ -40,7 +40,7 @@ fun ThemePickerDialog(
             modifier = Modifier
                 .softShadow(elevation = 8.dp, cornerRadius = 20.dp, spotAlpha = 0.12f)
                 .clip(RoundedCornerShape(20.dp))
-                .background(AppColors.Bg)
+                .background(AppColors.CardBg)
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {

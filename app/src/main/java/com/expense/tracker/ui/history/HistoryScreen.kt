@@ -87,7 +87,7 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
                         .size(36.dp)
                         .iconBtnShadow()
                         .clip(CircleShape)
-                        .background(AppColors.Bg)
+                        .background(AppColors.CardBg)
                         .pointerInput(onBack) { detectTapGestures(onTap = { onBack() }) },
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
@@ -100,7 +100,7 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
                         .size(36.dp)
                         .iconBtnShadow()
                         .clip(CircleShape)
-                        .background(AppColors.Bg)
+                        .background(AppColors.CardBg)
                         .clickable { calendarMode = !calendarMode },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -196,7 +196,7 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
                                 .fillMaxWidth()
                                 .softShadow(elevation = 2.dp, cornerRadius = 16.dp, spotAlpha = 0.06f)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(AppColors.Bg)
+                                .background(AppColors.CardBg)
                                 .clickable { expandedDays[day.dateLabel] = !expanded },
                         ) {
                             Row(

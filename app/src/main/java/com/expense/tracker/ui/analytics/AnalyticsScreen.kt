@@ -60,7 +60,7 @@ fun AnalyticsScreen(
                     .size(36.dp)
                     .iconBtnShadow()
                     .clip(CircleShape)
-                    .background(AppColors.Bg)
+                    .background(AppColors.CardBg)
                     .pointerInput(onBack) { detectTapGestures(onTap = { onBack() }) },
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
@@ -103,7 +103,7 @@ fun AnalyticsScreen(
                     .padding(horizontal = 16.dp)
                     .softShadow(elevation = 2.dp, cornerRadius = 16.dp, spotAlpha = 0.06f)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(AppColors.Bg)
+                    .background(AppColors.CardBg)
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {

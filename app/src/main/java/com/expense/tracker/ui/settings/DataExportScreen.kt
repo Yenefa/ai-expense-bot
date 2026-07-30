@@ -144,7 +144,7 @@ fun DataExportScreen(onClose: () -> Unit) {
                         .size(36.dp)
                         .iconBtnShadow()
                         .clip(CircleShape)
-                        .background(AppColors.Bg)
+                        .background(AppColors.CardBg)
                         .pointerInput(onClose) { detectTapGestures(onTap = { onClose() }) },
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
@@ -325,7 +325,7 @@ private fun DataOption(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val rowColor = if (enabled) AppColors.Bg else AppColors.Bg
+    val rowColor = AppColors.CardBg
     Row(
         modifier = Modifier
             .fillMaxWidth()

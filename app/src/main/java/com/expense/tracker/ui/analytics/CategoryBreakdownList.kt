@@ -60,7 +60,7 @@ fun CategoryBreakdownList(
                 .fillMaxWidth()
                 .softShadow(elevation = 2.dp, cornerRadius = 16.dp, spotAlpha = 0.06f)
                 .clip(RoundedCornerShape(16.dp))
-                .background(AppColors.Bg)
+                .background(AppColors.CardBg)
                 .padding(20.dp),
         ) {
             Text(
@@ -83,7 +83,7 @@ fun CategoryBreakdownList(
             .fillMaxWidth()
             .softShadow(elevation = 2.dp, cornerRadius = 16.dp, spotAlpha = 0.06f)
             .clip(RoundedCornerShape(16.dp))
-            .background(AppColors.Bg)
+            .background(AppColors.CardBg)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {

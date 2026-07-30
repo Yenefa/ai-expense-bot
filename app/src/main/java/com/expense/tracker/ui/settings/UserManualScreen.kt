@@ -35,8 +35,8 @@ import com.expense.tracker.ui.theme.softShadow
 /**
  * 软件说明书 — 帮助用户快速理解 App 的核心功能与交互细节。
  *
- * 设计：每节是一张白色卡片（softShadow）+ emoji 标题 + 多段 bullet 文本，
- * 整页可滚动，与设置菜单保持视觉一致（ChatGPT 白底极简风）。
+ * 设计：每节是一张主题卡片（softShadow）+ emoji 标题 + 多段 bullet 文本，
+ * 整页可滚动，与设置菜单保持视觉一致。
  */
 @Composable
 fun UserManualScreen(onClose: () -> Unit) {
@@ -57,7 +57,7 @@ fun UserManualScreen(onClose: () -> Unit) {
                         .size(36.dp)
                         .iconBtnShadow()
                         .clip(CircleShape)
-                        .background(AppColors.Bg)
+                        .background(AppColors.CardBg)
                         .pointerInput(onClose) { detectTapGestures(onTap = { onClose() }) },
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
@@ -195,7 +195,7 @@ private fun ManualSection(emoji: String, title: String, lines: List<String>) {
             .padding(bottom = 12.dp)
             .softShadow(elevation = 2.dp, cornerRadius = 16.dp, spotAlpha = 0.06f)
             .clip(RoundedCornerShape(16.dp))
-            .background(AppColors.Bg)
+            .background(AppColors.CardBg)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {

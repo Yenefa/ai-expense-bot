@@ -78,7 +78,7 @@ fun SettingsMenuScreen(
                         .size(36.dp)
                         .iconBtnShadow()
                         .clip(CircleShape)
-                        .background(AppColors.Bg)
+                        .background(AppColors.CardBg)
                         .pointerInput(onClose) { detectTapGestures(onTap = { onClose() }) },
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
@@ -135,7 +135,7 @@ fun SettingsMenuScreen(
 private fun MenuRow(emoji: String, title: String, subtitle: String, onClick: () -> Unit) {
     val enabled = subtitle != "即将上线"
     val fg = if (enabled) AppColors.TextPrimary else AppColors.TextMuted
-    val bg = if (enabled) AppColors.Bg else AppColors.Bg
+    val bg = AppColors.CardBg
 
     Row(
         modifier = Modifier

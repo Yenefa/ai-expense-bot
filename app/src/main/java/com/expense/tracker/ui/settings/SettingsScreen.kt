@@ -69,7 +69,7 @@ fun SettingsScreen(prefs: UserPrefs, onClose: () -> Unit) {
                     .size(36.dp)
                     .iconBtnShadow()
                     .clip(CircleShape)
-                    .background(AppColors.Bg)
+                    .background(AppColors.CardBg)
                     .pointerInput(onClose) { detectTapGestures(onTap = { onClose() }) },
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }

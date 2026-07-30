@@ -51,7 +51,7 @@ fun InputBar(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .inputShadow()
             .clip(RoundedCornerShape(28.dp))
-            .background(AppColors.Bg)
+            .background(AppColors.CardBg)
             .padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -85,7 +85,7 @@ fun MessageActionSheet(
                     .padding(horizontal = 16.dp, vertical = 24.dp)
                     .softShadow(elevation = 12.dp, cornerRadius = 22.dp, spotAlpha = 0.16f)
                     .clip(RoundedCornerShape(22.dp))
-                    .background(AppColors.Bg)
+                    .background(AppColors.CardBg)
                     .clickable(
                         indication = null,
                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },

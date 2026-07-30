@@ -86,7 +86,7 @@ fun DeletedItemsScreen(repo: ExpenseRepository, onClose: () -> Unit) {
                         .size(36.dp)
                         .iconBtnShadow()
                         .clip(CircleShape)
-                        .background(AppColors.Bg)
+                        .background(AppColors.CardBg)
                         .pointerInput(onClose) { detectTapGestures(onTap = { onClose() }) },
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = AppColors.TextPrimary) }
@@ -121,7 +121,7 @@ fun DeletedItemsScreen(repo: ExpenseRepository, onClose: () -> Unit) {
                                     .fillMaxWidth()
                                     .softShadow(elevation = 2.dp, cornerRadius = 14.dp, spotAlpha = 0.06f)
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(AppColors.Bg)
+                                    .background(AppColors.CardBg)
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {

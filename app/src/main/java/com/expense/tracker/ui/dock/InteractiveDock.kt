@@ -31,7 +31,7 @@ fun InteractiveDock(
             .padding(horizontal = 18.dp, vertical = 8.dp)
             .dockShadow()
             .clip(RoundedCornerShape(28.dp))
-            .background(AppColors.Bg)
+            .background(AppColors.CardBg)
             .padding(horizontal = 22.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceAround,
