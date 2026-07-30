@@ -38,17 +38,21 @@ fun LineChartView(counts: List<Int>, xLabels: List<String>, modifier: Modifier =
         maxCount <= 10 -> 6
         else -> 5
     }
-    Chart(
-        modifier = modifier.fillMaxWidth().height(260.dp),
-        chart = lineChart(),
-        chartModelProducer = producer,
-        startAxis = rememberStartAxis(
-            valueFormatter = yFormatter,
-            itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = yItemCount),
-        ),
-        bottomAxis = rememberBottomAxis(
-            valueFormatter = xFormatter,
-            itemPlacer = AxisItemPlacer.Horizontal.default(spacing = if (xLabels.size > 12) 5 else 1),
-        ),
-    )
+    ProvideAnalyticsChartStyle {
+        Chart(
+            modifier = modifier.fillMaxWidth().height(260.dp),
+            chart = lineChart(),
+            chartModelProducer = producer,
+            startAxis = rememberStartAxis(
+                valueFormatter = yFormatter,
+                itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = yItemCount),
+            ),
+            bottomAxis = rememberBottomAxis(
+                valueFormatter = xFormatter,
+                itemPlacer = AxisItemPlacer.Horizontal.default(
+                    spacing = if (xLabels.size > 12) 5 else 1,
+                ),
+            ),
+        )
+    }
 }
