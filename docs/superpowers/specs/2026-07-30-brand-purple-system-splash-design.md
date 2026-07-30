@@ -29,16 +29,17 @@
 
 ### 启动主题
 
-新增 `Theme.ExpenseTracker.Starting`，父主题使用 `Theme.SplashScreen`，配置：
+新增 `Theme.ExpenseTracker.Starting`，父主题使用 `Theme.SplashScreen.IconBackground`，配置：
 
 - `windowSplashScreenBackground`：`@color/splash_background`
-- `windowSplashScreenAnimatedIcon`：`@mipmap/ic_launcher`
+- `windowSplashScreenAnimatedIcon`：`@drawable/ic_launcher_foreground`
 - `windowSplashScreenIconBackgroundColor`：`@color/splash_background`
 - `postSplashScreenTheme`：`@style/Theme.ExpenseTracker`
 - 启动阶段状态栏和导航栏背景：`@color/splash_background`
 - 启动阶段系统栏图标：使用适合深紫背景的浅色图标
 
 颜色资源 `splash_background` 固定为 `#2B1A3B`。不添加 `values-night` 覆盖，确保两种应用主题下品牌色一致。
+前景与背景分离可避免 AndroidX 在 API 26–30 对自适应图标的裁切和缩放，同时继续复用现有资源。
 
 ### Activity 接入
 
@@ -49,7 +50,7 @@
 
 ### 图标和过渡
 
-- 不生成新的位图；系统启动页直接复用当前自适应图标。
+- 不生成新的位图；系统启动页复用现有图标前景和品牌背景资源。
 - 不人为延长启动页时间。
 - 不添加独立 Splash Activity。
 - SplashScreen 在首帧就绪后按系统时机退出，随后切换到现有 Compose 内容。
