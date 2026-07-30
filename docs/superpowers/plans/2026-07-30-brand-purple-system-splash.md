@@ -309,17 +309,22 @@ Expected: `Verified using v2 scheme (APK Signature Scheme v2): true`.
 ### Task 4: Deliver the v3.6 APK
 
 **Files:**
-- Source: `app/build/outputs/apk/debug/app-debug.apk`
-- Create: `C:\Users\fuker\Desktop\app\codex change\ai-expense-bot-v3.6-purple-splash-2026-07-30.apk`
-- Create: `C:\Users\fuker\Documents\Codex\2026-07-29\c-users-fuker-desktop-app-ai\outputs\ai-expense-bot-v3.6-purple-splash-2026-07-30.apk`
+- Source: `C:\Users\fuker\Desktop\app\account app\expense-tracker\.worktrees\brand-purple-splash\app\build\outputs\apk\debug\app-debug.apk`
+- Create: `C:\Users\fuker\Desktop\app\codex change\ai-expense-bot-v3.6-purple-splash-2026-07-31.apk`
+- Create: `C:\Users\fuker\Documents\Codex\2026-07-29\c-users-fuker-desktop-app-ai\outputs\ai-expense-bot-v3.6-purple-splash-2026-07-31.apk`
 
 - [ ] **Step 1: Copy the verified APK to both delivery locations**
 
 ```powershell
-$sourceApk = 'C:\Users\fuker\Desktop\app\account app\expense-tracker\app\build\outputs\apk\debug\app-debug.apk'
-$artifactName = 'ai-expense-bot-v3.6-purple-splash-2026-07-30.apk'
+$sourceApk = 'C:\Users\fuker\Desktop\app\account app\expense-tracker\.worktrees\brand-purple-splash\app\build\outputs\apk\debug\app-debug.apk'
+$artifactName = 'ai-expense-bot-v3.6-purple-splash-2026-07-31.apk'
+$expectedSourceSha = 'E165BAC2E083AA406BD9D0CE93D6CBDABB6AD4FF127476E0DBBB5FBEE91D0D7F'
 $desktopDir = 'C:\Users\fuker\Desktop\app\codex change'
 $outputDir = 'C:\Users\fuker\Documents\Codex\2026-07-29\c-users-fuker-desktop-app-ai\outputs'
+$actualSourceSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceApk).Hash
+if ($actualSourceSha -ne $expectedSourceSha) {
+    throw "Source APK SHA-256 mismatch. Expected $expectedSourceSha; got $actualSourceSha."
+}
 New-Item -ItemType Directory -Path $desktopDir -Force | Out-Null
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 Copy-Item -LiteralPath $sourceApk -Destination (Join-Path $desktopDir $artifactName) -Force
@@ -337,7 +342,7 @@ $pathsToCheck = @(
 Get-FileHash -Algorithm SHA256 -LiteralPath $pathsToCheck
 ```
 
-Expected: all three hash values are identical.
+Expected: all three hash values equal `E165BAC2E083AA406BD9D0CE93D6CBDABB6AD4FF127476E0DBBB5FBEE91D0D7F`.
 
 - [ ] **Step 3: Record the device-test limitation**
 
