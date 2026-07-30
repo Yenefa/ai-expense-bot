@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
-    $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 }
 else {
     $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
@@ -23,6 +23,21 @@ function Read-ProjectText {
     }
 
     [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)
+}
+
+function Remove-BlockAndLineComments {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Text
+    )
+
+    $withoutBlockComments = [regex]::Replace(
+        $Text,
+        '/\*.*?\*/',
+        '',
+        [System.Text.RegularExpressions.RegexOptions]::Singleline
+    )
+    [regex]::Replace($withoutBlockComments, '//[^\r\n]*', '')
 }
 
 $colorsRelativePath = 'app\src\main\res\values\colors.xml'
@@ -68,6 +83,15 @@ $manifestRelativePath = 'app\src\main\AndroidManifest.xml'
 $androidNamespace = 'http://schemas.android.com/apk/res/android'
 $namespaceManager = [System.Xml.XmlNamespaceManager]::new($manifest.NameTable)
 $namespaceManager.AddNamespace('android', $androidNamespace)
+$applications = @($manifest.SelectNodes('/manifest/application', $namespaceManager))
+if (
+    $applications.Count -ne 1 -or
+    $applications[0].GetAttribute('theme', $androidNamespace) -cne
+        '@style/Theme.ExpenseTracker'
+) {
+    throw 'Expected application to use @style/Theme.ExpenseTracker'
+}
+
 $mainActivities = @(
     $manifest.SelectNodes(
         '/manifest/application/activity[@android:name=".MainActivity"]',
@@ -82,30 +106,48 @@ if (
     throw 'Expected .MainActivity to use @style/Theme.ExpenseTracker.Starting'
 }
 
+$startingThemeAssignments = @(
+    $manifest.SelectNodes(
+        '//*[@android:theme="@style/Theme.ExpenseTracker.Starting"]',
+        $namespaceManager
+    )
+)
+if ($startingThemeAssignments.Count -ne 1) {
+    throw 'Expected exactly one manifest assignment of @style/Theme.ExpenseTracker.Starting'
+}
+
 $mainActivityRelativePath = 'app\src\main\java\com\expense\tracker\MainActivity.kt'
 $mainActivity = Read-ProjectText $mainActivityRelativePath
-$installSplashIndex = $mainActivity.IndexOf(
-    'installSplashScreen()',
-    [System.StringComparison]::Ordinal
+$mainActivityWithoutComments = Remove-BlockAndLineComments $mainActivity
+$onCreateSplashPattern = (
+    'override\s+fun\s+onCreate\s*' +
+    '\(\s*savedInstanceState\s*:\s*Bundle\?\s*\)\s*\{\s*' +
+    'installSplashScreen\(\)\s*' +
+    'super\.onCreate\(savedInstanceState\)'
 )
-$superOnCreateIndex = $mainActivity.IndexOf(
-    'super.onCreate(savedInstanceState)',
-    [System.StringComparison]::Ordinal
-)
-if ($installSplashIndex -lt 0) {
-    throw 'Expected MainActivity.kt to call installSplashScreen()'
-}
-if ($superOnCreateIndex -lt 0) {
-    throw 'Expected MainActivity.kt to call super.onCreate(savedInstanceState)'
-}
-if ($installSplashIndex -gt $superOnCreateIndex) {
-    throw 'Expected installSplashScreen() before super.onCreate(savedInstanceState)'
+if (
+    -not [regex]::IsMatch(
+        $mainActivityWithoutComments,
+        $onCreateSplashPattern,
+        [System.Text.RegularExpressions.RegexOptions]::Singleline
+    )
+) {
+    throw (
+        'Expected onCreate to call installSplashScreen() immediately before ' +
+        'super.onCreate(savedInstanceState)'
+    )
 }
 
 $gradleRelativePath = 'app\build.gradle.kts'
 $gradle = Read-ProjectText $gradleRelativePath
+$gradleWithoutComments = Remove-BlockAndLineComments $gradle
 $splashDependency = 'implementation("androidx.core:core-splashscreen:1.2.0")'
-if ($gradle.IndexOf($splashDependency, [System.StringComparison]::Ordinal) -lt 0) {
+if (
+    $gradleWithoutComments.IndexOf(
+        $splashDependency,
+        [System.StringComparison]::Ordinal
+    ) -lt 0
+) {
     throw "Expected app/build.gradle.kts to contain $splashDependency"
 }
 
