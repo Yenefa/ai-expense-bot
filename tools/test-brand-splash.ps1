@@ -141,7 +141,7 @@ if (
 $gradleRelativePath = 'app\build.gradle.kts'
 $gradle = Read-ProjectText $gradleRelativePath
 $gradleWithoutComments = Remove-BlockAndLineComments $gradle
-$splashDependency = 'implementation("androidx.core:core-splashscreen:1.2.0")'
+$splashDependency = 'implementation("androidx.core:core-splashscreen:1.0.1")'
 if (
     $gradleWithoutComments.IndexOf(
         $splashDependency,

@@ -6,7 +6,7 @@
 
 **Architecture:** Add an AndroidX SplashScreen starting theme that owns only `MainActivity` startup, then hands off to the existing application theme. Use a static PowerShell contract test to verify the dependency, XML resources, manifest wiring, and `installSplashScreen()` ordering before building the APK.
 
-**Tech Stack:** Android 14 / API 34, Kotlin, Jetpack Compose, AndroidX Core SplashScreen 1.2.0, Gradle, PowerShell
+**Tech Stack:** Android 14 / API 34, Kotlin, Jetpack Compose, AndroidX Core SplashScreen 1.0.1, Gradle, PowerShell
 
 ---
 
@@ -115,8 +115,8 @@ if ($superIndex -lt 0 -or $installIndex -gt $superIndex) {
 }
 
 $gradleSource = Read-ProjectText 'app\build.gradle.kts'
-if (-not $gradleSource.Contains('implementation("androidx.core:core-splashscreen:1.2.0")')) {
-    throw 'Missing AndroidX Core SplashScreen 1.2.0 dependency'
+if (-not $gradleSource.Contains('implementation("androidx.core:core-splashscreen:1.0.1")')) {
+    throw 'Missing AndroidX Core SplashScreen 1.0.1 dependency'
 }
 
 Write-Output 'Brand splash configuration: PASS'
@@ -200,7 +200,7 @@ Leave the `<application android:theme="@style/Theme.ExpenseTracker">` assignment
 Add this import to `MainActivity.kt`:
 
 ```kotlin
-import androidx.core.splashscreen.installSplashScreen
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 ```
 
 Update `onCreate`:
@@ -217,7 +217,7 @@ override fun onCreate(savedInstanceState: Bundle?) {
 Add under the existing Activity dependency in `app/build.gradle.kts`:
 
 ```kotlin
-implementation("androidx.core:core-splashscreen:1.2.0")
+implementation("androidx.core:core-splashscreen:1.0.1")
 ```
 
 The stable version is verified against the AndroidX Core release page dated July 2026.
@@ -237,7 +237,7 @@ Expected: `Brand splash configuration: PASS`.
 Run:
 
 ```powershell
-.\tools\test-launcher-icon-safe-zone.ps1
+.\tools\test-launcher-icon-safe-zone.ps1 -ExpectedScale 0.70
 ```
 
 Expected: five `PASS` lines for mdpi through xxxhdpi.
