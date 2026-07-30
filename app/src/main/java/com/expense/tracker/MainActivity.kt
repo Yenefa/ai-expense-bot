@@ -14,12 +14,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.expense.tracker.data.prefs.ThemeMode
@@ -35,6 +39,7 @@ import com.expense.tracker.ui.settings.DataExportScreen
 import com.expense.tracker.ui.settings.SettingsMenuScreen
 import com.expense.tracker.ui.settings.SettingsScreen
 import com.expense.tracker.ui.settings.UserManualScreen
+import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
@@ -91,147 +96,153 @@ class MainActivity : ComponentActivity() {
                     else screen = Screen.Chat
                 }
 
-                // 主屏幕切换 — Chat ↔ 子页面（Analytics / History / Settings）
-                // Chat 是 "根"（rank=0），其他子页面 rank=1
-                // 进入子页面（rank 增加）：新页面从右滑入，旧页面向左滑出
-                // 返回 Chat（rank 减少）：新页面（Chat）从左滑入，旧页面向右滑出
-                AnimatedContent(
-                    targetState = screen,
-                    transitionSpec = {
-                        val forward = targetState.rank > initialState.rank
-                        val duration = 320
-                        if (forward) {
-                            (slideInHorizontally(
-                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
-                                initialOffsetX = { it },
-                            ) + fadeIn(animationSpec = tween(duration / 2))) togetherWith
-                            (slideOutHorizontally(
-                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
-                                targetOffsetX = { -it / 4 },
-                            ) + fadeOut(animationSpec = tween(duration / 2)))
-                        } else {
-                            (slideInHorizontally(
-                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
-                                initialOffsetX = { -it / 4 },
-                            ) + fadeIn(animationSpec = tween(duration / 2))) togetherWith
-                            (slideOutHorizontally(
-                                animationSpec = tween(duration, easing = FastOutSlowInEasing),
-                                targetOffsetX = { it },
-                            ) + fadeOut(animationSpec = tween(duration / 2)))
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AppColors.Bg),
+                ) {
+                    // 主屏幕切换 — Chat ↔ 子页面（Analytics / History / Settings）
+                    // Chat 是 "根"（rank=0），其他子页面 rank=1
+                    // 进入子页面（rank 增加）：新页面从右滑入，旧页面向左滑出
+                    // 返回 Chat（rank 减少）：新页面（Chat）从左滑入，旧页面向右滑出
+                    AnimatedContent(
+                        targetState = screen,
+                        transitionSpec = {
+                            val forward = targetState.rank > initialState.rank
+                            val duration = 320
+                            if (forward) {
+                                (slideInHorizontally(
+                                    animationSpec = tween(duration, easing = FastOutSlowInEasing),
+                                    initialOffsetX = { it },
+                                ) + fadeIn(animationSpec = tween(duration / 2))) togetherWith
+                                (slideOutHorizontally(
+                                    animationSpec = tween(duration, easing = FastOutSlowInEasing),
+                                    targetOffsetX = { -it / 4 },
+                                ) + fadeOut(animationSpec = tween(duration / 2)))
+                            } else {
+                                (slideInHorizontally(
+                                    animationSpec = tween(duration, easing = FastOutSlowInEasing),
+                                    initialOffsetX = { -it / 4 },
+                                ) + fadeIn(animationSpec = tween(duration / 2))) togetherWith
+                                (slideOutHorizontally(
+                                    animationSpec = tween(duration, easing = FastOutSlowInEasing),
+                                    targetOffsetX = { it },
+                                ) + fadeOut(animationSpec = tween(duration / 2)))
+                            }
+                        },
+                        label = "screen-transition",
+                    ) { current ->
+                        when (current) {
+                            Screen.Chat -> ChatScreen(
+                                vm = chatVm,
+                                onOpenAnalytics = { screen = Screen.Analytics },
+                                onOpenHistory = { screen = Screen.History },
+                                onOpenSettings = { screen = Screen.Settings },
+                            )
+                            Screen.Analytics -> AnalyticsScreen(
+                                vm = analyticsVm,
+                                onBack = { screen = Screen.Chat },
+                                onOpenInsights = { subScreen = SubScreen.Insights },
+                            )
+                            Screen.History -> HistoryScreen(
+                                vm = historyVm,
+                                onBack = { screen = Screen.Chat },
+                            )
+                            Screen.Settings -> SettingsMenuScreen(
+                                onClose = { screen = Screen.Chat },
+                                onOpenLlmSettings = { subScreen = SubScreen.LlmSettings },
+                                onOpenDataExport = { subScreen = SubScreen.DataExport },
+                                onOpenDeletedItems = { subScreen = SubScreen.DeletedItems },
+                                onOpenUserManual = { subScreen = SubScreen.UserManual },
+                                prefs = container.userPrefs,
+                            )
                         }
-                    },
-                    label = "screen-transition",
-                ) { current ->
-                    when (current) {
-                        Screen.Chat -> ChatScreen(
-                            vm = chatVm,
-                            onOpenAnalytics = { screen = Screen.Analytics },
-                            onOpenHistory = { screen = Screen.History },
-                            onOpenSettings = { screen = Screen.Settings },
-                        )
-                        Screen.Analytics -> AnalyticsScreen(
-                            vm = analyticsVm,
-                            onBack = { screen = Screen.Chat },
-                            onOpenInsights = { subScreen = SubScreen.Insights },
-                        )
-                        Screen.History -> HistoryScreen(
-                            vm = historyVm,
-                            onBack = { screen = Screen.Chat },
-                        )
-                        Screen.Settings -> SettingsMenuScreen(
-                            onClose = { screen = Screen.Chat },
-                            onOpenLlmSettings = { subScreen = SubScreen.LlmSettings },
-                            onOpenDataExport = { subScreen = SubScreen.DataExport },
-                            onOpenDeletedItems = { subScreen = SubScreen.DeletedItems },
-                            onOpenUserManual = { subScreen = SubScreen.UserManual },
+                    }
+
+                    // LLM 设置 sub-screen 从右侧滑入覆盖
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.LlmSettings,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        SettingsScreen(
                             prefs = container.userPrefs,
+                            onClose = { subScreen = null },
                         )
                     }
-                }
 
-                // LLM 设置 sub-screen 从右侧滑入覆盖
-                AnimatedVisibility(
-                    visible = subScreen == SubScreen.LlmSettings,
-                    enter = slideInHorizontally(
-                        animationSpec = tween(320, easing = FastOutSlowInEasing),
-                        initialOffsetX = { it },
-                    ) + fadeIn(animationSpec = tween(160)),
-                    exit = slideOutHorizontally(
-                        animationSpec = tween(280, easing = FastOutSlowInEasing),
-                        targetOffsetX = { it },
-                    ) + fadeOut(animationSpec = tween(140)),
-                ) {
-                    SettingsScreen(
-                        prefs = container.userPrefs,
-                        onClose = { subScreen = null },
-                    )
-                }
+                    // 数据导出 sub-screen 同样从右侧滑入
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.DataExport,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        DataExportScreen(onClose = { subScreen = null })
+                    }
 
-                // 数据导出 sub-screen 同样从右侧滑入
-                AnimatedVisibility(
-                    visible = subScreen == SubScreen.DataExport,
-                    enter = slideInHorizontally(
-                        animationSpec = tween(320, easing = FastOutSlowInEasing),
-                        initialOffsetX = { it },
-                    ) + fadeIn(animationSpec = tween(160)),
-                    exit = slideOutHorizontally(
-                        animationSpec = tween(280, easing = FastOutSlowInEasing),
-                        targetOffsetX = { it },
-                    ) + fadeOut(animationSpec = tween(140)),
-                ) {
-                    DataExportScreen(onClose = { subScreen = null })
-                }
+                    // 最近删除 sub-screen 从右侧滑入
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.DeletedItems,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        DeletedItemsScreen(
+                            repo = container.expenseRepo,
+                            onClose = { subScreen = null },
+                        )
+                    }
 
-                // 最近删除 sub-screen 从右侧滑入
-                AnimatedVisibility(
-                    visible = subScreen == SubScreen.DeletedItems,
-                    enter = slideInHorizontally(
-                        animationSpec = tween(320, easing = FastOutSlowInEasing),
-                        initialOffsetX = { it },
-                    ) + fadeIn(animationSpec = tween(160)),
-                    exit = slideOutHorizontally(
-                        animationSpec = tween(280, easing = FastOutSlowInEasing),
-                        targetOffsetX = { it },
-                    ) + fadeOut(animationSpec = tween(140)),
-                ) {
-                    DeletedItemsScreen(
-                        repo = container.expenseRepo,
-                        onClose = { subScreen = null },
-                    )
-                }
+                    // 软件说明书 sub-screen 从右侧滑入
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.UserManual,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        UserManualScreen(onClose = { subScreen = null })
+                    }
 
-                // 软件说明书 sub-screen 从右侧滑入
-                AnimatedVisibility(
-                    visible = subScreen == SubScreen.UserManual,
-                    enter = slideInHorizontally(
-                        animationSpec = tween(320, easing = FastOutSlowInEasing),
-                        initialOffsetX = { it },
-                    ) + fadeIn(animationSpec = tween(160)),
-                    exit = slideOutHorizontally(
-                        animationSpec = tween(280, easing = FastOutSlowInEasing),
-                        targetOffsetX = { it },
-                    ) + fadeOut(animationSpec = tween(140)),
-                ) {
-                    UserManualScreen(onClose = { subScreen = null })
-                }
-
-                // 智核分析 sub-screen 从右侧滑入
-                AnimatedVisibility(
-                    visible = subScreen == SubScreen.Insights,
-                    enter = slideInHorizontally(
-                        animationSpec = tween(320, easing = FastOutSlowInEasing),
-                        initialOffsetX = { it },
-                    ) + fadeIn(animationSpec = tween(160)),
-                    exit = slideOutHorizontally(
-                        animationSpec = tween(280, easing = FastOutSlowInEasing),
-                        targetOffsetX = { it },
-                    ) + fadeOut(animationSpec = tween(140)),
-                ) {
-                    InsightsScreen(
-                        vm = analyticsVm,
-                        llmPrefs = prefs,
-                        onBack = { subScreen = null },
-                    )
+                    // 智核分析 sub-screen 从右侧滑入
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.Insights,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        InsightsScreen(
+                            vm = analyticsVm,
+                            llmPrefs = prefs,
+                            onBack = { subScreen = null },
+                        )
+                    }
                 }
             }
         }
