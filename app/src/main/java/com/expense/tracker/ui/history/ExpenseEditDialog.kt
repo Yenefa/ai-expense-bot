@@ -178,7 +178,7 @@ private fun EditContent(
                 ) {
                     Text(
                         text = "${c.emoji} ${c.displayName}",
-                        color = if (selected) Color.White else AppColors.TextPrimary,
+                        color = if (selected) AppColors.Bg else AppColors.TextPrimary,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }

@@ -165,12 +165,9 @@ private fun DayGrid(
     modifier: Modifier = Modifier,
 ) {
     val hasData = cell != null && cell.count > 0
-    val bg = when {
-        isToday -> AppColors.TextPrimary
-        else -> AppColors.Bg
-    }
-    val mainColor = if (isToday) Color.White else AppColors.TextPrimary
-    val subColor = if (isToday) Color.White.copy(alpha = 0.85f) else AppColors.TextSecondary
+    val bg = if (isToday) AppColors.TextPrimary else AppColors.CardBg
+    val mainColor = if (isToday) AppColors.Bg else AppColors.TextPrimary
+    val subColor = if (isToday) AppColors.Bg.copy(alpha = 0.85f) else AppColors.TextSecondary
 
     Box(
         modifier = modifier
@@ -213,7 +210,7 @@ private fun DayGrid(
             if (hasData) {
                 Text(
                     text = "¥${formatAmount(cell!!.total)}",
-                    color = if (isToday) Color.White else AppColors.TextPrimary,
+                    color = mainColor,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,

@@ -17,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.expense.tracker.data.model.Category
@@ -32,15 +31,15 @@ fun CategoryChip(
     onDoubleClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // 背景色平滑过渡：白 ↔ 黑
+    // 背景色平滑过渡：次级填充 ↔ 强前景
     val bg by animateColorAsState(
-        targetValue = if (selected) AppColors.TextPrimary else AppColors.Bg,
+        targetValue = if (selected) AppColors.TextPrimary else AppColors.ChipFill,
         animationSpec = tween(durationMillis = 280),
         label = "chip-bg",
     )
-    // 文字色平滑过渡：黑 ↔ 白
+    // 文字色始终与背景形成深浅主题对应的对比
     val fg by animateColorAsState(
-        targetValue = if (selected) Color.White else AppColors.TextPrimary,
+        targetValue = if (selected) AppColors.Bg else AppColors.TextPrimary,
         animationSpec = tween(durationMillis = 280),
         label = "chip-fg",
     )

@@ -169,7 +169,7 @@ fun InsightsScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = AppColors.Bg),
+                            colors = CardDefaults.cardColors(containerColor = AppColors.CardBg),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         ) {
                             Row(
@@ -213,7 +213,7 @@ fun InsightsScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = AppColors.CardBg),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         ) {
             Column(
@@ -248,7 +248,7 @@ fun InsightsScreen(
                     enabled = !state.analyzing && state.totalAmount > 0.0 && llmPrefs != null,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AppColors.TextPrimary,
-                        contentColor = Color.White,
+                        contentColor = AppColors.Bg,
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),

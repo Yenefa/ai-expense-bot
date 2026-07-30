@@ -23,6 +23,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.expense.tracker.ui.theme.AppColors
 
 /**
  * 🧠 液态玻璃按钮：ON 时高透白光；OFF 时几乎隐形。
@@ -34,6 +35,8 @@ fun LiquidGlassButton(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val strongColor = AppColors.TextPrimary
+    val highlightColor = AppColors.Bg
     val bgAlpha by animateFloatAsState(
         targetValue = if (on) 0.06f else 0.02f,
         animationSpec = tween(300),
@@ -65,13 +68,13 @@ fun LiquidGlassButton(
                 clip = false,
             )
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = bgAlpha))
+            .background(strongColor.copy(alpha = bgAlpha))
             .pointerInput(on) { detectTapGestures(onTap = { onToggle() }) },
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.size(34.dp)) {
             drawCircle(
-                color = Color.Black.copy(alpha = borderAlpha),
+                color = strongColor.copy(alpha = borderAlpha),
                 radius = size.minDimension / 2 - 1.dp.toPx(),
                 style = Stroke(width = 1.5.dp.toPx()),
             )
@@ -83,7 +86,7 @@ fun LiquidGlassButton(
                     .align(Alignment.TopStart)
                     .rotate(-25f)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.7f))
+                    .background(highlightColor.copy(alpha = 0.7f))
                     .alpha(0.85f),
             )
         }
