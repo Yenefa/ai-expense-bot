@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
  */
 data class AppColorPalette(
     val Bg: Color,
+    val CardBg: Color,
     val TextPrimary: Color,
     val TextSecondary: Color,
     val TextMuted: Color,
@@ -23,6 +24,7 @@ data class AppColorPalette(
 /** 浅色色板（ChatGPT 白底极简）。 */
 val LightAppColors = AppColorPalette(
     Bg = Color(0xFFFFFFFF),
+    CardBg = Color(0xFFFFFFFF),
     TextPrimary = Color(0xFF0D0D0D),
     TextSecondary = Color(0xFF5D5D5D),
     TextMuted = Color(0xFF8E8E8E),
@@ -35,6 +37,7 @@ val LightAppColors = AppColorPalette(
 /** 深色色板（背景 #1C1C1E，卡片 #2C2C2E 拉开层次，文字 #F2F2F2 护眼）。 */
 val DarkAppColors = AppColorPalette(
     Bg = Color(0xFF1C1C1E),
+    CardBg = Color(0xFF2C2C2E),
     TextPrimary = Color(0xFFF2F2F2),
     TextSecondary = Color(0xFFAEAEAE),
     TextMuted = Color(0xFF6E6E6E),
@@ -53,6 +56,9 @@ val LocalAppColors = compositionLocalOf { LightAppColors }
 object AppColors {
     val Bg: Color
         @Composable get() = LocalAppColors.current.Bg
+
+    val CardBg: Color
+        @Composable get() = LocalAppColors.current.CardBg
 
     val TextPrimary: Color
         @Composable get() = LocalAppColors.current.TextPrimary
