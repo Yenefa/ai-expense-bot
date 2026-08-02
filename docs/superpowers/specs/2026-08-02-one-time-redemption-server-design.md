@@ -2,7 +2,7 @@
 
 ## 目标
 
-为 Y.E cost v3.6 的朋友测试版提供十个全局一次性兑换码。每个兑换码可在任意一台手机上成功兑换一次；兑换成功后立即从服务器可用码池移除，并为该 App 安装增加 30 天 AI 会员。AI 访问必须联网，真正的 CloudBase AI API Key 只保存在服务器端，不进入源码、APK、网站、日志或兑换码。
+为 Y.E cost v3.6 的朋友测试版提供十个全局一次性兑换码。每个兑换码可在任意一台手机上成功兑换一次；兑换成功后立即从服务器可用码池移除，并为该 App 安装增加 30 天 AI 会员。AI 访问必须联网，云函数使用同一 CloudBase 环境的托管身份调用内置 AI，不向 Android 分发 CloudBase AI API Key。
 
 ## 范围
 
@@ -11,7 +11,7 @@
 - CloudBase HTTP 云函数提供兑换和 AI 代理接口。
 - CloudBase 数据库保存尚未使用的兑换码哈希和最小核销记录。
 - Android App 使用首次安装生成的随机 `installationId` 标识当前安装。
-- 兑换成功后签发绑定 `installationId`、有效期 30 天的订阅令牌。
+- 兑换成功后签发绑定 `installationId`、有效期 30 天的随机订阅令牌。
 - 生成并导入十个高熵兑换码，明文只在管理员本地交付文件中出现一次。
 - 保留 BYOK 回退和全部 OCR 功能。
 
@@ -26,7 +26,7 @@ Y.E cost Android App
   ├─ GET /v1/subscriptions/status
   │    └─ 验证订阅令牌和安装标识
   └─ POST /v1/chat/completions
-       └─ 验证订阅令牌后，用服务器 AI Key 调用 CloudBase AI Gateway
+       └─ 验证订阅令牌后，用云函数同环境身份调用 CloudBase AI `hy3`
 ```
 
 服务器默认只能看到网络请求和 IP，IP 不作为设备身份。App 首次运行生成随机 UUID 形式的 `installationId` 并持久化；兑换和会员请求同时发送该标识。
@@ -52,6 +52,15 @@ Y.E cost Android App
 
 核销记录只用于审计、防止网络重试造成权益丢失，不会使兑换码重新可用。
 
+### subscription_tokens
+
+- 文档 ID：随机订阅令牌的 SHA-256 哈希。
+- `installationIdHash`：安装标识的 SHA-256。
+- `expiresAt`：服务器确定的令牌到期时间。
+- `createdAt`、`revokedAt`：签发与撤销状态。
+
+数据库不保存订阅令牌明文。令牌只在兑换成功响应中返回一次，随后每次请求由服务器计算哈希并查询有效记录。
+
 ## 兑换流程
 
 1. App 提交规范化兑换码、`installationId` 和随机 `requestId`。
@@ -59,17 +68,16 @@ Y.E cost Android App
 3. 如果可用码存在，服务器计算 30 天到期时间，写入核销记录并删除可用码。
 4. 如果可用码不存在但核销记录属于同一 `installationId`，视为同一次兑换的网络重试；返回原到期时间，不再次增加 30 天。
 5. 其他不存在、已兑换或禁用情况统一返回“兑换码无效或已使用”，不泄露内部状态。
-6. 事务成功后，服务器签发订阅令牌并返回 `expiresAt`。令牌绑定 `installationId`，到期时间为服务器时间加 30 天。
+6. 事务成功后，服务器返回随机订阅令牌和 `expiresAt`。令牌绑定 `installationId`，到期时间为服务器时间加 30 天。
 
 可用码的删除、核销记录写入和权益确定必须在同一数据库事务中完成。这样同一个兑换码发生并发请求时，最多只有一个安装获得权益。
 
 ## 订阅令牌
 
-- 使用服务器密钥进行 HMAC-SHA256 签名。
-- 载荷只包含随机令牌 ID、安装标识哈希、签发时间、到期时间和协议版本。
-- 服务器签名密钥和 CloudBase AI API Key通过云函数加密环境变量提供，不写入仓库。
+- 使用系统安全随机数生成 256 位不透明令牌；数据库只保存 SHA-256 哈希。
+- 不需要令牌签名密钥，也不在令牌中承载可被客户端修改的权益数据。
 - Android 使用现有独立 Keystore 存储保存订阅令牌，备份规则继续排除对应密文文件。
-- App 调用状态和 AI 接口时同时提交订阅令牌与 `installationId`；不匹配、过期或签名无效均拒绝。
+- App 调用状态和 AI 接口时同时提交订阅令牌与 `installationId`；哈希不存在、安装标识不匹配、已撤销或过期均拒绝。
 - 到期后 App 清除订阅令牌，并回退到用户自己配置的 BYOK；未配置 BYOK 时提示续期。
 
 ## AI 代理
@@ -81,7 +89,7 @@ Y.E cost Android App
 - 验证订阅令牌、安装标识和到期时间。
 - 强制模型为 `hy3`，忽略客户端尝试指定的其他模型。
 - 限制请求体大小、消息数量和单安装调用频率。
-- 使用服务器端 CloudBase AI API Key调用现有 AI Gateway。
+- 使用 CloudBase Node SDK 的同环境托管身份调用 `cloudbase` provider 下的 `hy3`，不配置或转发 CloudBase AI API Key。
 - Release 日志不得记录兑换码、订阅令牌、AI Key、账目原文、金额、备注或 LLM 返回正文。
 
 ## Android 改造
@@ -103,7 +111,7 @@ Y.E cost Android App
 
 ## 安全边界
 
-- CloudBase AI API Key和订阅签名密钥只存在于服务器端机密配置。
+- 云函数通过同环境托管身份访问数据库和 `hy3`，Android、网站和仓库均不保存 CloudBase AI API Key或订阅签名密钥。
 - 兑换码只传输一次并只存哈希；所有接口使用 HTTPS。
 - 不使用 IP、Android ID、IMEI、广告 ID或硬件序列号定位设备。
 - `installationId` 只表示当前 App 安装；清除数据或重装后会生成新标识，本阶段不提供权益找回。
