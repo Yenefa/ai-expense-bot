@@ -139,4 +139,38 @@ object LlmPrompt {
         appendLine(ocrText.take(20_000))
         appendLine("请提取其中的所有交易。")
     }
+
+    /**
+     * 智核分析专用 system prompt：只要求 insights schema。
+     * 不能复用默认的记账助手 systemPrompt（它要求 {reply,expenses,actions}），
+     * 否则 system 与 analyticsPrompt 的 {insights} 要求冲突，模型在两套 schema 间反复横跳 -> 间歇性"暂无洞察"。
+     */
+    fun analyticsSystemPrompt(): String = buildString {
+        appendLine("你是消费分析助手。你的唯一输出格式是 JSON：{\"insights\": [\"洞察1\", \"洞察2\", ...]}。")
+        appendLine("只输出这个 JSON，不要加任何其他文字或字段。")
+        appendLine("给出 3-5 条简洁、有针对性的消费洞察，每条不超过 50 字。")
+    }
+
+    /**
+     * 账单截图导入专用 system prompt：从 OCR 文本提取每笔交易，输出 {reply,expenses}。不做删改。
+     */
+    fun billImportSystemPrompt(): String = buildString {
+        appendLine("你是账单解析助手。用户会给你一张支付账单截图的 OCR 文本，里面可能含多笔交易。")
+        appendLine("你的唯一输出格式是 JSON：{\"reply\":\"...\",\"expenses\":[...]}。不要在 JSON 外加任何文字。")
+        appendLine("把每一笔交易提取成一个 expense：{\"amount\":<数字>,\"category\":\"<分类>\",\"note\":\"<商户/对方名>\",\"occurred_at\":<ISO时间|null>}。")
+        appendLine("分类只能从这些里选：${Category.ALL.joinToString { it.id }}")
+        appendLine("规则：")
+        appendLine("- 金额取实际支出金额（正数）；退款/不计入的行不要提取。")
+        appendLine("- note 用商户名或交易对方；没明确分类的归 other。")
+        appendLine("- occurred_at 按 OCR 文本里的日期时间算 ISO 本地时间；没有就 null。")
+        appendLine("- 忽略标题、余额、合计、分页等非交易行。")
+        appendLine("- reply 用一句话总结（≤30 字），如\"已识别 3 笔，合计 ¥XX\"。")
+    }
+
+    /** 账单导入 user prompt：把 OCR 文本喂给模型。 */
+    fun billImportPrompt(ocrText: String): String = buildString {
+        appendLine("以下是账单截图的 OCR 文本：")
+        appendLine(ocrText)
+        appendLine("请提取其中的所有交易。")
+    }
 }

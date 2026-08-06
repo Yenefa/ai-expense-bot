@@ -140,4 +140,66 @@ class AnalyticsViewModelTest {
         vm.uiState.first { it.period == Period.Month && it.subPeriods.isNotEmpty() }
         assertThat(vm.uiState.value.selectedSubPeriodIndex).isEqualTo(8)
     }
+
+    @Test
+    fun `selectPeriodAndRef views specific month and sets refLabel`() = runTest {
+        val dao = FakeExpenseDaoForAnalytics()
+        val repo = ExpenseRepository(dao)
+        val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(10) })
+        vm.uiState.first { it.subPeriods.isNotEmpty() }
+
+        // 选 2024 年 5 月（ref 用该月中任一时刻）
+        val refMay2024 = LocalDate.of(2024, 5, 15).atStartOfDay(zone).toInstant().toEpochMilli()
+        vm.selectPeriodAndRef(Period.Month, refMay2024)
+        val state = vm.uiState.first { it.refLabel != null }
+
+        assertThat(state.period).isEqualTo(Period.Month)
+        assertThat(state.refLabel).isEqualTo("2024 年 5 月")
+        // 2024 年 5 月有 31 天
+        assertThat(state.subPeriods).hasSize(31)
+    }
+
+    @Test
+    fun `selectPeriod clears refLabel back to current`() = runTest {
+        val dao = FakeExpenseDaoForAnalytics()
+        val repo = ExpenseRepository(dao)
+        val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(10) })
+        vm.uiState.first { it.subPeriods.isNotEmpty() }
+
+        val ref = LocalDate.of(2024, 5, 15).atStartOfDay(zone).toInstant().toEpochMilli()
+        vm.selectPeriodAndRef(Period.Month, ref)
+        vm.uiState.first { it.refLabel != null }
+        assertThat(vm.uiState.value.refLabel).isEqualTo("2024 年 5 月")
+
+        // selectPeriod 回到"本月"，refLabel 清空
+        vm.selectPeriod(Period.Month)
+        vm.uiState.first { it.refLabel == null }
+        assertThat(vm.uiState.value.refLabel).isNull()
+    }
+
+    @Test
+    fun `stepRef moves month backward and sets refLabel`() = runTest {
+        val dao = FakeExpenseDaoForAnalytics()
+        val repo = ExpenseRepository(dao)
+        val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(10) }) // 2025-06-10
+        vm.uiState.first { it.subPeriods.isNotEmpty() }
+        vm.selectPeriod(Period.Month)
+        vm.uiState.first { it.period == Period.Month }
+
+        vm.stepRef(-1) // 上个月
+        val state = vm.uiState.first { it.refLabel != null }
+        assertThat(state.refLabel).isEqualTo("2025 年 5 月")
+    }
+
+    @Test
+    fun `stepRef from null ref starts at current week`() = runTest {
+        val dao = FakeExpenseDaoForAnalytics()
+        val repo = ExpenseRepository(dao)
+        val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(10) }) // 2025-06-10 周二
+        vm.uiState.first { it.subPeriods.isNotEmpty() }
+
+        vm.stepRef(-1) // 上一周：2025-06-03 周二 -> ISO 第 23 周
+        val state = vm.uiState.first { it.refLabel != null }
+        assertThat(state.refLabel).isEqualTo("2025 年第 23 周")
+    }
 }
