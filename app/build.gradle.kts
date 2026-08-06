@@ -5,6 +5,14 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val subscriptionApiBaseUrl = providers
+    .gradleProperty("YE_COST_SUBSCRIPTION_API_BASE_URL")
+    .orElse("")
+    .get()
+val escapedSubscriptionApiBaseUrl = subscriptionApiBaseUrl
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 android {
     namespace = "com.expense.tracker"
     compileSdk = 34
@@ -15,6 +23,11 @@ android {
         versionCode = 27
         versionName = "3.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "SUBSCRIPTION_API_BASE_URL",
+            "\"$escapedSubscriptionApiBaseUrl\"",
+        )
     }
     buildTypes {
         release {
@@ -27,10 +40,29 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.10" }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+    sourceSets { getByName("androidTest").assets.srcDir("$projectDir/schemas") }
+}
+
+tasks.configureEach {
+    if (name in setOf("assembleRelease", "bundleRelease", "lintRelease")) {
+        doFirst {
+            if (subscriptionApiBaseUrl.isBlank()) {
+                throw GradleException(
+                    "Release requires -PYE_COST_SUBSCRIPTION_API_BASE_URL with the deployed HTTPS endpoint",
+                )
+            }
+            if (!subscriptionApiBaseUrl.startsWith("https://")) {
+                throw GradleException("Subscription API base URL must use HTTPS")
+            }
+        }
+    }
 }
 
 dependencies {
@@ -64,6 +96,9 @@ dependencies {
     // Networking (LLM)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // On-device Chinese OCR for payment bill screenshots (model bundled in APK)
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.0")
 
     // Charts
     implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")

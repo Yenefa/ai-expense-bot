@@ -16,6 +16,7 @@ data class Category(
             Category("entertainment", "🎮", "娱乐"),
             Category("housing",       "🏠", "住房"),
             Category("medical",       "💊", "医疗"),
+            Category("education",     "📚", "学习与创作"),
             Category("investment",    "💹", "投资", isInvestment = true),
             Category("other",         "📦", "其他"),
         )

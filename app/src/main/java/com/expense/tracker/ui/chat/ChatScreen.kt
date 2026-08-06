@@ -27,6 +27,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +46,7 @@ fun ChatScreen(
     onOpenAnalytics: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenBillImport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by vm.uiState.collectAsState()
@@ -53,8 +57,11 @@ fun ChatScreen(
     var actionSheetTarget by remember { mutableStateOf<ChatMessageEntity?>(null) }
 
     // 任意弹窗打开时拦截系统返回键，只关弹窗，不退出 App
-    BackHandler(enabled = bubbleCategoryId != null || actionSheetTarget != null) {
+    BackHandler(
+        enabled = bubbleCategoryId != null || actionSheetTarget != null || state.pendingConfirmation != null,
+    ) {
         when {
+            state.pendingConfirmation != null -> vm.cancelPending()
             actionSheetTarget != null -> actionSheetTarget = null
             else -> bubbleCategoryId = null
         }
@@ -124,8 +131,9 @@ fun ChatScreen(
                 llmEnabled = state.llmEnabled,
                 onToggleLlm = vm::toggleLlm,
                 onSend = vm::submitFreeText,
-                onPlusClick = { /* TODO: image upload */ },
-                placeholder = if (state.llmEnabled) "随便说什么..." else "回复记账助手",
+                onPlusClick = onOpenBillImport,
+                placeholder = if (state.llmEnabled) "随便说什么..." else "回复 Y.E cost",
+                enabled = !state.sending && state.pendingConfirmation == null,
             )
             InteractiveDock(
                 onAnalytics = onOpenAnalytics,
@@ -159,6 +167,25 @@ fun ChatScreen(
                 actionSheetTarget = null
             },
         )
+
+        state.pendingConfirmation?.let { confirmation ->
+            AlertDialog(
+                onDismissRequest = vm::cancelPending,
+                title = { Text(confirmation.preview.title) },
+                text = {
+                    Column {
+                        Text(confirmation.preview.detail)
+                        Text("请核对笔数和日期；确认前不会修改任何账目。")
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = vm::confirmPending) { Text("确认执行") }
+                },
+                dismissButton = {
+                    TextButton(onClick = vm::cancelPending) { Text("取消") }
+                },
+            )
+        }
     }
 }
 

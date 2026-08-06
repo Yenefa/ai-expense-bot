@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$ProjectRoot
 )
 
@@ -43,8 +43,8 @@ function Remove-BlockAndLineComments {
 $colorsRelativePath = 'app\src\main\res\values\colors.xml'
 [xml]$colors = Read-ProjectText $colorsRelativePath
 $splashColors = @($colors.SelectNodes('/resources/color[@name="splash_background"]'))
-if ($splashColors.Count -ne 1 -or $splashColors[0].InnerText -cne '#2B1A3B') {
-    throw 'Expected splash_background color to be exactly #2B1A3B'
+if ($splashColors.Count -ne 1 -or $splashColors[0].InnerText -cne '#FFFFFF') {
+    throw 'Expected splash_background color to be exactly #FFFFFF'
 }
 
 $themesRelativePath = 'app\src\main\res\values\themes.xml'
@@ -62,13 +62,12 @@ if (
 
 $expectedThemeItems = [ordered]@{
     'windowSplashScreenBackground' = '@color/splash_background'
-    'windowSplashScreenAnimatedIcon' = '@drawable/ic_launcher_foreground'
+    'windowSplashScreenAnimatedIcon' = '@drawable/splash_blank_icon'
     'windowSplashScreenIconBackgroundColor' = '@color/splash_background'
     'postSplashScreenTheme' = '@style/Theme.ExpenseTracker'
     'android:statusBarColor' = '@color/splash_background'
     'android:navigationBarColor' = '@color/splash_background'
-    'android:windowLightStatusBar' = 'false'
-    'android:windowLightNavigationBar' = 'false'
+    'android:windowLightStatusBar' = 'true'
 }
 
 foreach ($expectedItem in $expectedThemeItems.GetEnumerator()) {
@@ -167,6 +166,117 @@ if (
     ) -lt 0
 ) {
     throw "Expected app/build.gradle.kts to contain $splashDependency"
+}
+
+# windowLightNavigationBar was introduced in API 27. Keeping it out of the
+# base values resource prevents Android 8.0 (API 26) from resolving an
+# unsupported framework attribute during splash theme inflation.
+$baseNavigationBarItems = @(
+    $startingThemes[0].SelectNodes('item') |
+        Where-Object { $_.GetAttribute('name') -ceq 'android:windowLightNavigationBar' }
+)
+if ($baseNavigationBarItems.Count -ne 0) {
+    throw 'Expected android:windowLightNavigationBar to be absent from base theme'
+}
+
+[xml]$api27Themes = Read-ProjectText 'app\src\main\res\values-v27\themes.xml'
+$api27NavigationBarItems = @(
+    $api27Themes.SelectNodes('/resources/style[@name="Theme.ExpenseTracker.Starting"]/item') |
+        Where-Object { $_.GetAttribute('name') -ceq 'android:windowLightNavigationBar' }
+)
+if ($api27NavigationBarItems.Count -ne 1 -or $api27NavigationBarItems[0].InnerText -cne 'true') {
+    throw 'Expected API 27 theme item android:windowLightNavigationBar=true'
+}
+
+$stringsRelativePath = 'app\src\main\res\values\strings.xml'
+[xml]$strings = Read-ProjectText $stringsRelativePath
+$expectedStrings = [ordered]@{
+    'app_name' = 'Y.E cost'
+    'brand_slogan' = '记下日常，看见生活'
+}
+foreach ($expectedString in $expectedStrings.GetEnumerator()) {
+    $nodes = @(
+        $strings.SelectNodes('/resources/string') |
+            Where-Object { $_.GetAttribute('name') -ceq $expectedString.Key }
+    )
+    if ($nodes.Count -ne 1 -or $nodes[0].InnerText -cne $expectedString.Value) {
+        throw "Expected string $($expectedString.Key)=$($expectedString.Value)"
+    }
+}
+
+$blankIcon = Read-ProjectText 'app\src\main\res\drawable\splash_blank_icon.xml'
+if ($blankIcon -notmatch '#00000000') {
+    throw 'Expected splash_blank_icon to be transparent'
+}
+
+$brandSplash = Read-ProjectText (
+    'app\src\main\java\com\expense\tracker\ui\splash\BrandSplashScreen.kt'
+)
+$brandSplashTokens = @(
+    'Color.White',
+    'RoundedCornerShape(48.dp)',
+    '.scale(1.42f)',
+    'R.string.app_name',
+    'R.string.brand_slogan',
+    'Color(0xFF211D24)',
+    'Color(0xFF77717A)',
+    'DisposableEffect(view)',
+    'window.statusBarColor = android.graphics.Color.WHITE',
+    'window.navigationBarColor = android.graphics.Color.WHITE',
+    'isAppearanceLightStatusBars = true',
+    'isAppearanceLightNavigationBars = true'
+)
+foreach ($token in $brandSplashTokens) {
+    if ($brandSplash.IndexOf($token, [System.StringComparison]::Ordinal) -lt 0) {
+        throw "Expected BrandSplashScreen token: $token"
+    }
+}
+
+$mainActivityTokens = @(
+    'savedInstanceState == null',
+    'delay(BRAND_SPLASH_DURATION_MS)',
+    'private const val BRAND_SPLASH_DURATION_MS = 850L',
+    'splashAlpha.animateTo(',
+    'targetValue = 0f',
+    'animationSpec = tween(220)',
+    'if (showBrandSplash)',
+    'BrandSplashScreen(',
+    'Modifier.graphicsLayer { alpha = splashAlpha.value }'
+)
+foreach ($token in $mainActivityTokens) {
+    if ($mainActivity.IndexOf($token, [System.StringComparison]::Ordinal) -lt 0) {
+        throw "Expected MainActivity brand splash token: $token"
+    }
+}
+
+$exclusiveSplashPattern = (
+    'if\s*\(showBrandSplash\)\s*\{.*?' +
+    'BrandSplashScreen\s*\(.*?\)\s*\}\s*else\s*\{'
+)
+if (-not [regex]::IsMatch(
+    $mainActivity,
+    $exclusiveSplashPattern,
+    [System.Text.RegularExpressions.RegexOptions]::Singleline
+)) {
+    throw 'Expected brand splash and app UI to be mutually exclusive compositions'
+}
+
+$activeBrandPaths = @(
+    (Join-Path $ProjectRoot 'app\src\main'),
+    (Join-Path $ProjectRoot 'README.md')
+)
+foreach ($activeBrandPath in $activeBrandPaths) {
+    $files = if (Test-Path -LiteralPath $activeBrandPath -PathType Container) {
+        Get-ChildItem -LiteralPath $activeBrandPath -File -Recurse
+    }
+    else {
+        Get-Item -LiteralPath $activeBrandPath
+    }
+    foreach ($file in $files) {
+        if ([System.IO.File]::ReadAllText($file.FullName).Contains('记账助手')) {
+            throw "Found stale app name in $($file.FullName)"
+        }
+    }
 }
 
 Write-Output 'Brand splash configuration: PASS'

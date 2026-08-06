@@ -1,9 +1,12 @@
 package com.expense.tracker.llm
 
 import com.google.common.truth.Truth.assertThat
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.time.LocalDateTime
+import java.time.Instant
 import java.time.ZoneId
+import java.util.Locale
 
 class LlmResponseParserTest {
 
@@ -13,7 +16,7 @@ class LlmResponseParserTest {
         assertThat(result.reply).isEqualTo("收到")
         assertThat(result.expenses).hasSize(1)
         assertThat(result.expenses[0].categoryId).isEqualTo("food")
-        assertThat(result.expenses[0].amount).isEqualTo(35.0)
+        assertThat(result.expenses[0].amountCents).isEqualTo(3_500L)
         assertThat(result.expenses[0].occurredAtMillis).isNull()
     }
 
@@ -36,19 +39,42 @@ class LlmResponseParserTest {
         assertThat(result.expenses[0].occurredAtMillis).isEqualTo(expected)
     }
 
+    @Test fun parseUtcOccurredAt() {
+        val raw = """{"reply":"ok","expenses":[{"amount":10,"category":"food","note":"","occurred_at":"2025-06-12T12:00:00Z"}]}"""
+
+        val result = LlmResponseParser.parse(raw)
+
+        assertThat(result.expenses.single().occurredAtMillis)
+            .isEqualTo(Instant.parse("2025-06-12T12:00:00Z").toEpochMilli())
+    }
+
+    @Test fun parseOffsetOccurredAt() {
+        val raw = """{"reply":"ok","expenses":[{"amount":10,"category":"food","note":"","occurred_at":"2025-06-12T20:00:00+08:00"}]}"""
+
+        val result = LlmResponseParser.parse(raw)
+
+        assertThat(result.expenses.single().occurredAtMillis)
+            .isEqualTo(Instant.parse("2025-06-12T12:00:00Z").toEpochMilli())
+    }
+
     @Test fun unknownCategoryFallsBackToOther() {
         val raw = """{"reply":"","expenses":[{"amount":1,"category":"weird","note":"","occurred_at":null}]}"""
         val result = LlmResponseParser.parse(raw)
         assertThat(result.expenses[0].categoryId).isEqualTo("other")
     }
 
-    @Test fun nonPositiveAmountFiltered() {
+    @Test fun educationCategoryIsPreserved() {
+        val raw = """{"reply":"已记","expenses":[{"amount":88,"category":"education","note":"API 费用","occurred_at":null}]}"""
+
+        val result = LlmResponseParser.parse(raw)
+
+        assertThat(result.expenses.single().categoryId).isEqualTo("education")
+    }
+
+    @Test fun nonPositiveAmountRejectsWholeJsonPayload() {
         val raw = """{"reply":"这些金额无效","expenses":[{"amount":0,"category":"food","note":"","occurred_at":null},
           {"amount":-5,"category":"food","note":"","occurred_at":null}]}"""
-        val result = LlmResponseParser.parse(raw)
-        // 金额过滤掉，但 reply 还在
-        assertThat(result.reply).isEqualTo("这些金额无效")
-        assertThat(result.expenses).isEmpty()
+        assertThrows(LlmParseException::class.java) { LlmResponseParser.parse(raw) }
     }
 
     @Test fun garbageReturnsAsPlainTextReply() {
@@ -75,5 +101,45 @@ class LlmResponseParserTest {
         val result = LlmResponseParser.parse("""{"reply":"","expenses":[{"amount":5,"category":"food","note":"","occurred_at":null}]}""")
         assertThat(result.reply).isEqualTo("已记录")
         assertThat(result.expenses).hasSize(1)
+    }
+
+    @Test fun parseAmountDoesNotDependOnDeviceLocale() {
+        val previous = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.GERMANY)
+            val result = LlmResponseParser.parse(
+                """{"reply":"ok","expenses":[{"amount":12.345,"category":"food","note":"","occurred_at":null}]}"""
+            )
+
+            assertThat(result.expenses.single().amountCents).isEqualTo(1_235L)
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
+    @Test fun updateAmountParsesDirectlyToCents() {
+        val result = LlmResponseParser.parse(
+            """{"reply":"ok","expenses":[],"actions":[{"action":"update","expense_id":7,"amount":6.789}]}"""
+        )
+
+        val action = result.actions.single() as ParsedAction.Update
+        assertThat(action.amountCents).isEqualTo(679L)
+    }
+
+    @Test fun oneInvalidActionRejectsWholePayloadInsteadOfApplyingValidSubset() {
+        val raw = """{"reply":"已修改2笔","expenses":[],"actions":[
+          {"action":"update","expense_id":7,"note":"有效项"},
+          {"action":"update","expense_id":0,"note":"非法项"}
+        ]}"""
+
+        assertThrows(LlmParseException::class.java) { LlmResponseParser.parse(raw) }
+    }
+
+    @Test fun unknownActionRejectsWholePayload() {
+        val raw = """{"reply":"已处理","expenses":[],"actions":[
+          {"action":"move_everything","expense_id":7}
+        ]}"""
+
+        assertThrows(LlmParseException::class.java) { LlmResponseParser.parse(raw) }
     }
 }

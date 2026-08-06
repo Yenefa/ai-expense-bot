@@ -20,7 +20,7 @@ import com.expense.tracker.ui.theme.AppColors
 fun TemplateCard(
     selectedCategoryId: String,
     onSelectCategory: (String) -> Unit,
-    onSubmit: (Double) -> Unit,
+    onSubmit: (Long) -> Unit,
     onDoubleClickCategory: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {

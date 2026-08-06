@@ -20,7 +20,7 @@ class CsvExpenseImporterTest {
         assertThat(result.issues).isEmpty()
         assertThat(result.expenses).containsExactly(
             ImportedExpense(
-                amount = 12.5,
+                amountCents = 1_250L,
                 categoryId = "food",
                 note = "面, \"双拼\"\n大份",
                 occurredAt = 1781438400000,
@@ -44,6 +44,20 @@ class CsvExpenseImporterTest {
         assertThat(result.expenses).hasSize(1)
         assertThat(result.issues).hasSize(3)
         assertThat(result.issues.map { it.recordNumber }).containsExactly(3, 4, 5)
+    }
+
+    @Test
+    fun parsesDecimalTextDirectlyToRoundedCentsAndRejectsExponentNotation() {
+        val csv = """
+            id,amount,categoryId,note,occurredAt,createdAt
+            1,12.345,food,三位小数,1781438400000,1781541152859
+            2,1e2,food,指数金额,1781438400000,1781541152859
+        """.trimIndent()
+
+        val result = CsvExpenseImporter.parse(csv)
+
+        assertThat(result.expenses.single().amountCents).isEqualTo(1_235L)
+        assertThat(result.issues.single().recordNumber).isEqualTo(3)
     }
 
     @Test(expected = IllegalArgumentException::class)

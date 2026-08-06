@@ -1,9 +1,10 @@
 package com.expense.tracker.data.importer
 
 import com.expense.tracker.data.model.Category
+import com.expense.tracker.data.model.Money
 
 data class ImportedExpense(
-    val amount: Double,
+    val amountCents: Long,
     val categoryId: String,
     val note: String,
     val occurredAt: Long,
@@ -53,12 +54,14 @@ object CsvExpenseImporter {
             fun field(name: String): String =
                 record.fields.getOrElse(indexes.getValue(name)) { "" }
 
-            val amount = field("amount").trim().toDoubleOrNull()
+            val amountCents = runCatching {
+                Money.parseYuanToCents(field("amount"))
+            }.getOrNull()
             val categoryId = field("categoryId").trim()
             val occurredAt = field("occurredAt").trim().toLongOrNull()
             val createdAt = field("createdAt").trim().toLongOrNull()
             val errors = buildList {
-                if (amount == null || !amount.isFinite() || amount <= 0.0) {
+                if (amountCents == null) {
                     add("金额必须是大于零的数字")
                 }
                 if (Category.byId(categoryId) == null) {
@@ -76,7 +79,7 @@ object CsvExpenseImporter {
                 issues += CsvImportIssue(record.recordNumber, errors.joinToString("；"))
             } else {
                 expenses += ImportedExpense(
-                    amount = amount!!,
+                    amountCents = amountCents!!,
                     categoryId = categoryId,
                     note = field("note"),
                     occurredAt = occurredAt!!,

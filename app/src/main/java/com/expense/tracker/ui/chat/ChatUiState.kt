@@ -13,4 +13,6 @@ data class ChatUiState(
     val streamingText: String? = null,
     /** 输入框草稿 — 由 ViewModel 持有，跨 ChatScreen 重组（包括从子页面返回）不丢失。 */
     val inputDraft: String = "",
+    /** 多笔或删改操作的本地确认门；确认前数据库不会发生变化。 */
+    val pendingConfirmation: LlmResult.ConfirmationRequired? = null,
 )

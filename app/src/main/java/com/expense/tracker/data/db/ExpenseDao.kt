@@ -14,6 +14,9 @@ interface ExpenseDao {
     @Insert
     suspend fun insertAll(expenses: List<ExpenseEntity>): List<Long>
 
+    @Query("DELETE FROM expenses")
+    suspend fun clearAll()
+
     @Update
     suspend fun update(expense: ExpenseEntity)
 

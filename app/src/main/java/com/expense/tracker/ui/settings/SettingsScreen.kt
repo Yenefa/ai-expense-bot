@@ -50,6 +50,7 @@ fun SettingsScreen(prefs: UserPrefs, onClose: () -> Unit) {
     var baseUrl by remember(snap) { mutableStateOf(snap?.baseUrl ?: "") }
     var apiKey by remember(snap) { mutableStateOf(snap?.apiKey ?: "") }
     var model by remember(snap) { mutableStateOf(snap?.model ?: "") }
+    var saveError by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -91,6 +92,13 @@ fun SettingsScreen(prefs: UserPrefs, onClose: () -> Unit) {
             shape = RoundedCornerShape(14.dp),
             modifier = Modifier.fillMaxWidth(),
         )
+        if (snap?.apiKeyError == true || saveError) {
+            Text(
+                text = "API Key 安全存储暂不可用，请重新输入后保存。",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         OutlinedTextField(
             value = model, onValueChange = { model = it },
             label = { Text("Model") },
@@ -102,8 +110,13 @@ fun SettingsScreen(prefs: UserPrefs, onClose: () -> Unit) {
         Button(
             onClick = {
                 scope.launch {
-                    prefs.setApiConfig(baseUrl.trim(), apiKey.trim(), model.trim())
-                    onClose()
+                    runCatching {
+                        prefs.setApiConfig(baseUrl.trim(), apiKey.trim(), model.trim())
+                    }.onSuccess {
+                        onClose()
+                    }.onFailure {
+                        saveError = true
+                    }
                 }
             },
             colors = ButtonDefaults.buttonColors(

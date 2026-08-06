@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.expense.tracker.data.db.ExpenseEntity
+import com.expense.tracker.data.model.Money
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
@@ -271,7 +272,7 @@ private fun ExpenseRow(item: DisplayExpense, onClick: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(item.timeLabel, style = MaterialTheme.typography.labelSmall, color = AppColors.TextMuted)
             Spacer(Modifier.width(8.dp))
-            Text("¥%.2f".format(item.amount), style = MaterialTheme.typography.bodyMedium, color = AppColors.TextPrimary)
+            Text("¥${Money.formatYuan(item.amountCents)}", style = MaterialTheme.typography.bodyMedium, color = AppColors.TextPrimary)
         }
     }
 }

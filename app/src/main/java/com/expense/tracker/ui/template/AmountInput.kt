@@ -29,10 +29,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.expense.tracker.data.model.Money
 import com.expense.tracker.ui.theme.AppColors
 
 @Composable
-fun AmountInput(onSubmit: (Double) -> Unit, modifier: Modifier = Modifier) {
+fun AmountInput(onSubmit: (Long) -> Unit, modifier: Modifier = Modifier) {
     var text by remember { mutableStateOf("") }
     Row(
         modifier = modifier.padding(vertical = 6.dp),
@@ -71,10 +72,10 @@ fun AmountInput(onSubmit: (Double) -> Unit, modifier: Modifier = Modifier) {
                 .background(AppColors.TextPrimary)
                 .pointerInput(text) {
                     detectTapGestures(onTap = {
-                        val v = text.toDoubleOrNull()
-                        if (v != null && v > 0) {
-                            onSubmit(v); text = ""
-                        }
+                        val amountCents = runCatching { Money.parseYuanToCents(text) }.getOrNull()
+                            ?: return@detectTapGestures
+                        onSubmit(amountCents)
+                        text = ""
                     })
                 },
             contentAlignment = Alignment.Center,

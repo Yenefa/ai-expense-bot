@@ -3,11 +3,14 @@ package com.expense.tracker.ui.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expense.tracker.data.model.Category
+import com.expense.tracker.data.model.Money
 import com.expense.tracker.data.prefs.UserPrefs
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.data.repo.ChatRepository
 import com.expense.tracker.data.repo.ExpenseRepository
+import com.expense.tracker.llm.MutationPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,9 +21,20 @@ import kotlinx.coroutines.launch
 
 /** LLM 调用接口 — 输入用户文本 + 当前 prefs，返回助手要展示的文本。Part 3 任务再实现真实版本。 */
 typealias LlmHandler = suspend (text: String, prefs: UserPrefsSnapshot) -> LlmResult
+typealias LlmConfirmationHandler = suspend (token: String) -> LlmResult
+typealias LlmCancellationHandler = (token: String) -> Unit
 
 sealed interface LlmResult {
-    data class Ok(val replyText: String, val expenseId: Long?) : LlmResult
+    data class Ok(
+        val replyText: String,
+        val expenseIds: List<Long> = emptyList(),
+        /** 账目变更与助手批次消息已在同一数据库事务中提交。 */
+        val assistantPersisted: Boolean = false,
+    ) : LlmResult
+    data class ConfirmationRequired(
+        val token: String,
+        val preview: MutationPreview,
+    ) : LlmResult
     data class Error(val message: String) : LlmResult
 }
 
@@ -29,6 +43,8 @@ class ChatViewModel(
     private val chatRepo: ChatRepository,
     private val userPrefs: UserPrefs,
     private val llmHandler: LlmHandler,
+    private val confirmationHandler: LlmConfirmationHandler = { LlmResult.Error("确认已失效") },
+    private val cancellationHandler: LlmCancellationHandler = {},
 ) : ViewModel() {
 
     private val internal = MutableStateFlow(ChatUiState())
@@ -59,22 +75,24 @@ class ChatViewModel(
     }
 
     /** 关闭 LLM 时的快速记账。 */
-    fun submitTemplate(amount: Double, note: String = "") {
-        if (amount <= 0.0) return
+    fun submitTemplate(amountCents: Long, note: String = "") {
+        if (amountCents <= 0L) return
+        if (internal.value.sending || internal.value.pendingConfirmation != null) return
         val cat = Category.byIdOrOther(internal.value.selectedCategoryId)
         val trimmedNote = note.trim()
+        internal.update { it.copy(sending = true) }
         viewModelScope.launch {
-            internal.update { it.copy(sending = true) }
             val noteSuffix = if (trimmedNote.isNotEmpty()) " · $trimmedNote" else ""
-            chatRepo.appendUser("[模板] ${cat.emoji} ${cat.displayName} ¥${"%.2f".format(amount)}$noteSuffix")
-            val expenseId = expenseRepo.add(
-                amount = amount,
+            val formattedAmount = Money.formatYuan(amountCents)
+            chatRepo.appendUser("[模板] ${cat.emoji} ${cat.displayName} ¥$formattedAmount$noteSuffix")
+            val expenseId = expenseRepo.addCents(
+                amountCents = amountCents,
                 categoryId = cat.id,
                 note = trimmedNote,
                 occurredAt = System.currentTimeMillis(),
             )
             chatRepo.appendAssistant(
-                text = "✅ 已记录 · ${cat.emoji} ${cat.displayName} ¥${"%.2f".format(amount)}$noteSuffix",
+                text = "✅ 已记录 · ${cat.emoji} ${cat.displayName} ¥$formattedAmount$noteSuffix",
                 relatedExpenseId = expenseId,
             )
             internal.update { it.copy(sending = false) }
@@ -85,8 +103,10 @@ class ChatViewModel(
     fun submitFreeText(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
+        if (internal.value.sending || internal.value.pendingConfirmation != null) return
+        // 在启动协程前同步占用发送门，避免同一帧内的连续点击启动两个请求。
+        internal.update { it.copy(sending = true, inputDraft = "") }
         viewModelScope.launch {
-            internal.update { it.copy(sending = true, inputDraft = "") }
             chatRepo.appendUser(trimmed)
             val prefs = userPrefs.snapshot.first()
             if (!prefs.llmEnabled) {
@@ -98,30 +118,78 @@ class ChatViewModel(
             // 思考态 — UI 显示三点跳动动画
             internal.update { it.copy(thinking = true) }
             val result = runCatching { llmHandler(trimmed, prefs) }
-                .getOrElse { LlmResult.Error("调用失败：${it.message ?: "未知错误"}") }
+                .getOrElse {
+                    if (it is CancellationException) throw it
+                    LlmResult.Error("调用失败：${it.message ?: "未知错误"}")
+                }
             // LLM 已返回，关闭思考态，开始流式打字
             internal.update { it.copy(thinking = false) }
 
             when (result) {
                 is LlmResult.Ok -> {
-                    streamReply(result.replyText)
-                    // 先清流式状态，再写 DB；这样 DB 推回的正式 bubble 替换流式占位时不会重影
-                    internal.update { it.copy(streamingText = null) }
-                    chatRepo.appendAssistant(result.replyText, relatedExpenseId = result.expenseId)
+                    appendFinalResult(result)
+                }
+                is LlmResult.ConfirmationRequired -> {
+                    internal.update { it.copy(pendingConfirmation = result) }
                 }
                 is LlmResult.Error -> {
-                    val errText = "⚠️ ${result.message}"
-                    streamReply(errText)
-                    internal.update { it.copy(streamingText = null) }
-                    chatRepo.appendAssistant(errText)
+                    appendError(result)
                 }
             }
             internal.update { it.copy(sending = false) }
         }
     }
 
+    fun confirmPending() {
+        val confirmation = internal.value.pendingConfirmation ?: return
+        internal.update { it.copy(pendingConfirmation = null, sending = true, thinking = true) }
+        viewModelScope.launch {
+            val result = runCatching { confirmationHandler(confirmation.token) }
+                .getOrElse {
+                    if (it is CancellationException) throw it
+                    LlmResult.Error(it.message ?: "执行失败，本次未修改。")
+                }
+            internal.update { it.copy(thinking = false) }
+            when (result) {
+                is LlmResult.Ok -> appendFinalResult(result)
+                is LlmResult.Error -> appendError(result)
+                is LlmResult.ConfirmationRequired -> appendError(LlmResult.Error("确认状态异常，本次未修改。"))
+            }
+            internal.update { it.copy(sending = false) }
+        }
+    }
+
+    fun cancelPending() {
+        val confirmation = internal.value.pendingConfirmation ?: return
+        cancellationHandler(confirmation.token)
+        internal.update { it.copy(pendingConfirmation = null) }
+        viewModelScope.launch { chatRepo.appendAssistant("已取消，本次未修改任何账目。") }
+    }
+
+    private suspend fun appendFinalResult(result: LlmResult.Ok) {
+        if (result.assistantPersisted) {
+            // 正式消息已与账目事务一起写入，避免再写一次或显示重复的流式气泡。
+            internal.update { it.copy(streamingText = null) }
+            return
+        }
+        streamReply(result.replyText)
+        // 先清流式状态，再写 DB；这样 DB 推回的正式 bubble 替换流式占位时不会重影
+        internal.update { it.copy(streamingText = null) }
+        chatRepo.appendAssistant(
+            text = result.replyText,
+            relatedExpenseIds = result.expenseIds,
+        )
+    }
+
+    private suspend fun appendError(result: LlmResult.Error) {
+        val errText = "⚠️ ${result.message}"
+        streamReply(errText)
+        internal.update { it.copy(streamingText = null) }
+        chatRepo.appendAssistant(errText)
+    }
+
     /**
-     * 逐字"打字"显示 LLM 回复 — 25ms/字符；空字符串直接跳过。
+     * 逐字"打字"显示 LLM 回复 — 8ms/字符；空字符串直接跳过。
      * 完成后调用方负责清理 streamingText 状态（写入 DB 后清空）。
      */
     private suspend fun streamReply(fullText: String) {
@@ -132,9 +200,9 @@ class ChatViewModel(
             internal.update { it.copy(streamingText = sb.toString()) }
             // 标点稍微停顿更有节奏感
             val perCharMs = when (ch) {
-                '。', '！', '？', '.', '!', '?' -> 80L
-                '，', '、', ',', ';' -> 50L
-                else -> 22L
+                '。', '！', '？', '.', '!', '?' -> 40L
+                '，', '、', ',', ';' -> 25L
+                else -> 8L
             }
             delay(perCharMs)
         }

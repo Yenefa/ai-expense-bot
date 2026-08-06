@@ -33,6 +33,7 @@ private class FakeExpenseDaoForAnalytics : ExpenseDao {
     override suspend fun insert(expense: ExpenseEntity): Long { seq++; state.value = state.value + expense.copy(id = seq); return seq }
     override suspend fun insertAll(expenses: List<ExpenseEntity>): List<Long> =
         expenses.map { insert(it) }
+    override suspend fun clearAll() { state.value = emptyList() }
     override suspend fun update(expense: ExpenseEntity) { state.value = state.value.map { if (it.id == expense.id) expense else it } }
     override fun observeActive(): Flow<List<ExpenseEntity>> = state
     override suspend fun getAllActiveOnce(): List<ExpenseEntity> = state.value.filter { it.deletedAt == null }
@@ -67,9 +68,9 @@ class AnalyticsViewModelTest {
         val dao = FakeExpenseDaoForAnalytics()
         val repo = ExpenseRepository(dao)
         // 周一（6/9）餐饮 30 元 + 交通 10 元；周二（6/10）购物 50 元
-        dao.insertRaw(ExpenseEntity(amount = 30.0, categoryId = "food", note = "", occurredAt = millis(9), createdAt = millis(9)))
-        dao.insertRaw(ExpenseEntity(amount = 10.0, categoryId = "transport", note = "", occurredAt = millis(9), createdAt = millis(9)))
-        dao.insertRaw(ExpenseEntity(amount = 50.0, categoryId = "shopping", note = "", occurredAt = millis(10), createdAt = millis(10)))
+        dao.insertRaw(ExpenseEntity(amountCents = 3_000L, categoryId = "food", note = "", occurredAt = millis(9), createdAt = millis(9)))
+        dao.insertRaw(ExpenseEntity(amountCents = 1_000L, categoryId = "transport", note = "", occurredAt = millis(9), createdAt = millis(9)))
+        dao.insertRaw(ExpenseEntity(amountCents = 5_000L, categoryId = "shopping", note = "", occurredAt = millis(10), createdAt = millis(10)))
 
         // 用周二的时刻触发 ViewModel，周期范围应是 6/9(周一) ~ 6/16
         val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(10) })
@@ -100,7 +101,7 @@ class AnalyticsViewModelTest {
         val dao = FakeExpenseDaoForAnalytics()
         val repo = ExpenseRepository(dao)
         val now = millis(9)
-        dao.insertRaw(ExpenseEntity(amount = 10.0, categoryId = "food", note = "", occurredAt = now, createdAt = now))
+        dao.insertRaw(ExpenseEntity(amountCents = 1_000L, categoryId = "food", note = "", occurredAt = now, createdAt = now))
 
         val vm = AnalyticsViewModel(repo, zone, nowProvider = { now })
         vm.uiState.first { it.subPeriods.isNotEmpty() }
@@ -126,7 +127,7 @@ class AnalyticsViewModelTest {
         val dao = FakeExpenseDaoForAnalytics()
         val repo = ExpenseRepository(dao)
         val now = millis(9)
-        dao.insertRaw(ExpenseEntity(amount = 10.0, categoryId = "food", note = "", occurredAt = now, createdAt = now))
+        dao.insertRaw(ExpenseEntity(amountCents = 1_000L, categoryId = "food", note = "", occurredAt = now, createdAt = now))
 
         val vm = AnalyticsViewModel(repo, zone, nowProvider = { millis(9) })
         vm.uiState.first { it.subPeriods.isNotEmpty() }

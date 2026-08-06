@@ -23,6 +23,7 @@ private class FakeExpenseDao : ExpenseDao {
     }
     override suspend fun insertAll(expenses: List<ExpenseEntity>): List<Long> =
         expenses.map { insert(it) }
+    override suspend fun clearAll() { state.value = emptyList() }
     override suspend fun update(expense: ExpenseEntity) {
         state.value = state.value.map { if (it.id == expense.id) expense else it }
     }
@@ -54,11 +55,14 @@ private class FakeChatDao : ChatMessageDao {
         state.value = state.value + msg.copy(id = seq)
         return seq
     }
+    override suspend fun insertAll(messages: List<ChatMessageEntity>): List<Long> =
+        messages.map { insert(it) }
     override suspend fun update(msg: ChatMessageEntity) {
         state.value = state.value.map { if (it.id == msg.id) msg else it }
     }
     override fun observeAll(): Flow<List<ChatMessageEntity>> = state
     override suspend fun getAllOnce(): List<ChatMessageEntity> = state.value
+    override suspend fun getRecent(limit: Int): List<ChatMessageEntity> = state.value.takeLast(limit)
     override suspend fun getById(id: Long): ChatMessageEntity? = state.value.firstOrNull { it.id == id }
     override suspend fun clearAll() { state.value = emptyList() }
 }
@@ -66,11 +70,11 @@ private class FakeChatDao : ChatMessageDao {
 class RepositoryTest {
     @Test fun expenseRepoAddPersists() = runBlocking {
         val repo = ExpenseRepository(FakeExpenseDao())
-        val id = repo.add(amount = 35.0, categoryId = "food", note = "午饭", occurredAt = 1L)
+        val id = repo.addCents(amountCents = 3_500L, categoryId = "food", note = "午饭", occurredAt = 1L)
         assertThat(id).isGreaterThan(0L)
         val all = repo.observeActive().first()
         assertThat(all).hasSize(1)
-        assertThat(all[0].amount).isEqualTo(35.0)
+        assertThat(all[0].amountCents).isEqualTo(3_500L)
     }
 
     @Test fun chatRepoAppendsBoth() = runBlocking {
@@ -82,11 +86,42 @@ class RepositoryTest {
         assertThat(all[1].relatedExpenseId).isEqualTo(7L)
     }
 
+    @Test fun chatRepoPersistsWholeExpenseBatchAndReadsBoundedHistory() = runBlocking {
+        val repo = ChatRepository(FakeChatDao())
+        repo.appendUser("第一条", at = 100L)
+        repo.appendUser("第二条", at = 101L)
+        repo.appendAssistant(
+            text = "已记3笔",
+            at = 102L,
+            relatedExpenseIds = listOf(7L, 8L, 9L),
+        )
+
+        val recent = repo.getRecent(2)
+
+        assertThat(recent.map { it.content }).containsExactly("第二条", "已记3笔").inOrder()
+        assertThat(recent.last().relatedExpenseIds()).containsExactly(7L, 8L, 9L).inOrder()
+        assertThat(recent.last().relatedExpenseId).isEqualTo(7L)
+    }
+
+    @Test fun expenseRepoBatchAddKeepsExactCents() = runBlocking {
+        val repo = ExpenseRepository(FakeExpenseDao())
+
+        val ids = repo.addAllCents(
+            listOf(
+                ExpenseDraft(1L, "other", "一分钱", 10L),
+                ExpenseDraft(1_235L, "food", "午饭", 20L),
+            )
+        )
+
+        assertThat(ids).hasSize(2)
+        assertThat(repo.observeActive().first().map { it.amountCents })
+            .containsExactly(1L, 1_235L).inOrder()
+    }
     @Test fun expenseImportSkipsExistingAndWithinFileDuplicates() = runBlocking {
         val dao = FakeExpenseDao()
         dao.insert(
             ExpenseEntity(
-                amount = 9.0,
+                amountCents = 900L,
                 categoryId = "drink",
                 note = "菠萝百香果",
                 occurredAt = 100L,
@@ -94,8 +129,8 @@ class RepositoryTest {
             )
         )
         val repo = ExpenseRepository(dao)
-        val duplicate = ImportedExpense(9.0, "drink", "菠萝百香果", 100L, 101L)
-        val newRow = ImportedExpense(35.0, "food", "午饭", 200L, 201L)
+        val duplicate = ImportedExpense(900L, "drink", "菠萝百香果", 100L, 101L)
+        val newRow = ImportedExpense(3_500L, "food", "午饭", 200L, 201L)
 
         val result = repo.importExpenses(listOf(duplicate, newRow, newRow))
 

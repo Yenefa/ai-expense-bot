@@ -2,6 +2,7 @@ package com.expense.tracker.llm
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 // === Chat completion 请求 ===
 @Serializable
@@ -30,7 +31,7 @@ data class LlmExpensesPayload(
 
 @Serializable
 data class LlmExpenseItem(
-    val amount: Double,
+    val amount: JsonElement,
     val category: String,
     val note: String = "",
     @SerialName("occurred_at") val occurredAt: String? = null,
@@ -43,7 +44,7 @@ data class LlmActionItem(
     /** 要操作的那笔 expense id（LLM 需从我们提供的最近记录列表中选） */
     @SerialName("expense_id") val expenseId: Long,
     /** update 时的新值（delete 时忽略） */
-    val amount: Double? = null,
+    val amount: JsonElement? = null,
     val category: String? = null,
     val note: String? = null,
     @SerialName("occurred_at") val occurredAt: String? = null,
@@ -56,9 +57,9 @@ data class AnalyticsInsightsPayload(val insights: List<String> = emptyList())
 // === 解析后的动作 ===
 sealed interface ParsedAction {
     /** 新增记账（传统流程） */
-    data class Add(val amount: Double, val categoryId: String, val note: String, val occurredAtMillis: Long?) : ParsedAction
+    data class Add(val amountCents: Long, val categoryId: String, val note: String, val occurredAtMillis: Long?) : ParsedAction
     /** 删除指定 expense */
     data class Delete(val expenseId: Long) : ParsedAction
     /** 更新指定 expense 的字段 */
-    data class Update(val expenseId: Long, val amount: Double?, val categoryId: String?, val note: String?, val occurredAtMillis: Long?) : ParsedAction
+    data class Update(val expenseId: Long, val amountCents: Long?, val categoryId: String?, val note: String?, val occurredAtMillis: Long?) : ParsedAction
 }

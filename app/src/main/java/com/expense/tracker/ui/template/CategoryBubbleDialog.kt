@@ -56,6 +56,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.expense.tracker.data.model.Category
+import com.expense.tracker.data.model.Money
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.softShadow
 
@@ -70,7 +71,7 @@ fun CategoryBubbleDialog(
     category: Category?,
     onDismiss: () -> Unit,
     onSwitchCategory: (String) -> Unit = {},
-    onSubmit: (amount: Double, note: String) -> Unit,
+    onSubmit: (amountCents: Long, note: String) -> Unit,
 ) {
     // 关键：缓存最后一次非空 category，避免退出动画期间 category=null 导致 !! 崩溃
     var cachedCategory by remember { mutableStateOf<Category?>(null) }
@@ -162,7 +163,7 @@ private fun BubbleContent(
     category: Category,
     onCancel: () -> Unit,
     onSwitchCategory: (String) -> Unit,
-    onSubmit: (amount: Double, note: String) -> Unit,
+    onSubmit: (amountCents: Long, note: String) -> Unit,
 ) {
     var note by remember(category.id) { mutableStateOf("") }
     var amountText by remember(category.id) { mutableStateOf("") }
@@ -277,10 +278,9 @@ private fun BubbleContent(
                     .background(AppColors.TextPrimary)
                     .pointerInput(amountText, note) {
                         detectTapGestures(onTap = {
-                            val v = amountText.toDoubleOrNull()
-                            if (v != null && v > 0) {
-                                onSubmit(v, note)
-                            }
+                            val amountCents = runCatching { Money.parseYuanToCents(amountText) }.getOrNull()
+                                ?: return@detectTapGestures
+                            onSubmit(amountCents, note)
                         })
                     },
                 contentAlignment = Alignment.Center,

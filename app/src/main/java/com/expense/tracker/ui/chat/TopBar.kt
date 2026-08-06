@@ -21,7 +21,7 @@ fun TopBar(modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "记账助手",
+            "Y.E cost",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             color = AppColors.TextPrimary,

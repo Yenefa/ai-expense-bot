@@ -27,8 +27,10 @@ import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AutoDelete
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.model.Category
+import com.expense.tracker.data.model.Money
 import com.expense.tracker.data.repo.ExpenseRepository
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
@@ -73,6 +76,7 @@ fun DeletedItemsScreen(repo: ExpenseRepository, onClose: () -> Unit) {
 
     // 正在执行恢复/删除的行（用于动画移除）
     var pendingIds by remember { mutableStateOf(setOf<Long>()) }
+    var pendingPurge by remember { mutableStateOf<ExpenseEntity?>(null) }
 
     Box(Modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(Modifier.fillMaxSize()) {
@@ -138,7 +142,7 @@ fun DeletedItemsScreen(repo: ExpenseRepository, onClose: () -> Unit) {
                                         )
                                         Spacer(Modifier.width(6.dp))
                                         Text(
-                                            "¥%.2f".format(item.amount),
+                                            "¥${Money.formatYuan(item.amountCents)}",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.SemiBold,
                                             color = AppColors.TextPrimary,
@@ -185,8 +189,7 @@ fun DeletedItemsScreen(repo: ExpenseRepository, onClose: () -> Unit) {
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(Color(0xFFEF4444).copy(alpha = 0.12f))
                                         .clickable {
-                                            pendingIds = pendingIds + item.id
-                                            scope.launch { repo.purge(item.id) }
+                                            pendingPurge = item
                                         },
                                     contentAlignment = Alignment.Center,
                                 ) {
@@ -202,6 +205,38 @@ fun DeletedItemsScreen(repo: ExpenseRepository, onClose: () -> Unit) {
                     }
                 }
             }
+        }
+
+        val item = pendingPurge
+        if (item != null) {
+            val category = Category.byIdOrOther(item.categoryId)
+            AlertDialog(
+                onDismissRequest = { pendingPurge = null },
+                title = { Text("永久删除账目？") },
+                text = {
+                    Text(
+                        "${category.emoji} ${category.displayName} ¥${Money.formatYuan(item.amountCents)}" +
+                            if (item.note.isBlank()) "\n删除后无法恢复。" else " · ${item.note}\n删除后无法恢复。",
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            pendingPurge = null
+                            pendingIds = pendingIds + item.id
+                            scope.launch {
+                                runCatching { repo.purge(item.id) }
+                                    .onFailure { pendingIds = pendingIds - item.id }
+                            }
+                        },
+                    ) {
+                        Text("永久删除", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingPurge = null }) { Text("取消") }
+                },
+            )
         }
     }
 }

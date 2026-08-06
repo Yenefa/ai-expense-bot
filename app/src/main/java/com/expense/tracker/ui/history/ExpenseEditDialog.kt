@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.model.Category
+import com.expense.tracker.data.model.Money
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.softShadow
 import java.time.Instant
@@ -138,7 +139,7 @@ private fun EditContent(
     val zone = remember { ZoneId.systemDefault() }
 
     // remember(original.id) 确保切换不同 expense 时重新初始化
-    var amountText by remember(original.id) { mutableStateOf("%.2f".format(original.amount)) }
+    var amountText by remember(original.id) { mutableStateOf(Money.formatYuan(original.amountCents)) }
     var categoryId by remember(original.id) { mutableStateOf(original.categoryId) }
     var noteText by remember(original.id) { mutableStateOf(original.note) }
     var occurredAt by remember(original.id) { mutableStateOf(original.occurredAt) }
@@ -336,11 +337,11 @@ private fun EditContent(
                     .clip(RoundedCornerShape(14.dp))
                     .background(AppColors.TextPrimary)
                     .clickable {
-                        val newAmount = amountText.toDoubleOrNull() ?: return@clickable
-                        if (newAmount <= 0.0) return@clickable
+                        val newAmountCents = runCatching { Money.parseYuanToCents(amountText) }
+                            .getOrNull() ?: return@clickable
                         onSave(
                             original.copy(
-                                amount = newAmount,
+                                amountCents = newAmountCents,
                                 categoryId = categoryId,
                                 note = noteText.trim(),
                                 occurredAt = occurredAt,

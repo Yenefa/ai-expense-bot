@@ -82,7 +82,7 @@
 - Modify: `app/src/test/java/com/expense/tracker/ui/chat/ChatViewModelTest.kt`
 
 - [ ] Write failing coordinator tests proving multi-record updates never apply before confirmation, cancel never applies, and confirmation applies once.
-- [ ] Write failing ViewModel tests for pending state, cancel text, confirm result, and all inserted IDs saved as one assistant batch.
+- [ ] Write failing ViewModel tests for pending state, cancel text, confirm result, and all affected IDs saved transactionally as one assistant batch, so safe follow-ups retain the exact latest set.
 - [ ] Run targeted tests and confirm failures.
 - [ ] Implement the coordinator with bounded in-memory confirmation tokens, expanded active-record context, history context, and safe error messages.
 - [ ] Extend `LlmResult` and UI state; add confirm/cancel ViewModel actions and a Material 3 preview dialog.

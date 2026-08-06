@@ -2,64 +2,164 @@ package com.expense.tracker.data.export
 
 import com.expense.tracker.data.db.ChatMessageEntity
 import com.expense.tracker.data.db.ExpenseEntity
+import com.expense.tracker.data.prefs.ThemeMode
 import com.google.common.truth.Truth.assertThat
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class DataExporterTest {
 
-    @Test fun jsonContainsAllExpensesAndChats() {
+    @Test fun completeBackupRoundTripsDeletedExpensesChatsAndPreferences() {
         val expenses = listOf(
-            ExpenseEntity(amount = 35.0, categoryId = "food", note = "午饭", occurredAt = 1L, createdAt = 2L, id = 10),
-            ExpenseEntity(amount = 18.5, categoryId = "drink", note = "咖啡", occurredAt = 3L, createdAt = 4L, id = 11),
+            ExpenseEntity(3_500L, "food", "午饭", 1L, 2L, id = 10),
+            ExpenseEntity(1_850L, "drink", "咖啡", 3L, 4L, deletedAt = 5L, id = 11),
         )
         val chats = listOf(
-            ChatMessageEntity(role = "user", content = "午饭35", createdAt = 5L, relatedExpenseId = 10, id = 100),
-            ChatMessageEntity(role = "assistant", content = "已记 ¥35", createdAt = 6L, relatedExpenseId = 10, id = 101),
+            ChatMessageEntity("user", "午饭35", 5L, relatedExpenseId = 10, id = 100),
+            ChatMessageEntity(
+                "assistant",
+                "已记2笔",
+                6L,
+                relatedExpenseId = 10,
+                relatedExpenseIdsCsv = "10,11",
+                id = 101,
+            ),
+        )
+        val preferences = BackupPreferences(
+            llmEnabled = true,
+            baseUrl = "https://example.com/v1",
+            model = "model-a",
+            themeMode = ThemeMode.DARK,
         )
 
-        val json = DataExporter.toJson(expenses, chats, version = "2.5", exportedAtIso = "2026-06-19T10:00:00Z")
-
-        // 不做精确匹配 — JSON 序列化可能有空格差异；只检查关键字段都在
-        assertThat(json).contains("\"version\": \"2.5\"")
-        assertThat(json).contains("\"exportedAt\": \"2026-06-19T10:00:00Z\"")
-        assertThat(json).contains("\"amount\": 35.0")
-        assertThat(json).contains("\"categoryId\": \"drink\"")
-        assertThat(json).contains("\"role\": \"user\"")
-        assertThat(json).contains("已记 ¥35")
-        assertThat(json).contains("\"relatedExpenseId\": 10")
-    }
-
-    @Test fun csvHeaderIsCorrect() {
-        val csv = DataExporter.toCsv(emptyList())
-        assertThat(csv).isEqualTo("id,amount,categoryId,note,occurredAt,createdAt")
-    }
-
-    @Test fun csvEscapesCommasAndQuotesInNote() {
-        val expenses = listOf(
-            ExpenseEntity(amount = 9.0, categoryId = "drink", note = "菠萝,百香果", occurredAt = 1L, createdAt = 2L, id = 1),
-            ExpenseEntity(amount = 8.0, categoryId = "food", note = "他说\"好吃\"", occurredAt = 3L, createdAt = 4L, id = 2),
+        val json = DataExporter.toBackupJson(
+            expenses = expenses,
+            chatMessages = chats,
+            preferences = preferences,
+            sourceAppVersion = "3.6",
+            exportedAtIso = "2026-07-31T10:00:00Z",
         )
+        val decoded = DataExporter.parseBackup(json)
 
-        val csv = DataExporter.toCsv(expenses)
-        // 第 2 行：包含逗号 → 双引号包裹
-        assertThat(csv).contains("\"菠萝,百香果\"")
-        // 第 3 行：包含双引号 → 包裹+内部双双引号转义
-        assertThat(csv).contains("\"他说\"\"好吃\"\"\"")
+        assertThat(decoded.formatVersion).isEqualTo(2)
+        assertThat(decoded.sourceAppVersion).isEqualTo("3.6")
+        assertThat(decoded.expenses).containsExactlyElementsIn(expenses).inOrder()
+        assertThat(decoded.chatMessages).containsExactlyElementsIn(chats).inOrder()
+        assertThat(json).contains("\"relatedExpenseIds\"")
+        assertThat(decoded.preferences).isEqualTo(preferences)
+        assertThat(json).doesNotContain("apiKey")
     }
 
-    @Test fun csvIncludesAllRows() {
-        val expenses = (1..5).map { i ->
-            ExpenseEntity(
-                amount = i.toDouble(),
-                categoryId = "food",
-                note = "记录$i",
-                occurredAt = i.toLong(),
-                createdAt = i.toLong(),
-                id = i.toLong(),
-            )
+    @Test fun legacyExporterJsonCanBeRestored() {
+        val legacy = """
+            {
+              "version": "3.6",
+              "exportedAt": "2026-07-31T10:00:00Z",
+              "expenses": [{
+                "id": 7,
+                "amount": 12.345,
+                "categoryId": "food",
+                "note": "午饭",
+                "occurredAt": 100,
+                "createdAt": 101
+              }],
+              "chatMessages": [{
+                "id": 8,
+                "role": "assistant",
+                "content": "已记录",
+                "createdAt": 102,
+                "relatedExpenseId": 7
+              }]
+            }
+        """.trimIndent()
+
+        val decoded = DataExporter.parseBackup(legacy)
+
+        assertThat(decoded.expenses.single().amountCents).isEqualTo(1_235L)
+        assertThat(decoded.expenses.single().deletedAt).isNull()
+        assertThat(decoded.preferences.themeMode).isEqualTo(ThemeMode.SYSTEM)
+    }
+
+    @Test fun malformedOrDuplicateBackupIsRejectedBeforeRestore() {
+        assertThrows(BackupFormatException::class.java) {
+            DataExporter.parseBackup("not json")
         }
+
+        val duplicateIds = """
+            {
+              "formatVersion": 2,
+              "sourceAppVersion": "3.6",
+              "exportedAt": "2026-07-31T10:00:00Z",
+              "expenses": [
+                {"id":1,"amountCents":100,"categoryId":"food","note":"a","occurredAt":1,"createdAt":1,"deletedAt":null},
+                {"id":1,"amountCents":200,"categoryId":"food","note":"b","occurredAt":2,"createdAt":2,"deletedAt":null}
+              ],
+              "chatMessages": [],
+              "preferences": {"llmEnabled":false,"baseUrl":"https://api.openai.com/v1","model":"gpt-4o-mini","themeMode":"SYSTEM"}
+            }
+        """.trimIndent()
+        assertThrows(BackupFormatException::class.java) {
+            DataExporter.parseBackup(duplicateIds)
+        }
+
+        val invalidBatchId = """
+            {
+              "formatVersion":2,
+              "sourceAppVersion":"3.6",
+              "exportedAt":"2026-07-31T10:00:00Z",
+              "expenses":[],
+              "chatMessages":[{"id":1,"role":"assistant","content":"x","createdAt":1,"relatedExpenseId":7,"relatedExpenseIds":[7,-8]}],
+              "preferences":{"llmEnabled":false,"baseUrl":"","model":"","themeMode":"SYSTEM"}
+            }
+        """.trimIndent()
+        assertThrows(BackupFormatException::class.java) {
+            DataExporter.parseBackup(invalidBatchId)
+        }
+    }
+
+    @Test fun blankDisabledLlmConfigurationDoesNotBlockFinancialBackup() {
+        val preferences = BackupPreferences(
+            llmEnabled = false,
+            baseUrl = "",
+            model = "",
+            themeMode = ThemeMode.SYSTEM,
+        )
+
+        val json = DataExporter.toBackupJson(
+            expenses = listOf(ExpenseEntity(100L, "food", "", 1L, 1L, id = 1L)),
+            chatMessages = emptyList(),
+            preferences = preferences,
+            sourceAppVersion = "3.6",
+            exportedAtIso = "2026-07-31T10:00:00Z",
+        )
+
+        assertThat(DataExporter.parseBackup(json).preferences).isEqualTo(preferences)
+    }
+
+    @Test fun unsupportedBackupVersionIsRejected() {
+        val unsupported = """
+            {"formatVersion":99,"sourceAppVersion":"3.6","exportedAt":"2026-07-31T10:00:00Z","expenses":[],"chatMessages":[],"preferences":{"llmEnabled":false,"baseUrl":"","model":"","themeMode":"SYSTEM"}}
+        """.trimIndent()
+
+        val error = assertThrows(BackupFormatException::class.java) {
+            DataExporter.parseBackup(unsupported)
+        }
+        assertThat(error).hasMessageThat().contains("99")
+    }
+
+    @Test fun csvHeaderAndEscapingStayCompatible() {
+        assertThat(DataExporter.toCsv(emptyList()))
+            .isEqualTo("id,amount,categoryId,note,occurredAt,createdAt")
+        val expenses = listOf(
+            ExpenseEntity(900L, "drink", "菠萝,百香果", 1L, 2L, id = 1),
+            ExpenseEntity(800L, "food", "他说\"好吃\"", 3L, 4L, id = 2),
+        )
+
         val csv = DataExporter.toCsv(expenses)
-        // 1 行头 + 5 行数据 = 6 行
-        assertThat(csv.lines()).hasSize(6)
+
+        assertThat(csv).contains("\"菠萝,百香果\"")
+        assertThat(csv).contains("\"他说\"\"好吃\"\"\"")
+        assertThat(csv.lines()[1].split(',')[1]).isEqualTo("9.00")
+        assertThat(csv.lines()[2].split(',')[1]).isEqualTo("8.00")
     }
 }

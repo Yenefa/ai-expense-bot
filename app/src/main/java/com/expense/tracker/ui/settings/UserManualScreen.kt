@@ -67,7 +67,7 @@ fun UserManualScreen(onClose: () -> Unit) {
 
             Spacer(Modifier.size(16.dp))
             Text(
-                "欢迎使用记账助手 — 一款像和 AI 聊天一样记账的 Android 原生 App。所有数据只存在你的手机本地。",
+                "欢迎使用 Y.E cost — 一款对话式智能记账 Android App。所有数据只存在你的手机本地。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = AppColors.TextSecondary,
             )
@@ -147,7 +147,7 @@ fun UserManualScreen(onClose: () -> Unit) {
                 title = "设置 — 你现在的位置",
                 lines = listOf(
                     "🧠 LLM 设置：配置 API 地址（DeepSeek / OpenAI / 豆包）、密钥、模型名",
-                    "📁 数据导入与导出：可导入本应用 CSV（自动跳过重复账目），也可导出 JSON（全部记账+聊天）或 CSV（仅记账）",
+                    "📁 数据导入与导出：完整 JSON 可备份并恢复账目（含回收站）、聊天和非敏感设置；CSV 用于批量导入或 Excel 处理",
                     "📖 软件说明书：你正在看的这页",
                     "ℹ️ 关于：版本号 + 简介",
                 ),
@@ -158,7 +158,7 @@ fun UserManualScreen(onClose: () -> Unit) {
                 title = "数据安全",
                 lines = listOf(
                     "记账数据存在手机本地 SQLite（/data/data 私有目录）",
-                    "API Key 存在本地 DataStore，不会上传到任何第三方",
+                    "API Key 存在本地 DataStore，仅在发起 AI 请求时发送给你配置的模型服务，且不会写入完整备份文件",
                     "App 不收集、不联网上传任何用户行为数据",
                     "唯一会发请求的就是你配置的 LLM API（地址由你自己填）",
                     "升级 App（同签名）数据不会丢；签名变了或卸载会清空",
@@ -171,7 +171,7 @@ fun UserManualScreen(onClose: () -> Unit) {
                 lines = listOf(
                     "AI 偶尔回复了不规范文字 — App 会容错当作闲聊显示，不会报错",
                     "AI 不知道「现在几点」是常见错觉 — 我们每次请求都把当前时间注入 system prompt，不会瞎填日期",
-                    "如果删错了一笔，可先去「最近删除」恢复；也建议定期用「数据导入与导出」做个 JSON 或 CSV 备份",
+                    "如果删错了一笔，可先去「最近删除」恢复；建议定期导出完整 JSON 备份，CSV 更适合 Excel 查看而不是完整恢复",
                     "投资类的支出（买股票/基金）选 💹 投资 分类，不会污染消费洞察",
                 ),
             )

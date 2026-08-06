@@ -43,6 +43,7 @@ fun InputBar(
     onSend: (String) -> Unit,
     onPlusClick: () -> Unit,
     placeholder: String,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -68,6 +69,7 @@ fun InputBar(
                 BasicTextField(
                     value = text,
                     onValueChange = onTextChange,
+                    enabled = enabled,
                     singleLine = true,
                     textStyle = TextStyle(
                         color = AppColors.TextPrimary,
@@ -97,10 +99,10 @@ fun InputBar(
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
-                .background(if (llmEnabled) AppColors.Accent else AppColors.Accent.copy(alpha = 0.35f))
-                .pointerInput(text, llmEnabled) {
+                .background(if (llmEnabled && enabled) AppColors.Accent else AppColors.Accent.copy(alpha = 0.35f))
+                .pointerInput(text, llmEnabled, enabled) {
                     detectTapGestures(onTap = {
-                        if (llmEnabled && text.isNotBlank()) {
+                        if (enabled && llmEnabled && text.isNotBlank()) {
                             onSend(text)
                         }
                     })

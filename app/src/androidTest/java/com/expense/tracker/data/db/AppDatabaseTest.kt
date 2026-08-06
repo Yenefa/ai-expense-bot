@@ -27,13 +27,13 @@ class AppDatabaseTest {
     @Test fun insertAndQueryExpense() = runBlocking {
         val dao = db.expenseDao()
         val id = dao.insert(ExpenseEntity(
-            amount = 35.0, categoryId = "food", note = "午饭",
+            amountCents = 3_500L, categoryId = "food", note = "午饭",
             occurredAt = 1_000L, createdAt = 1_000L,
         ))
         assertThat(id).isGreaterThan(0L)
-        val all = dao.observeAll().first()
+        val all = dao.observeActive().first()
         assertThat(all).hasSize(1)
-        assertThat(all[0].amount).isEqualTo(35.0)
+        assertThat(all[0].amountCents).isEqualTo(3_500L)
         assertThat(all[0].categoryId).isEqualTo("food")
     }
 
@@ -48,11 +48,11 @@ class AppDatabaseTest {
 
     @Test fun expensesInRangeFiltersByOccurredAt() = runBlocking {
         val dao = db.expenseDao()
-        dao.insert(ExpenseEntity(10.0, "food", "", 100L, 100L))
-        dao.insert(ExpenseEntity(20.0, "food", "", 500L, 500L))
-        dao.insert(ExpenseEntity(30.0, "food", "", 1000L, 1000L))
+        dao.insert(ExpenseEntity(1_000L, "food", "", 100L, 100L))
+        dao.insert(ExpenseEntity(2_000L, "food", "", 500L, 500L))
+        dao.insert(ExpenseEntity(3_000L, "food", "", 1000L, 1000L))
         val mid = dao.observeInRange(200L, 800L).first()
         assertThat(mid).hasSize(1)
-        assertThat(mid[0].amount).isEqualTo(20.0)
+        assertThat(mid[0].amountCents).isEqualTo(2_000L)
     }
 }

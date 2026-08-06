@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.model.Period
+import com.expense.tracker.data.model.Money
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.data.repo.ExpenseRepository
 import com.expense.tracker.llm.LlmPrompt
@@ -113,7 +114,7 @@ class AnalyticsViewModel(
         val n = labels.size
 
         // 自动选择默认子周期：月→当天，年→当月，周→总览
-        val nowDate = java.time.LocalDate.ofInstant(java.time.Instant.ofEpochMilli(nowMillis), zone)
+        val nowDate = java.time.Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
         val defaultSubIndex: Int? = when (p) {
             Period.Month -> {
                 val today = nowDate.dayOfMonth - 1
@@ -125,9 +126,9 @@ class AnalyticsViewModel(
             }
             Period.Week -> null
         }
-        val amounts = DoubleArray(n)
+        val amountCents = LongArray(n)
         val counts = IntArray(n)
-        val byCat = HashMap<String, Double>()
+        val byCatCents = HashMap<String, Long>()
 
         // 投资类不计入消费分析图表（短线很快收回，不算真实开销）
         val consumptionList = list.filter { e ->
@@ -137,10 +138,10 @@ class AnalyticsViewModel(
         consumptionList.forEach { e ->
             val idx = TimeRanges.bucketIndex(p, fromMillis, e.occurredAt, zone)
             if (idx in 0 until n) {
-                amounts[idx] += e.amount
+                amountCents[idx] += e.amountCents
                 counts[idx] += 1
             }
-            byCat[e.categoryId] = (byCat[e.categoryId] ?: 0.0) + e.amount
+            byCatCents[e.categoryId] = (byCatCents[e.categoryId] ?: 0L) + e.amountCents
         }
 
         // 单次遍历：按桶索引分组，避免 O(n*m) 重复计算 bucketIndex
@@ -151,19 +152,19 @@ class AnalyticsViewModel(
         val subPeriodDetails = (0 until n).map { idx ->
             val entries = bucketed[idx] ?: emptyList()
             SubPeriodDetail(
-                totalAmount = entries.sumOf { it.amount },
-                byCategory = entries.groupBy({ it.categoryId }, { it.amount })
-                    .mapValues { (_, amounts) -> amounts.sum() },
+                totalAmount = Money.centsToYuan(entries.sumOf { it.amountCents }),
+                byCategory = entries.groupBy({ it.categoryId }, { it.amountCents })
+                    .mapValues { (_, cents) -> Money.centsToYuan(cents.sum()) },
             )
         }
 
         return AnalyticsUiState(
             period = p,
-            barAmounts = amounts.toList(),
+            barAmounts = amountCents.map(Money::centsToYuan),
             lineCounts = counts.toList(),
-            pieByCategory = byCat,
+            pieByCategory = byCatCents.mapValues { (_, cents) -> Money.centsToYuan(cents) },
             xLabels = labels,
-            totalAmount = consumptionList.sumOf { it.amount },
+            totalAmount = Money.centsToYuan(consumptionList.sumOf { it.amountCents }),
             totalCount = consumptionList.size,
             insights = emptyList(), // 切换周期清除历史洞察
             subPeriods = subPeriodDetails,

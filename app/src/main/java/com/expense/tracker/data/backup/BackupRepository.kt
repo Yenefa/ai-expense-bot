@@ -1,0 +1,50 @@
+package com.expense.tracker.data.backup
+
+import androidx.room.withTransaction
+import com.expense.tracker.data.db.AppDatabase
+import com.expense.tracker.data.export.BackupData
+import com.expense.tracker.data.export.BackupPreferences
+import com.expense.tracker.data.export.DataExporter
+import com.expense.tracker.data.prefs.UserPrefs
+import kotlinx.coroutines.flow.first
+
+class BackupRepository(
+    private val database: AppDatabase,
+    private val userPrefs: UserPrefs,
+) {
+    suspend fun createBackup(sourceAppVersion: String, exportedAtIso: String): String {
+        val preferences = userPrefs.snapshot.first()
+        val (expenses, chatMessages) = database.withTransaction {
+            database.expenseDao().getAllOnce() to database.chatDao().getAllOnce()
+        }
+        return DataExporter.toBackupJson(
+            expenses = expenses,
+            chatMessages = chatMessages,
+            preferences = BackupPreferences(
+                llmEnabled = preferences.llmEnabled,
+                baseUrl = preferences.baseUrl,
+                model = preferences.model,
+                themeMode = preferences.themeMode,
+            ),
+            sourceAppVersion = sourceAppVersion,
+            exportedAtIso = exportedAtIso,
+        )
+    }
+
+    fun parseBackup(content: String): BackupData = DataExporter.parseBackup(content)
+
+    suspend fun restore(backup: BackupData) {
+        database.withTransaction {
+            database.chatDao().clearAll()
+            database.expenseDao().clearAll()
+            if (backup.expenses.isNotEmpty()) database.expenseDao().insertAll(backup.expenses)
+            if (backup.chatMessages.isNotEmpty()) database.chatDao().insertAll(backup.chatMessages)
+        }
+        userPrefs.restoreNonSecret(
+            llmEnabled = backup.preferences.llmEnabled,
+            baseUrl = backup.preferences.baseUrl,
+            model = backup.preferences.model,
+            themeMode = backup.preferences.themeMode,
+        )
+    }
+}

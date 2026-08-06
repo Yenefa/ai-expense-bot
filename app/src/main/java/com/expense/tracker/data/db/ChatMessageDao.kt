@@ -11,6 +11,9 @@ interface ChatMessageDao {
     @Insert
     suspend fun insert(msg: ChatMessageEntity): Long
 
+    @Insert
+    suspend fun insertAll(messages: List<ChatMessageEntity>): List<Long>
+
     @Update
     suspend fun update(msg: ChatMessageEntity)
 
@@ -19,6 +22,9 @@ interface ChatMessageDao {
 
     @Query("SELECT * FROM chat_messages ORDER BY createdAt ASC")
     suspend fun getAllOnce(): List<ChatMessageEntity>
+
+    @Query("SELECT * FROM (SELECT * FROM chat_messages ORDER BY createdAt DESC, id DESC LIMIT :limit) ORDER BY createdAt ASC, id ASC")
+    suspend fun getRecent(limit: Int): List<ChatMessageEntity>
 
     @Query("SELECT * FROM chat_messages WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): ChatMessageEntity?

@@ -10,6 +10,13 @@ data class ExpenseImportSummary(
     val skippedDuplicates: Int,
 )
 
+data class ExpenseDraft(
+    val amountCents: Long,
+    val categoryId: String,
+    val note: String,
+    val occurredAt: Long,
+)
+
 class ExpenseRepository(private val dao: ExpenseDao) {
 
     /** 活跃记录（给聊天列表、分析、历史用） */
@@ -18,15 +25,31 @@ class ExpenseRepository(private val dao: ExpenseDao) {
     fun observeInRange(fromMillis: Long, toMillis: Long): Flow<List<ExpenseEntity>> =
         dao.observeInRange(fromMillis, toMillis)
 
-    suspend fun add(amount: Double, categoryId: String, note: String, occurredAt: Long): Long {
+    suspend fun addCents(amountCents: Long, categoryId: String, note: String, occurredAt: Long): Long {
+        require(amountCents > 0L) { "金额必须大于 0" }
         val now = System.currentTimeMillis()
         return dao.insert(ExpenseEntity(
-            amount = amount,
+            amountCents = amountCents,
             categoryId = categoryId,
             note = note,
             occurredAt = occurredAt,
             createdAt = now,
         ))
+    }
+
+    /** 单次批量写入，供截图拆单等多笔导入使用。 */
+    suspend fun addAllCents(rows: List<ExpenseDraft>): List<Long> {
+        rows.forEach { require(it.amountCents > 0L) { "金额必须大于 0" } }
+        val createdAt = System.currentTimeMillis()
+        return dao.insertAll(rows.map { row ->
+            ExpenseEntity(
+                amountCents = row.amountCents,
+                categoryId = row.categoryId,
+                note = row.note,
+                occurredAt = row.occurredAt,
+                createdAt = createdAt,
+            )
+        })
     }
 
     /** 硬删除（彻底移除），v2.8 及以前的行为。 */
@@ -61,7 +84,7 @@ class ExpenseRepository(private val dao: ExpenseDao) {
 
         rows.forEach { row ->
             val entity = ExpenseEntity(
-                amount = row.amount,
+                amountCents = row.amountCents,
                 categoryId = row.categoryId,
                 note = row.note,
                 occurredAt = row.occurredAt,
@@ -82,7 +105,7 @@ class ExpenseRepository(private val dao: ExpenseDao) {
     }
 
     private data class ImportKey(
-        val amount: Double,
+        val amountCents: Long,
         val categoryId: String,
         val note: String,
         val occurredAt: Long,
@@ -90,7 +113,7 @@ class ExpenseRepository(private val dao: ExpenseDao) {
     )
 
     private fun ExpenseEntity.importKey() = ImportKey(
-        amount = amount,
+        amountCents = amountCents,
         categoryId = categoryId,
         note = note,
         occurredAt = occurredAt,

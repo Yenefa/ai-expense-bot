@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.model.Category
+import com.expense.tracker.data.model.Money
 import com.expense.tracker.data.repo.ExpenseRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +23,7 @@ data class DailyGroup(
 
 data class DisplayExpense(
     val id: Long,
-    val amount: Double,
+    val amountCents: Long,
     val categoryId: String,
     val categoryEmoji: String,
     val categoryName: String,
@@ -60,7 +61,7 @@ class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
 
     /** 把 DisplayExpense 还原为完整的 ExpenseEntity，传给编辑弹窗。 */
     fun toEntity(d: DisplayExpense): ExpenseEntity = ExpenseEntity(
-        amount = d.amount,
+        amountCents = d.amountCents,
         categoryId = d.categoryId,
         note = d.note,
         occurredAt = d.occurredAt,
@@ -84,12 +85,12 @@ class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
             .map { (date, items) ->
                 DailyGroup(
                     dateLabel = date.format(fmt),
-                    total = items.sumOf { it.amount },
+                    total = Money.centsToYuan(items.sumOf { it.amountCents }),
                     items = items.sortedByDescending { it.occurredAt }.map { e ->
                         val cat = Category.byIdOrOther(e.categoryId)
                         DisplayExpense(
                             id = e.id,
-                            amount = e.amount,
+                            amountCents = e.amountCents,
                             categoryId = e.categoryId,
                             categoryEmoji = cat.emoji,
                             categoryName = cat.displayName,
@@ -103,7 +104,7 @@ class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
             }
 
         val cellsByDate = byDate.mapValues { (date, items) ->
-            DayCell(date = date, total = items.sumOf { it.amount }, count = items.size)
+            DayCell(date = date, total = Money.centsToYuan(items.sumOf { it.amountCents }), count = items.size)
         }
 
         return HistoryUiState(groups = groups, cellsByDate = cellsByDate)

@@ -41,6 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.expense.tracker.ExpenseApp
+import com.expense.tracker.data.export.BackupData
 import com.expense.tracker.data.export.DataExporter
 import com.expense.tracker.data.importer.CsvExpenseImporter
 import com.expense.tracker.data.importer.CsvImportResult
@@ -73,36 +74,43 @@ fun DataExportScreen(onClose: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var busyLabel by remember { mutableStateOf("处理中…") }
     var pendingImport by remember { mutableStateOf<CsvImportResult?>(null) }
+    var pendingBackup by remember { mutableStateOf<BackupData?>(null) }
 
     // 待导出的内容缓存 — 用户点了选项后，等系统文件选择器回调时把内容写入
-    var pendingPayload by remember { mutableStateOf<Pair<String, String>?>(null) } // (mime, content)
+    var pendingPayload by remember { mutableStateOf<String?>(null) }
     var lastSummary by remember { mutableStateOf<String?>(null) }
 
-    val saveLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/octet-stream"),
-    ) { uri: Uri? ->
+    val handleSaveResult: (Uri?) -> Unit = { uri ->
         val payload = pendingPayload
         pendingPayload = null
         if (uri == null || payload == null) {
             busy = false
-            return@rememberLauncherForActivityResult
-        }
-        scope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openOutputStream(uri)?.use { os ->
-                        os.write(payload.second.toByteArray(Charsets.UTF_8))
-                    }
-                }.isSuccess
+        } else {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri)?.use { os ->
+                            os.write(payload.toByteArray(Charsets.UTF_8))
+                        } ?: error("无法打开目标文件")
+                    }.isSuccess
+                }
+                busy = false
+                Toast.makeText(
+                    context,
+                    if (ok) (lastSummary ?: "导出完成") else "导出失败：无法写入文件",
+                    Toast.LENGTH_LONG,
+                ).show()
             }
-            busy = false
-            Toast.makeText(
-                context,
-                if (ok) (lastSummary ?: "导出完成") else "导出失败：无法写入文件",
-                Toast.LENGTH_LONG,
-            ).show()
         }
     }
+
+    val backupSaveLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { handleSaveResult(it) }
+
+    val csvSaveLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv"),
+    ) { handleSaveResult(it) }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -113,9 +121,9 @@ fun DataExportScreen(onClose: () -> Unit) {
         scope.launch {
             val parsed = runCatching {
                 withContext(Dispatchers.IO) {
-                    val csv = context.contentResolver.openInputStream(uri)
-                        ?.bufferedReader(Charsets.UTF_8)
-                        ?.use { it.readText() }
+                    val csv = context.contentResolver.openInputStream(uri)?.use { input ->
+                        input.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                    }
                         ?: error("无法读取所选文件")
                     CsvExpenseImporter.parse(csv)
                 }
@@ -126,6 +134,34 @@ fun DataExportScreen(onClose: () -> Unit) {
                     Toast.makeText(
                         context,
                         "导入失败：${it.message ?: "CSV 格式不正确"}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+        }
+    }
+
+    val backupImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        busy = true
+        busyLabel = "校验完整备份…"
+        scope.launch {
+            val parsed = runCatching {
+                withContext(Dispatchers.IO) {
+                    val content = context.contentResolver.openInputStream(uri)?.use { input ->
+                        input.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                    }
+                        ?: error("无法读取所选文件")
+                    container.backupRepo.parseBackup(content)
+                }
+            }
+            busy = false
+            parsed.onSuccess { pendingBackup = it }
+                .onFailure {
+                    Toast.makeText(
+                        context,
+                        "备份校验失败：${it.message ?: "文件格式不正确"}",
                         Toast.LENGTH_LONG,
                     ).show()
                 }
@@ -154,12 +190,24 @@ fun DataExportScreen(onClose: () -> Unit) {
             Spacer(Modifier.size(16.dp))
 
             Text(
-                "从 CSV 恢复记账，或将本地数据导出为文件。所有操作都在手机本地完成，不会上传云端。",
+                "从完整备份恢复全部本地数据，或用 CSV 导入导出账目。所有操作都在手机本地完成。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = AppColors.TextSecondary,
             )
             Spacer(Modifier.size(20.dp))
 
+            DataOption(
+                emoji = "♻️",
+                title = "恢复完整备份",
+                subtitle = "校验后覆盖当前账目、回收站、聊天和非敏感设置",
+                enabled = !busy,
+                onClick = {
+                    backupImportLauncher.launch(
+                        arrayOf("application/json", "text/json", "text/plain", "application/octet-stream"),
+                    )
+                },
+            )
+            Spacer(Modifier.size(10.dp))
             DataOption(
                 emoji = "📥",
                 title = "导入 CSV",
@@ -175,24 +223,34 @@ fun DataExportScreen(onClose: () -> Unit) {
             DataOption(
                 emoji = "🗂",
                 title = "导出 JSON（完整）",
-                subtitle = "包含全部记账 + 聊天消息，便于跨设备迁移",
+                subtitle = "包含全部账目（含回收站）、聊天和非敏感设置",
                 enabled = !busy,
                 onClick = {
                     busy = true
                     busyLabel = "准备导出…"
                     scope.launch {
-                        val expenses = container.expenseRepo.getAllActiveOnce()
-                        val chats = container.chatRepo.getAllOnce()
                         val nowMs = System.currentTimeMillis()
                         val isoNow = Instant.ofEpochMilli(nowMs).toString()
                         val versionName = runCatching {
                             context.packageManager.getPackageInfo(context.packageName, 0).versionName
                         }.getOrNull() ?: "?"
-                        val json = DataExporter.toJson(expenses, chats, versionName, isoNow)
-                        pendingPayload = "application/json" to json
-                        lastSummary = "已导出 ${expenses.size} 笔记账 / ${chats.size} 条聊天"
-                        val name = "expense-tracker-export-${defaultStamp(nowMs)}.json"
-                        saveLauncher.launch(name)
+                        val result = runCatching {
+                            withContext(Dispatchers.IO) {
+                                container.backupRepo.createBackup(versionName, isoNow)
+                            }
+                        }
+                        result.onSuccess { json ->
+                            pendingPayload = json
+                            lastSummary = "完整备份已导出"
+                            backupSaveLauncher.launch("expense-tracker-backup-${defaultStamp(nowMs)}.json")
+                        }.onFailure {
+                            busy = false
+                            Toast.makeText(
+                                context,
+                                "备份失败：${it.message ?: "无法读取本地数据"}",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
                     }
                 },
             )
@@ -209,10 +267,10 @@ fun DataExportScreen(onClose: () -> Unit) {
                         val expenses = container.expenseRepo.getAllActiveOnce()
                         val nowMs = System.currentTimeMillis()
                         val csv = DataExporter.toCsv(expenses)
-                        pendingPayload = "text/csv" to csv
+                        pendingPayload = csv
                         lastSummary = "已导出 ${expenses.size} 笔记账（CSV）"
                         val name = "expense-tracker-export-${defaultStamp(nowMs)}.csv"
-                        saveLauncher.launch(name)
+                        csvSaveLauncher.launch(name)
                     }
                 },
             )
@@ -228,7 +286,7 @@ fun DataExportScreen(onClose: () -> Unit) {
 
             Spacer(Modifier.weight(1f))
             Text(
-                "提示：API Key 等敏感配置不会被导出。",
+                "提示：完整备份可恢复全部账目、回收站和聊天；API Key 不会写入明文文件。",
                 style = MaterialTheme.typography.labelSmall,
                 color = AppColors.TextMuted,
                 modifier = Modifier.padding(bottom = 8.dp),
@@ -311,6 +369,66 @@ fun DataExportScreen(onClose: () -> Unit) {
                         enabled = !busy,
                         onClick = { pendingImport = null },
                     ) { Text("取消") }
+                },
+            )
+        }
+
+        val backup = pendingBackup
+        if (backup != null) {
+            AlertDialog(
+                onDismissRequest = { if (!busy) pendingBackup = null },
+                title = { Text("确认恢复完整备份") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "${backup.expenses.size} 笔记账（含 ${backup.expenses.count { it.deletedAt != null }} 笔已删除）",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            "${backup.chatMessages.size} 条聊天 · 来源版本 ${backup.sourceAppVersion}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppColors.TextSecondary,
+                        )
+                        Text(
+                            "恢复会覆盖当前全部账目、回收站、聊天和非敏感设置，无法撤销。当前设备上的 API Key 会保留。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !busy,
+                        onClick = {
+                            pendingBackup = null
+                            busy = true
+                            busyLabel = "正在恢复完整备份…"
+                            scope.launch {
+                                val result = runCatching {
+                                    withContext(Dispatchers.IO) { container.backupRepo.restore(backup) }
+                                }
+                                busy = false
+                                result.onSuccess {
+                                    Toast.makeText(
+                                        context,
+                                        "恢复完成：${backup.expenses.size} 笔记账 / ${backup.chatMessages.size} 条聊天",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }.onFailure {
+                                    Toast.makeText(
+                                        context,
+                                        "恢复失败：${it.message ?: "无法写入本地数据"}",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            }
+                        },
+                    ) { Text("覆盖并恢复", color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = {
+                    TextButton(enabled = !busy, onClick = { pendingBackup = null }) {
+                        Text("取消")
+                    }
                 },
             )
         }

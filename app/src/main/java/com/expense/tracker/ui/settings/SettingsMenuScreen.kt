@@ -47,6 +47,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsMenuScreen(
     onClose: () -> Unit,
+    onOpenSubscription: () -> Unit,
     onOpenLlmSettings: () -> Unit,
     onOpenDataExport: () -> Unit = {},
     onOpenDeletedItems: () -> Unit = {},
@@ -88,7 +89,8 @@ fun SettingsMenuScreen(
 
             Spacer(Modifier.size(24.dp))
 
-            MenuRow(emoji = "🧠", title = "LLM 设置", subtitle = "配置 API 地址、密钥和模型", onClick = onOpenLlmSettings)
+            MenuRow(emoji = "✨", title = "AI 会员", subtitle = "兑换 30 天测试订阅", onClick = onOpenSubscription)
+            MenuRow(emoji = "🧠", title = "自定义 LLM", subtitle = "使用自己的 API 地址、密钥和模型", onClick = onOpenLlmSettings)
             MenuRow(emoji = "🌗", title = "深色模式", subtitle = themeMode.label, onClick = { showThemePicker = true })
             MenuRow(emoji = "📊", title = "预算管理", subtitle = "即将上线", onClick = { /* TODO */ })
             MenuRow(emoji = "🔔", title = "智能提醒", subtitle = "即将上线", onClick = { /* TODO */ })
@@ -100,13 +102,13 @@ fun SettingsMenuScreen(
             )
             MenuRow(emoji = "🗑", title = "最近删除", subtitle = "30 天内可恢复的已删除记录", onClick = onOpenDeletedItems)
             MenuRow(emoji = "📖", title = "软件说明书", subtitle = "了解所有功能与交互细节", onClick = onOpenUserManual)
-            MenuRow(emoji = "ℹ️", title = "关于记账助手", subtitle = "v$versionName · ChatGPT 风格 · 本地 SQLite", onClick = {
-                scope.launch { snackbarHost.showSnackbar("记账助手 v$versionName — 对话式智能记账") }
+            MenuRow(emoji = "ℹ️", title = "关于 Y.E cost", subtitle = "v$versionName · ChatGPT 风格 · 本地 SQLite", onClick = {
+                scope.launch { snackbarHost.showSnackbar("Y.E cost v$versionName — 对话式智能记账") }
             })
 
             Spacer(Modifier.weight(1f))
             Text(
-                "© 2026 记账助手 · 数据仅存储在手机本地",
+                "© 2026 Y.E cost · 数据仅存储在手机本地",
                 style = MaterialTheme.typography.labelSmall,
                 color = AppColors.TextMuted,
                 modifier = Modifier.padding(bottom = 16.dp),

@@ -1,4 +1,4 @@
-# 💰 记账助手 — AI 对话式记账 App
+# Y.E cost — AI 对话式记账 App
 
 > ChatGPT 风格 · 本地 SQLite · 大模型辅助 · Android 原生
 
@@ -185,7 +185,7 @@ app/src/main/java/com/expense/tracker/
 | LLM 配置（API Key、模型） | `files/datastore/user_prefs.preferences_pb` | 同上 |
 | 导出的 schema | `app/schemas/com.expense.tracker.data.db.AppDatabase/N.json`（git 跟踪） | - |
 
-Schema 升级策略：`AppDatabase` 启用了 `fallbackToDestructiveMigration()` 作为兜底，但每个版本都导出 schema JSON 到 git，未来真要改 schema 必须写 `Migration` 而不是依赖兜底。
+Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有版本升级显式注册 `Migration`。缺少迁移时应用会拒绝打开数据库，绝不会通过清空用户数据来兜底。
 
 ---
 
@@ -215,7 +215,7 @@ Schema 升级策略：`AppDatabase` 启用了 `fallbackToDestructiveMigration()`
 | **v3.3** | **甜甜圈图交互大改 + 月/年默认展开 + Insights 周期切换** — 单环设计替代内外环，底部可点击标签行(chips)切换日期；月→当天、年→当月自动展开；智核分析页面支持周/月/年切换 |
 | **v3.4** | **抛弃甜甜圈图 + 图表视觉优化** — 甜甜圈图被「emoji + 占比条 + 百分比 + 金额」分行列表替代（按金额降序，spring 动画进度条，一眼看清每个分类）；柱形/折线图高度 220dp→260dp，柱图 Y 轴加 ¥ 前缀；月图 30 天 / 年图 12 月全量压缩显示 |
 | **v3.5** | **🌓 深色模式** - 新增浅色 / 深色 / 跟随系统 三选一（默认跟随系统），设置页「深色模式」入口接通 ThemePickerDialog；AppColors 从静态 object 重构为 @Composable getter 委托 CompositionLocal，185 处调用零改动适配深浅色；所有 TextPrimary 背景按钮 / 卡片 / 对话框反色与层次适配；新增 ErrorBg 语义色 |
-| **v3.6** | **📥 CSV 导入** - 设置页新增「数据导入与导出」入口；支持选择本应用导出的 CSV，导入前预览有效条数与日期范围，自动忽略无效记录并跳过数据库及文件内重复账目 |
+| **v3.6** | **📥 CSV 导入 + 数据安全第一阶段** - CSV 导入支持预览、校验和去重；数据库金额改为整数分并提供无损迁移，移除破坏性迁移兜底；完整 JSON 可恢复账目（含回收站）、聊天和非敏感设置；永久删除增加二次确认 |
 
 ---
 
@@ -224,7 +224,7 @@ Schema 升级策略：`AppDatabase` 启用了 `fallbackToDestructiveMigration()`
 Issue / PR 欢迎。提 Issue 时请附：
 - 触发步骤
 - 期望行为 vs 实际行为
-- App 版本（设置 → 关于记账助手 里能看到）
+- App 版本（设置 → 关于 Y.E cost 里能看到）
 - 必要时附录屏 / 日志
 
 ---
