@@ -99,6 +99,8 @@ dependencies {
 
     // On-device Chinese OCR for payment bill screenshots (model bundled in APK)
     implementation("com.google.mlkit:text-recognition-chinese:16.0.0")
+    // Latin OCR for mixed-language / English receipts (parallel recognizer)
+    implementation("com.google.mlkit:text-recognition:16.0.0")
 
     // Charts
     implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")

@@ -343,9 +343,34 @@ private fun readBitmap(context: Context, uri: Uri): Bitmap {
         sampleSize *= 2
     }
     val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-    return context.contentResolver.openInputStream(uri)?.use { input ->
+    val decoded = context.contentResolver.openInputStream(uri)?.use { input ->
         BitmapFactory.decodeStream(input, null, options)
     } ?: error("无法解码图片")
+
+    return applyExifRotation(context, uri, decoded)
+}
+
+/** 部分平台分享/云相册的图片带 EXIF 方向信息，不旋转会导致文字横置、OCR 读不出。 */
+private fun applyExifRotation(context: Context, uri: Uri, bitmap: Bitmap): Bitmap {
+    val orientation = context.contentResolver.openInputStream(uri)?.use { input ->
+        runCatching { android.media.ExifInterface(input) }
+            .getOrNull()
+            ?.getAttributeInt(
+                android.media.ExifInterface.TAG_ORIENTATION,
+                android.media.ExifInterface.ORIENTATION_NORMAL,
+            )
+    } ?: android.media.ExifInterface.ORIENTATION_NORMAL
+    val degrees = when (orientation) {
+        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+        else -> 0f
+    }
+    if (degrees == 0f) return bitmap
+    val matrix = android.graphics.Matrix().apply { postRotate(degrees) }
+    val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    if (rotated !== bitmap) bitmap.recycle()
+    return rotated
 }
 
 private const val MAX_OCR_DIMENSION = 8_192
