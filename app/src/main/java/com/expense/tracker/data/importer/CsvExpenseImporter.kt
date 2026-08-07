@@ -91,12 +91,12 @@ object CsvExpenseImporter {
         return CsvImportResult(expenses, issues)
     }
 
-    private data class CsvRecord(
+    internal data class CsvRecord(
         val fields: List<String>,
         val recordNumber: Int,
     )
 
-    private fun parseRecords(csv: String): List<CsvRecord> {
+    internal fun parseRecords(csv: String): List<CsvRecord> {
         val records = mutableListOf<CsvRecord>()
         val fields = mutableListOf<String>()
         val field = StringBuilder()

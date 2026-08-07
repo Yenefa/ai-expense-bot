@@ -45,6 +45,7 @@ import com.expense.tracker.data.export.BackupData
 import com.expense.tracker.data.export.DataExporter
 import com.expense.tracker.data.importer.CsvExpenseImporter
 import com.expense.tracker.data.importer.CsvImportResult
+import com.expense.tracker.data.importer.PlatformCsvImporter
 import com.expense.tracker.ui.theme.AppColors
 import com.expense.tracker.ui.theme.iconBtnShadow
 import com.expense.tracker.ui.theme.softShadow
@@ -122,10 +123,14 @@ fun DataExportScreen(onClose: () -> Unit) {
             val parsed = runCatching {
                 withContext(Dispatchers.IO) {
                     val csv = context.contentResolver.openInputStream(uri)?.use { input ->
-                        input.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                        readCsvText(input)
                     }
                         ?: error("无法读取所选文件")
-                    CsvExpenseImporter.parse(csv)
+                    if (PlatformCsvImporter.looksLikePlatformCsv(csv)) {
+                        PlatformCsvImporter.parse(csv)
+                    } else {
+                        CsvExpenseImporter.parse(csv)
+                    }
                 }
             }
             busy = false
@@ -211,7 +216,7 @@ fun DataExportScreen(onClose: () -> Unit) {
             DataOption(
                 emoji = "📥",
                 title = "导入 CSV",
-                subtitle = "选择本应用导出的 CSV，自动跳过重复账目",
+                subtitle = "支持微信 / 支付宝账单 CSV 与本应用导出 CSV，自动跳过重复账目",
                 enabled = !busy,
                 onClick = {
                     importLauncher.launch(
@@ -479,4 +484,16 @@ private fun defaultStamp(nowMs: Long): String {
 private fun displayDate(timeMs: Long): String {
     val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     return fmt.format(Date(timeMs))
+}
+
+/** 读取 CSV 文本：优先 UTF-8（含 BOM），失败则按 GBK（微信导出常见编码）。 */
+private fun readCsvText(input: java.io.InputStream): String {
+    val bytes = input.readBytes()
+    val utf8 = runCatching {
+        val text = String(bytes, Charsets.UTF_8)
+        if (text.contains('\uFFFD')) throw IllegalArgumentException("not utf8")
+        text
+    }.getOrNull()
+    return utf8?.trimStart('\uFEFF')
+        ?: String(bytes, java.nio.charset.Charset.forName("GBK")).trimStart('\uFEFF')
 }
