@@ -113,4 +113,44 @@ class AppDatabaseMigrationTest {
         }
         db.close()
     }
+
+    @Test fun migration4To5AddsRecurringRulesTableAndKeepsExpenses() {
+        val dbName = "migration-test-4-5"
+        helper.createDatabase(dbName, 4).apply {
+            execSQL(
+                """INSERT INTO expenses
+                    (amountCents, categoryId, note, occurredAt, createdAt, deletedAt, id)
+                    VALUES (3500, 'food', '午饭', 1000, 1000, NULL, 7)
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(
+            dbName,
+            5,
+            true,
+            AppDatabase.MIGRATION_4_5,
+        )
+
+        db.query("SELECT amountCents, categoryId, note, id FROM expenses").use { cursor ->
+            assertThat(cursor.moveToFirst()).isTrue()
+            assertThat(cursor.getLong(0)).isEqualTo(3_500L)
+            assertThat(cursor.getString(1)).isEqualTo("food")
+            assertThat(cursor.getLong(3)).isEqualTo(7L)
+        }
+        // 新表存在且可插入
+        db.execSQL(
+            """INSERT INTO recurring_rules
+                (amountCents, categoryId, note, periodType, dayOfMonth, dayOfWeek, monthOfYear,
+                 nextDueAt, enabled, createdAt, id)
+                VALUES (120000, 'housing', '房租', 'MONTHLY', 1, 1, 1, 2000, 1, 2000, 1)
+            """.trimIndent(),
+        )
+        db.query("SELECT COUNT(*) FROM recurring_rules").use { cursor ->
+            assertThat(cursor.moveToFirst()).isTrue()
+            assertThat(cursor.getLong(0)).isEqualTo(1L)
+        }
+        db.close()
+    }
 }

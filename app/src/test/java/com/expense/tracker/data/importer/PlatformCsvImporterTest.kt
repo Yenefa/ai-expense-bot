@@ -62,6 +62,27 @@ class PlatformCsvImporterTest {
     }
 
     @Test
+    fun alipayRefundAndClosedAndFailedStatesAreAllSkipped() {
+        val csv = """
+            \uFEFF交易号,商家订单号,交易创建时间,付款时间,最近修改时间,交易来源地,类型,交易对方,商品名称,金额（元）,收/支,交易状态,服务费（元）,成功退款（元）,备注
+            2026080622001412345680,2026080610003,2026-08-06 10:00:00,2026-08-06 10:00:01,2026-08-06 10:00:02,手机客户端,即时到账交易,蜜雪冰城,柠檬水,8.00,支出,退款成功,0.00,8.00,
+            2026080622001412345681,2026080610004,2026-08-06 11:00:00,2026-08-06 11:00:01,2026-08-06 11:00:02,手机客户端,即时到账交易,某某店铺,商品,30.00,支出,交易关闭,0.00,0.00,
+            2026080622001412345682,2026080610005,2026-08-06 12:00:00,2026-08-06 12:00:01,2026-08-06 12:00:02,手机客户端,即时到账交易,某某店铺,商品,99.00,支出,交易失败,0.00,0.00,
+            2026080622001412345683,2026080610006,2026-08-06 13:00:00,2026-08-06 13:00:01,2026-08-06 13:00:02,手机客户端,即时到账交易,瑞幸咖啡,拿铁,19.90,支出,交易成功,0.00,0.00,
+        """.trimIndent()
+
+        val result = PlatformCsvImporter.parse(csv)
+
+        assertThat(result.expenses).hasSize(1)
+        assertThat(result.expenses[0].amountCents).isEqualTo(1_990L)
+        assertThat(result.expenses[0].categoryId).isEqualTo("food")
+        val messages = result.issues.joinToString { it.message }
+        assertThat(messages).contains("退款")
+        assertThat(messages).contains("交易关闭")
+        assertThat(messages).contains("交易失败")
+    }
+
+    @Test
     fun detectRecognizesPlatformHeaders() {
         assertThat(PlatformCsvImporter.looksLikePlatformCsv("交易时间,交易类型,交易对方,商品,收/支,金额(元)"))
             .isTrue()

@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Y.E cost</string>
     <string name="brand_slogan">记下日常，看见生活</string>
+    <string name="widget_description">本月支出与预算进度</string>
 </resources>
+

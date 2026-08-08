@@ -52,6 +52,9 @@ fun SettingsMenuScreen(
     onOpenDataExport: () -> Unit = {},
     onOpenDeletedItems: () -> Unit = {},
     onOpenUserManual: () -> Unit = {},
+    onOpenBudget: () -> Unit = {},
+    onOpenReminder: () -> Unit = {},
+    onOpenRecurring: () -> Unit = {},
     prefs: UserPrefs,
 ) {
     val snackbarHost = remember { SnackbarHostState() }
@@ -92,8 +95,9 @@ fun SettingsMenuScreen(
             MenuRow(emoji = "✨", title = "AI 会员", subtitle = "兑换 30 天测试订阅", onClick = onOpenSubscription)
             MenuRow(emoji = "🧠", title = "自定义 LLM", subtitle = "使用自己的 API 地址、密钥和模型", onClick = onOpenLlmSettings)
             MenuRow(emoji = "🌗", title = "深色模式", subtitle = themeMode.label, onClick = { showThemePicker = true })
-            MenuRow(emoji = "📊", title = "预算管理", subtitle = "即将上线", onClick = { /* TODO */ })
-            MenuRow(emoji = "🔔", title = "智能提醒", subtitle = "即将上线", onClick = { /* TODO */ })
+            MenuRow(emoji = "📊", title = "预算管理", subtitle = "月度/分类预算 · 90% 预警与超支提醒", onClick = onOpenBudget)
+            MenuRow(emoji = "🔔", title = "智能提醒", subtitle = "每日补记提醒 · 通知栏提醒", onClick = onOpenReminder)
+            MenuRow(emoji = "🔁", title = "周期账单", subtitle = "房租 / 订阅 / 工资自动生成", onClick = onOpenRecurring)
             MenuRow(
                 emoji = "📁",
                 title = "数据导入与导出",

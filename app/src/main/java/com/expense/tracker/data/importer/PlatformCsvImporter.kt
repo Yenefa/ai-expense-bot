@@ -136,17 +136,22 @@ object PlatformCsvImporter {
         val direction = field(record, idx, "收/支")
         val amountText = field(record, idx, "金额（元）")
         val status = field(record, idx, "交易状态")
+        val refunded = field(record, idx, "成功退款（元）")
 
-        if (status.isNotBlank() && !status.contains("成功") && !status.contains("交易关闭") && !status.contains("已退款")) {
-            issues += CsvImportIssue(line, "状态为「$status」，已跳过")
-            return
-        }
-        if (tradeType.contains("退款")) {
+        if (tradeType.contains("退款") || status.contains("退款")) {
             issues += CsvImportIssue(line, "退款交易「$counterparty」已跳过")
             return
         }
         if (direction.contains("收入")) {
             issues += CsvImportIssue(line, "收入「$counterparty ¥$amountText」已跳过（暂只支持支出）")
+            return
+        }
+        if (refunded.isNotBlank() && parseAmount(refunded)?.let { it > 0L } == true) {
+            issues += CsvImportIssue(line, "含成功退款「$counterparty ¥$refunded」，已跳过")
+            return
+        }
+        if (status.isNotBlank() && !isAlipaySuccess(status)) {
+            issues += CsvImportIssue(line, "状态为「$status」，已跳过")
             return
         }
         val occurredAt = parseDateTime(timeText) ?: now
@@ -166,6 +171,14 @@ object PlatformCsvImporter {
     }
 
     // === 字段读取（宽容匹配：全角/半角括号、别名） ===
+
+    /** 支付宝状态白名单：只认纯成功；退款成功/关闭/失败都不算支出。 */
+    private fun isAlipaySuccess(status: String): Boolean {
+        val normalized = status.trim().replace(" ", "")
+        return normalized == "交易成功" ||
+            normalized == "支付成功" ||
+            (normalized.contains("成功") && !normalized.contains("退款"))
+    }
 
     private fun field(record: CsvExpenseImporter.CsvRecord, idx: Map<String, Int>, name: String): String {
         val key = idx.keys.firstOrNull { normalize(it).contains(normalize(name)) }

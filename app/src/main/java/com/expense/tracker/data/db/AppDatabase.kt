@@ -20,13 +20,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * 缺少 Migration 时必须启动失败，绝不能用清空用户数据来换取启动成功。
  */
 @Database(
-    entities = [ExpenseEntity::class, ChatMessageEntity::class],
-    version = 4,
+    entities = [ExpenseEntity::class, ChatMessageEntity::class, RecurringRuleEntity::class],
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun chatDao(): ChatMessageDao
+    abstract fun recurringRuleDao(): RecurringRuleDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -72,13 +73,34 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v4 → v5：周期账单规则表（房租/订阅/工资等自动生成）。 */
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `recurring_rules` (
+                        `amountCents` INTEGER NOT NULL,
+                        `categoryId` TEXT NOT NULL,
+                        `note` TEXT NOT NULL,
+                        `periodType` TEXT NOT NULL,
+                        `dayOfMonth` INTEGER NOT NULL,
+                        `dayOfWeek` INTEGER NOT NULL,
+                        `monthOfYear` INTEGER NOT NULL,
+                        `nextDueAt` INTEGER NOT NULL,
+                        `enabled` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+                    )""".trimIndent(),
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "expense.db",
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build().also { instance = it }
         }
     }

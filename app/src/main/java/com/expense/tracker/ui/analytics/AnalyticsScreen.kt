@@ -41,6 +41,7 @@ import com.expense.tracker.ui.theme.softShadow
 @Composable
 fun AnalyticsScreen(
     vm: AnalyticsViewModel,
+    budgetOverviewVm: com.expense.tracker.ui.budget.BudgetOverviewViewModel? = null,
     onBack: () -> Unit,
     onOpenInsights: () -> Unit,
 ) {
@@ -92,6 +93,15 @@ fun AnalyticsScreen(
             ) {
                 Text("🧠 智核分析")
             }
+        }
+
+        // 本月预算卡片（设置了预算才显示）
+        if (budgetOverviewVm != null) {
+            Spacer(Modifier.height(16.dp))
+            com.expense.tracker.ui.budget.BudgetCard(
+                vm = budgetOverviewVm,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
         }
 
         // 汇总卡片

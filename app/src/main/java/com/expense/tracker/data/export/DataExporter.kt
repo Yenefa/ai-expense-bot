@@ -2,6 +2,7 @@ package com.expense.tracker.data.export
 
 import com.expense.tracker.data.db.ChatMessageEntity
 import com.expense.tracker.data.db.ExpenseEntity
+import com.expense.tracker.data.db.RecurringRuleEntity
 import com.expense.tracker.data.db.toExpenseIdsCsvOrNull
 import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.model.Money
@@ -32,6 +33,7 @@ data class BackupData(
     val expenses: List<ExpenseEntity>,
     val chatMessages: List<ChatMessageEntity>,
     val preferences: BackupPreferences,
+    val recurringRules: List<RecurringRuleEntity> = emptyList(),
 )
 
 /** Versioned JSON backup codec plus the existing spreadsheet-oriented CSV export. */
@@ -52,6 +54,22 @@ object DataExporter {
         val expenses: List<ExpenseDto>,
         val chatMessages: List<ChatMessageDto>,
         val preferences: PreferencesDto,
+        val recurringRules: List<RecurringRuleDto> = emptyList(),
+    )
+
+    @Serializable
+    private data class RecurringRuleDto(
+        val id: Long,
+        val amountCents: Long,
+        val categoryId: String,
+        val note: String,
+        val periodType: String,
+        val dayOfMonth: Int,
+        val dayOfWeek: Int,
+        val monthOfYear: Int,
+        val nextDueAt: Long,
+        val enabled: Boolean,
+        val createdAt: Long,
     )
 
     @Serializable
@@ -107,6 +125,7 @@ object DataExporter {
         preferences: BackupPreferences,
         sourceAppVersion: String,
         exportedAtIso: String,
+        recurringRules: List<RecurringRuleEntity> = emptyList(),
     ): String {
         val data = BackupData(
             formatVersion = CURRENT_FORMAT_VERSION,
@@ -115,6 +134,7 @@ object DataExporter {
             expenses = expenses,
             chatMessages = chatMessages,
             preferences = preferences,
+            recurringRules = recurringRules,
         )
         validate(data)
         return json.encodeToString(data.toEnvelope())
@@ -203,6 +223,21 @@ object DataExporter {
             preferences.model,
             preferences.themeMode.name,
         ),
+        recurringRules = recurringRules.map {
+            RecurringRuleDto(
+                id = it.id,
+                amountCents = it.amountCents,
+                categoryId = it.categoryId,
+                note = it.note,
+                periodType = it.periodType,
+                dayOfMonth = it.dayOfMonth,
+                dayOfWeek = it.dayOfWeek,
+                monthOfYear = it.monthOfYear,
+                nextDueAt = it.nextDueAt,
+                enabled = it.enabled,
+                createdAt = it.createdAt,
+            )
+        },
     )
 
     private fun BackupEnvelope.toBackupData() = BackupData(
@@ -234,6 +269,21 @@ object DataExporter {
             themeMode = runCatching { ThemeMode.valueOf(preferences.themeMode) }
                 .getOrElse { throw BackupFormatException("主题设置无效") },
         ),
+        recurringRules = recurringRules.map {
+            RecurringRuleEntity(
+                amountCents = it.amountCents,
+                categoryId = it.categoryId,
+                note = it.note,
+                periodType = it.periodType,
+                dayOfMonth = it.dayOfMonth,
+                dayOfWeek = it.dayOfWeek,
+                monthOfYear = it.monthOfYear,
+                nextDueAt = it.nextDueAt,
+                enabled = it.enabled,
+                createdAt = it.createdAt,
+                id = it.id,
+            )
+        },
     )
 
     private fun LegacyEnvelope.toBackupData() = BackupData(

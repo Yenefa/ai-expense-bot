@@ -3,9 +3,16 @@ package com.expense.tracker
 import android.content.Context
 import com.expense.tracker.data.db.AppDatabase
 import com.expense.tracker.data.backup.BackupRepository
+import com.expense.tracker.data.budget.BudgetCalculator
+import com.expense.tracker.data.budget.BudgetPrefs
+import com.expense.tracker.data.budget.BudgetStatus
+import com.expense.tracker.data.model.Money
 import com.expense.tracker.data.prefs.UserPrefs
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
+import com.expense.tracker.data.reminder.ReminderPrefs
+import com.expense.tracker.data.recurring.RecurringGenerator
 import com.expense.tracker.data.subscription.SubscriptionPrefs
+import com.expense.tracker.data.db.RecurringRuleDao
 import com.expense.tracker.data.repo.ChatRepository
 import com.expense.tracker.data.repo.ExpenseRepository
 import com.expense.tracker.data.repo.LlmMutationApplier
@@ -21,6 +28,9 @@ import com.expense.tracker.llm.AiAccessResolver
 import com.expense.tracker.ocr.MlKitOcrRecognizer
 import com.expense.tracker.ocr.OcrRecognizer
 import com.expense.tracker.ui.chat.LlmResult
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlinx.coroutines.flow.first
 
 class AppContainer(context: Context) {
     private val appCtx = context.applicationContext
@@ -28,6 +38,9 @@ class AppContainer(context: Context) {
     val db: AppDatabase by lazy { AppDatabase.get(appCtx) }
     val userPrefs: UserPrefs by lazy { UserPrefs.fromContext(appCtx) }
     val subscriptionPrefs: SubscriptionPrefs by lazy { SubscriptionPrefs.fromContext(appCtx) }
+    val budgetPrefs: BudgetPrefs by lazy { BudgetPrefs.fromContext(appCtx) }
+    val reminderPrefs: ReminderPrefs by lazy { ReminderPrefs.fromContext(appCtx) }
+    val recurringDao: RecurringRuleDao by lazy { db.recurringRuleDao() }
     val expenseRepo: ExpenseRepository by lazy { ExpenseRepository(db.expenseDao()) }
     val chatRepo: ChatRepository by lazy { ChatRepository(db.chatDao()) }
     val backupRepo: BackupRepository by lazy { BackupRepository(db, userPrefs) }
@@ -69,10 +82,41 @@ class AppContainer(context: Context) {
         importFromBillText(llmClient, config, ocrText)
     }
 
-    /** 对话 LLM：先生成安全计划；多笔、修改和删除必须经 UI 确认后才执行。 */
+    /** 周期账单到期检查：App 启动与每日提醒时调用。 */
+    val recurringRunner: suspend () -> Int = {
+        RecurringGenerator.runOnce(recurringDao, expenseRepo)
+    }
+
+    /** 对话 LLM：先生成安全计划；仅删除需 UI 确认。 */
     val llmHandler: suspend (String, UserPrefsSnapshot) -> LlmResult = chatLlmCoordinator::submit
     val llmConfirmationHandler: suspend (String) -> LlmResult = chatLlmCoordinator::confirm
     val llmCancellationHandler: (String) -> Unit = { chatLlmCoordinator.cancel(it) }
+
+    /** 记账后的预算预警文案（达到 90% 或超支时非空）。 */
+    val budgetWarningProvider: suspend () -> String? = suspend {
+        val budget = budgetPrefs.snapshot.first()
+        val monthStart = LocalDate.now(ZoneId.systemDefault()).withDayOfMonth(1)
+            .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val list = expenseRepo.observeInRange(monthStart, Long.MAX_VALUE).first()
+        val spentByCategory = list
+            .filter { it.deletedAt == null }
+            .groupBy { it.categoryId }
+            .mapValues { (_, items) -> items.sumOf { it.amountCents } }
+        val overview = BudgetCalculator.overview(
+            monthlyLimitCents = budget.monthlyLimitCents,
+            categoryLimitsCents = budget.categoryLimitsCents,
+            monthlySpentByCategory = spentByCategory,
+        )
+        val monthly = overview.monthly
+        when {
+            monthly == null -> null
+            monthly.status == BudgetStatus.WARN ->
+                "⚠️ 本月已用 ¥${Money.formatYuan(monthly.amountCents)}，达到预算 ${(monthly.percent * 100).toInt()}%，注意控制。"
+            monthly.status == BudgetStatus.OVER ->
+                "⚠️ 本月已超支 ¥${Money.formatYuan(monthly.amountCents - monthly.limitCents)}（预算 ¥${Money.formatYuan(monthly.limitCents)}）。"
+            else -> null
+        }
+    }
 
     /** 智核分析：发送当前周期的消费数据提示词，返回洞察列表。 */
     val analyticsAnalyzer: suspend (String, UserPrefsSnapshot) -> List<String> = { prompt, prefs ->

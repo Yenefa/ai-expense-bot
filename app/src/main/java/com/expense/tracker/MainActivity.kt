@@ -37,6 +37,10 @@ import com.expense.tracker.ui.analytics.AnalyticsViewModel
 import com.expense.tracker.ui.analytics.InsightsScreen
 import com.expense.tracker.ui.billimport.BillImportScreen
 import com.expense.tracker.ui.billimport.BillImportViewModel
+import com.expense.tracker.ui.budget.BudgetScreen
+import com.expense.tracker.ui.budget.BudgetViewModel
+import com.expense.tracker.ui.budget.BudgetOverviewViewModel
+import com.expense.tracker.ui.recurring.RecurringViewModel
 import com.expense.tracker.ui.chat.ChatScreen
 import com.expense.tracker.ui.chat.ChatViewModel
 import com.expense.tracker.ui.history.HistoryScreen
@@ -68,6 +72,7 @@ class MainActivity : ComponentActivity() {
                 llmHandler = container.llmHandler,
                 confirmationHandler = container.llmConfirmationHandler,
                 cancellationHandler = container.llmCancellationHandler,
+                budgetWarningProvider = container.budgetWarningProvider,
             ) as T
         }
     }
@@ -121,11 +126,43 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val budgetVm: BudgetViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                BudgetViewModel(prefs = container.budgetPrefs) as T
+        }
+    }
+
+    private val budgetOverviewVm: BudgetOverviewViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                BudgetOverviewViewModel(
+                    budgetPrefs = container.budgetPrefs,
+                    repo = container.expenseRepo,
+                ) as T
+        }
+    }
+
+    private val recurringVm: RecurringViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                RecurringViewModel(dao = container.recurringDao) as T
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 回到前台时刷新桌面组件（记账后立即反映）
+        runCatching { com.expense.tracker.widget.ExpenseWidgetProvider.requestRefresh(this) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        setContent {
-            var showBrandSplash by remember { mutableStateOf(savedInstanceState == null) }
+        setContent {            var showBrandSplash by remember { mutableStateOf(savedInstanceState == null) }
             val splashAlpha = remember { Animatable(1f) }
             LaunchedEffect(showBrandSplash) {
                 if (showBrandSplash) {
@@ -207,6 +244,7 @@ class MainActivity : ComponentActivity() {
                             )
                             Screen.Analytics -> AnalyticsScreen(
                                 vm = analyticsVm,
+                                budgetOverviewVm = budgetOverviewVm,
                                 onBack = { screen = Screen.Chat },
                                 onOpenInsights = { subScreen = SubScreen.Insights },
                             )
@@ -218,6 +256,9 @@ class MainActivity : ComponentActivity() {
                                 onClose = { screen = Screen.Chat },
                                 onOpenSubscription = { subScreen = SubScreen.Subscription },
                                 onOpenLlmSettings = { subScreen = SubScreen.LlmSettings },
+                                onOpenBudget = { subScreen = SubScreen.Budget },
+                                onOpenReminder = { subScreen = SubScreen.Reminder },
+                                onOpenRecurring = { subScreen = SubScreen.Recurring },
                                 onOpenDataExport = { subScreen = SubScreen.DataExport },
                                 onOpenDeletedItems = { subScreen = SubScreen.DeletedItems },
                                 onOpenUserManual = { subScreen = SubScreen.UserManual },
@@ -239,6 +280,60 @@ class MainActivity : ComponentActivity() {
                     ) {
                         SubscriptionScreen(
                             vm = subscriptionVm,
+                            onBack = { subScreen = null },
+                        )
+                    }
+
+                    // 预算管理 sub-screen 从右侧滑入覆盖
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.Budget,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        BudgetScreen(
+                            vm = budgetVm,
+                            onBack = { subScreen = null },
+                        )
+                    }
+
+                    // 记账提醒 sub-screen 从右侧滑入覆盖
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.Reminder,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        com.expense.tracker.ui.reminder.ReminderScreen(
+                            prefs = container.reminderPrefs,
+                            onBack = { subScreen = null },
+                        )
+                    }
+
+                    // 周期账单 sub-screen 从右侧滑入覆盖
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.Recurring,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        com.expense.tracker.ui.recurring.RecurringScreen(
+                            vm = recurringVm,
                             onBack = { subScreen = null },
                         )
                     }
@@ -364,6 +459,9 @@ class MainActivity : ComponentActivity() {
 
     private enum class SubScreen {
         Subscription,
+        Budget,
+        Reminder,
+        Recurring,
         LlmSettings,
         DataExport,
         DeletedItems,

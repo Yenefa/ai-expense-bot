@@ -45,6 +45,7 @@ class ChatViewModel(
     private val llmHandler: LlmHandler,
     private val confirmationHandler: LlmConfirmationHandler = { LlmResult.Error("确认已失效") },
     private val cancellationHandler: LlmCancellationHandler = {},
+    private val budgetWarningProvider: suspend () -> String? = { null },
 ) : ViewModel() {
 
     private val internal = MutableStateFlow(ChatUiState())
@@ -95,6 +96,9 @@ class ChatViewModel(
                 text = "✅ 已记录 · ${cat.emoji} ${cat.displayName} ¥$formattedAmount$noteSuffix",
                 relatedExpenseId = expenseId,
             )
+            runCatching { budgetWarningProvider() }.getOrNull()?.let { warning ->
+                chatRepo.appendAssistant(text = warning)
+            }
             internal.update { it.copy(sending = false) }
         }
     }

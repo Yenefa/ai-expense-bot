@@ -14,8 +14,12 @@ class BackupRepository(
 ) {
     suspend fun createBackup(sourceAppVersion: String, exportedAtIso: String): String {
         val preferences = userPrefs.snapshot.first()
-        val (expenses, chatMessages) = database.withTransaction {
-            database.expenseDao().getAllOnce() to database.chatDao().getAllOnce()
+        val (expenses, chatMessages, recurringRules) = database.withTransaction {
+            Triple(
+                database.expenseDao().getAllOnce(),
+                database.chatDao().getAllOnce(),
+                database.recurringRuleDao().observeAll().first(),
+            )
         }
         return DataExporter.toBackupJson(
             expenses = expenses,
@@ -28,6 +32,7 @@ class BackupRepository(
             ),
             sourceAppVersion = sourceAppVersion,
             exportedAtIso = exportedAtIso,
+            recurringRules = recurringRules,
         )
     }
 
@@ -39,6 +44,10 @@ class BackupRepository(
             database.expenseDao().clearAll()
             if (backup.expenses.isNotEmpty()) database.expenseDao().insertAll(backup.expenses)
             if (backup.chatMessages.isNotEmpty()) database.chatDao().insertAll(backup.chatMessages)
+            database.recurringRuleDao().clearAll()
+            if (backup.recurringRules.isNotEmpty()) {
+                database.recurringRuleDao().insertAll(backup.recurringRules)
+            }
         }
         userPrefs.restoreNonSecret(
             llmEnabled = backup.preferences.llmEnabled,
