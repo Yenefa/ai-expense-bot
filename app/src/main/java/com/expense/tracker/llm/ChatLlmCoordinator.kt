@@ -54,9 +54,6 @@ class ChatLlmCoordinator(
                 zone = zone,
             )
         }
-        val sourceExpenseHints = interpreted.expenseHints
-            .takeIf { interpreted.hasCompleteMultiDateHints }
-            .orEmpty()
         val lastBatchIds = priorMessages
             .asReversed()
             .firstOrNull { it.role == "assistant" && it.relatedExpenseIds().isNotEmpty() }
@@ -81,6 +78,9 @@ class ChatLlmCoordinator(
         )
         val parsed = LlmResponseParser.parse(raw)
         PrivacySafeLog.llmResponseParsed(parsed.expenses.size, parsed.actions.size)
+        val sourceExpenseHints = interpreted.expenseHints
+            .takeIf { parsed.expenses.isNotEmpty() && interpreted.hasCompleteExpenseHints }
+            .orEmpty()
         val plan = LlmMutationPlanner.create(
             result = parsed,
             nowMillis = now,

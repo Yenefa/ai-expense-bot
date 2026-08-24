@@ -3,6 +3,7 @@ package com.expense.tracker.llm
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 import org.junit.Test
 
@@ -33,7 +34,36 @@ class ExpenseTextInterpreterTest {
             LocalDate.of(2026, 8, 1),
             LocalDate.of(2026, 8, 1),
         ).inOrder()
+        assertThat(interpreted.expenseHints.map { it.time }).containsExactly(
+            LocalTime.of(22, 1),
+            LocalTime.of(18, 58),
+            null,
+            LocalTime.of(16, 0),
+            LocalTime.of(15, 0),
+            LocalTime.of(19, 0),
+            LocalTime.of(13, 0),
+            LocalTime.of(11, 30),
+            LocalTime.of(11, 0),
+        ).inOrder()
         assertThat(interpreted.hasMultipleDates).isTrue()
+        assertThat(interpreted.hasCompleteExpenseHints).isTrue()
+    }
+
+    @Test fun singleDateBatchAlsoProducesCompleteDeterministicHints() {
+        val interpreted = ExpenseTextInterpreter.interpret(
+            "8月1日早上8点早餐6元，中午12点午饭13元",
+            now,
+            zone,
+        )
+
+        assertThat(interpreted.expenseHints.map { it.amountCents })
+            .containsExactly(600L, 1_300L).inOrder()
+        assertThat(interpreted.expenseHints.map { it.date })
+            .containsExactly(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 1)).inOrder()
+        assertThat(interpreted.expenseHints.map { it.time })
+            .containsExactly(LocalTime.of(8, 0), LocalTime.of(12, 0)).inOrder()
+        assertThat(interpreted.hasMultipleDates).isFalse()
+        assertThat(interpreted.hasCompleteExpenseHints).isTrue()
     }
 
     @Test fun ordinaryAfternoonDecimalAmountIsNotRewrittenWithoutTheVoiceShorthandShape() {
@@ -41,6 +71,16 @@ class ExpenseTextInterpreterTest {
 
         assertThat(interpreted.normalizedText).isEqualTo("8月1号下午买水16.6元")
         assertThat(interpreted.expenseHints.single().amountCents).isEqualTo(1_660L)
+    }
+
+    @Test fun invalidLaterClockDoesNotEraseAnEarlierValidClockInTheSameExpense() {
+        val interpreted = ExpenseTextInterpreter.interpret(
+            "8月1日上午8点，口误晚上25点，早餐6元",
+            now,
+            zone,
+        )
+
+        assertThat(interpreted.expenseHints.single().time).isEqualTo(LocalTime.of(8, 0))
     }
 
     companion object {

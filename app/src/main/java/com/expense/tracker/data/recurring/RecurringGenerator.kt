@@ -3,7 +3,6 @@ package com.expense.tracker.data.recurring
 import com.expense.tracker.data.db.RecurringPeriodType
 import com.expense.tracker.data.db.RecurringRuleEntity
 import com.expense.tracker.data.repo.ExpenseRepository
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -22,12 +21,12 @@ object RecurringGenerator {
         nowMillis: Long,
         zone: ZoneId = ZoneId.systemDefault(),
     ): Long {
-        val current = LocalDate.ofInstant(Instant.ofEpochMilli(currentDueMillis), zone)
+        val current = java.time.Instant.ofEpochMilli(currentDueMillis).atZone(zone).toLocalDate()
             .atStartOfDay(zone).toInstant().toEpochMilli()
         if (current > nowMillis) return current
 
         val period = rule.period
-        var due = LocalDate.ofInstant(Instant.ofEpochMilli(currentDueMillis), zone)
+        var due = java.time.Instant.ofEpochMilli(currentDueMillis).atZone(zone).toLocalDate()
         var guard = 0
         while (guard < MAX_ADVANCE_STEPS) {
             due = advance(period, due, rule)

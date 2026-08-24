@@ -24,8 +24,8 @@ android {
         // - versionCode 每次交付 +1，永不回退
         // - versionName 语义化：主版本.次版本.修订（修复=修订+1，新功能=次版本+1）
         // - 每次版本变更必须同步更新 CHANGELOG.md
-        versionCode = 28
-        versionName = "3.7.0"
+        versionCode = 30
+        versionName = "3.7.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",

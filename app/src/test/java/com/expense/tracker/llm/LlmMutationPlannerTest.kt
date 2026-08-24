@@ -7,6 +7,7 @@ import org.junit.Test
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 
 class LlmMutationPlannerTest {
@@ -421,7 +422,7 @@ class LlmMutationPlannerTest {
             .isEqualTo(LocalDateTime.of(2026, 7, 29, 16, 0))
     }
 
-    @Test fun deletesAlwaysRequireConfirmationButEditsDoNot() {
+    @Test fun onlyDeletesRequireConfirmationAndEditsApplyImmediately() {
         val deletePlan = LlmMutationPlanner.create(
             result = LlmParseResult(
                 reply = "候选删除",
@@ -455,6 +456,60 @@ class LlmMutationPlannerTest {
             zone = zone,
         )
         assertThat(editPlan.requiresConfirmation).isFalse()
+    }
+
+    @Test fun exactSourceTimesOverrideWrongModelTimesForEveryAddedExpense() {
+        val plan = LlmMutationPlanner.create(
+            result = LlmParseResult(
+                reply = "候选2笔",
+                expenses = listOf(
+                    ParsedExpense(690L, "drink", "红茶", millis(2026, 8, 2, 9, 9)),
+                    ParsedExpense(1_900L, "food", "炸鸡", millis(2026, 8, 1, 8, 8)),
+                ),
+            ),
+            nowMillis = now,
+            availableRecords = emptyList(),
+            lastBatchIds = emptyList(),
+            currentText = "8月1日晚上10:01红茶6.9元，8月2日中午1点炸鸡19元",
+            targetDate = null,
+            sourceExpenseHints = listOf(
+                SourceExpenseHint(690L, LocalDate.of(2026, 8, 1), LocalTime.of(22, 1)),
+                SourceExpenseHint(1_900L, LocalDate.of(2026, 8, 2), LocalTime.of(13, 0)),
+            ),
+            zone = zone,
+        )
+
+        assertThat(plan.result.expenses.map { localDateTime(it.occurredAtMillis!!) })
+            .containsExactly(
+                LocalDateTime.of(2026, 8, 1, 22, 1),
+                LocalDateTime.of(2026, 8, 2, 13, 0),
+            ).inOrder()
+    }
+
+    @Test fun equalAmountsOnDifferentSourceTimesAreRejectedAsAmbiguous() {
+        val error = assertThrows(MutationSafetyException::class.java) {
+            LlmMutationPlanner.create(
+                result = LlmParseResult(
+                    reply = "候选2笔",
+                    expenses = listOf(
+                        ParsedExpense(1_000L, "food", "晚饭", null),
+                        ParsedExpense(1_000L, "food", "早餐", null),
+                    ),
+                ),
+                nowMillis = now,
+                availableRecords = emptyList(),
+                lastBatchIds = emptyList(),
+                currentText = "8月1日早上8点早餐10元，8月2日晚上8点晚饭10元",
+                targetDate = null,
+                sourceExpenseHints = listOf(
+                    SourceExpenseHint(1_000L, LocalDate.of(2026, 8, 1), LocalTime.of(8, 0)),
+                    SourceExpenseHint(1_000L, LocalDate.of(2026, 8, 2), LocalTime.of(20, 0)),
+                ),
+                zone = zone,
+            )
+        }
+
+        assertThat(error).hasMessageThat().contains("相同金额")
     }
 
 

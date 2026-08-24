@@ -1,10 +1,12 @@
 package com.expense.tracker.llm
 
 import com.expense.tracker.data.db.ExpenseEntity
+import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.model.Money
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class MutationSafetyException(message: String) : IllegalArgumentException(message)
 
@@ -17,6 +19,7 @@ data class MutationPreview(
     val totalCents: Long,
     val sourceDateLabels: List<String>,
     val targetDateLabel: String?,
+    val changeDetails: List<String> = emptyList(),
 )
 
 data class LlmMutationPlan(
@@ -69,6 +72,12 @@ object LlmMutationPlanner {
             if (result.expenses.map { it.amountCents } != sourceExpenseHints.map { it.amountCents }) {
                 throw MutationSafetyException("AI 返回金额或顺序与原文不一致，本次未记录。")
             }
+            val ambiguousEqualAmounts = sourceExpenseHints.groupBy { it.amountCents }.values.any { sameAmount ->
+                sameAmount.size > 1 && sameAmount.map { it.date to it.time }.distinct().size > 1
+            }
+            if (ambiguousEqualAmounts) {
+                throw MutationSafetyException("原文包含跨日期或时间的相同金额，无法安全绑定账目，请拆分后重试。")
+            }
         }
 
         val activeRecords = availableRecords.filter { it.deletedAt == null }
@@ -102,8 +111,11 @@ object LlmMutationPlanner {
 
         val normalizedExpenses = result.expenses.mapIndexed { index, item ->
             val originalMillis = item.occurredAtMillis ?: nowMillis
-            val perExpenseDate = sourceExpenseHints.getOrNull(index)?.date ?: targetDate
+            val sourceHint = sourceExpenseHints.getOrNull(index)
+            val perExpenseDate = sourceHint?.date ?: targetDate
             val occurredAtMillis = when {
+                sourceHint?.time != null -> sourceHint.date.atTime(sourceHint.time)
+                    .atZone(zone).toInstant().toEpochMilli()
                 perExpenseDate != null ->
                     ChineseDateResolver.replaceDateKeepingTime(originalMillis, perExpenseDate, zone)
                 // 用户没提任何时间：模型可能从历史里带出旧日期（如 8 月 1 日），
@@ -195,6 +207,39 @@ object LlmMutationPlanner {
             if (sourceDates.isNotEmpty()) append("；原日期 ${sourceDates.joinToString("、")}")
             if (targetLabel != null) append("；目标日期 $targetLabel")
         }
+        val changeDetails = normalizedActions.map { action ->
+            val original = snapshots.getValue(action.expenseId())
+            fun stateLabel(
+                amountCents: Long,
+                categoryId: String,
+                note: String,
+                occurredAt: Long,
+            ): String {
+                val dateTime = Instant.ofEpochMilli(occurredAt).atZone(zone).toLocalDateTime()
+                    .format(PREVIEW_DATE_TIME)
+                return "#${original.id} $dateTime ${Category.byIdOrOther(categoryId).displayName} " +
+                    "¥${Money.formatYuan(amountCents)}「${note.ifBlank { "无备注" }}」"
+            }
+            val before = stateLabel(
+                original.amountCents,
+                original.categoryId,
+                original.note,
+                original.occurredAt,
+            )
+            when (action) {
+                is ParsedAction.Delete -> "$before → 删除"
+                is ParsedAction.Update -> {
+                    val after = stateLabel(
+                        action.amountCents ?: original.amountCents,
+                        action.categoryId ?: original.categoryId,
+                        action.note ?: original.note,
+                        action.occurredAtMillis ?: original.occurredAt,
+                    )
+                    "$before → $after"
+                }
+                is ParsedAction.Add -> throw MutationSafetyException("不支持 actions 中的新增，本次未执行。")
+            }
+        }
 
         return LlmMutationPlan(
             result = normalized,
@@ -206,8 +251,9 @@ object LlmMutationPlanner {
                 totalCents = totalCents,
                 sourceDateLabels = sourceDates,
                 targetDateLabel = targetLabel,
+                changeDetails = changeDetails,
             ),
-            // 按产品准则：只有删除需要用户确认；批量新增和修改直接执行，不弹确认框。
+            // Product rule: edits apply immediately; only destructive deletion requires approval.
             requiresConfirmation = normalizedActions.any { it is ParsedAction.Delete },
         )
     }
@@ -228,4 +274,5 @@ object LlmMutationPlanner {
         }
 
     private const val MAX_MUTATIONS = 50
+    private val PREVIEW_DATE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 }

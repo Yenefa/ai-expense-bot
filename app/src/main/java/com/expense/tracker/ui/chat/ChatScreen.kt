@@ -21,6 +21,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -173,9 +175,12 @@ fun ChatScreen(
                 onDismissRequest = vm::cancelPending,
                 title = { Text(confirmation.preview.title) },
                 text = {
-                    Column {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
                         Text(confirmation.preview.detail)
-                        Text("请核对笔数和日期；确认前不会修改任何账目。")
+                        confirmation.preview.changeDetails.forEach { detail ->
+                            Text("• $detail")
+                        }
+                        Text("请逐笔核对变更；确认前不会修改任何账目。")
                     }
                 },
                 confirmButton = {

@@ -193,6 +193,71 @@ class ChatLlmCoordinatorTest {
         }
     }
 
+    @Test fun singleDateBatchRejectsAMissingModelExpenseBeforeApplying() = runBlocking {
+        var applyCalls = 0
+        val coordinator = ChatLlmCoordinator(
+            expenseRepository = ExpenseRepository(CoordinatorExpenseDao()),
+            chatRepository = ChatRepository(CoordinatorChatDao()),
+            requestJson = { _, _, _, _ ->
+                """{"reply":"只识别一笔","expenses":[
+                    {"amount":6,"category":"food","note":"早餐","occurred_at":null}
+                ],"actions":[]}""".trimIndent()
+            },
+            applyPlan = {
+                applyCalls++
+                MutationApplyResult(emptyList(), emptyList(), assistantMessageId = 1L)
+            },
+            nowProvider = {
+                LocalDateTime.of(2026, 8, 3, 0, 0)
+                    .atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+            },
+            zone = ZoneId.of("Asia/Shanghai"),
+        )
+
+        val result = coordinator.submit("8月1日早餐6元，午饭13元", prefs())
+
+        assertThat(result).isInstanceOf(LlmResult.Error::class.java)
+        assertThat((result as LlmResult.Error).message).contains("笔数")
+        assertThat(applyCalls).isEqualTo(0)
+    }
+
+    @Test fun explicitDateAndAmountInAnUpdateAppliesImmediately() = runBlocking {
+        val expense = ExpenseEntity(
+            amountCents = 600L,
+            categoryId = "drink",
+            note = "矿泉水",
+            occurredAt = LocalDateTime.of(2026, 8, 2, 16, 0)
+                .atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli(),
+            createdAt = 1L,
+            id = 7L,
+        )
+        var applyCalls = 0
+        val coordinator = ChatLlmCoordinator(
+            expenseRepository = ExpenseRepository(CoordinatorExpenseDao(listOf(expense))),
+            chatRepository = ChatRepository(CoordinatorChatDao()),
+            requestJson = { _, _, _, _ ->
+                """{"reply":"候选修改","expenses":[],"actions":[
+                    {"action":"update","expense_id":7,"amount":20}
+                ]}""".trimIndent()
+            },
+            applyPlan = {
+                applyCalls++
+                MutationApplyResult(listOf(7L), listOf(7L), assistantMessageId = 1L)
+            },
+            nowProvider = {
+                LocalDateTime.of(2026, 8, 3, 0, 0)
+                    .atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+            },
+            zone = ZoneId.of("Asia/Shanghai"),
+            tokenProvider = { "update-1" },
+        )
+
+        val result = coordinator.submit("把8月2日的矿泉水改成20元", prefs())
+
+        assertThat(result).isInstanceOf(LlmResult.Ok::class.java)
+        assertThat(applyCalls).isEqualTo(1)
+    }
+
     private fun prefs() = UserPrefsSnapshot(
         llmEnabled = true,
         baseUrl = "https://example.com/v1",
