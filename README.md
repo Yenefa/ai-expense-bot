@@ -43,8 +43,18 @@
 
 内置提取质量基准（协议见 [docs/expensebench.md](docs/expensebench.md)）：**120 条标注语录 × 6 个桶**（基础 / 相对日期 / 多笔 / 商户 / 口语 / 明确时间），评测金额、分类、日期、商户四个维度的准确率。
 
+**LLM 实测**（qwen3.7 家族，temperature=0、enable_thinking=false，2026-09-06，详见 [docs/expensebench-llm-report.md](docs/expensebench-llm-report.md)）：
+
+| 模型 | 金额 | 分类 | 日期 | 商户 | 整笔全对 | 笔数全对 |
+| --- | --- | --- | --- | --- | --- | --- |
+| qwen3.7-max-2026-06-08 | 100% | 95.7% | 97.8% | 98.0% | 92.8% | 100% |
+| qwen3.7-flash | 100% | 95.7% | 93.5% | 98.0% | 89.1% | 100% |
+| qwen3.7-flash-2026-07-15 | 100% | 95.7% | 92.8% | 100% | 89.1% | 100% |
+
+> 关键发现：金额/笔数 100% 无漏记；思考模式是负优化（长思维链截断 JSON，整笔全对 89.1%→74.6%），结构化记账必须 `enable_thinking=false`。
+
 - 端侧确定性管道报告随单测生成：`docs/expensebench-local-report.md`
-- LLM 评测按需运行（设置 `EXPENSEBENCH_API_KEY` 等环境变量后跑 `LlmExpenseBenchTest`），报告写 `docs/expensebench-llm-report.md`
+- LLM 评测按需运行（设置 `EXPENSEBENCH_API_KEY` 等环境变量后跑 `LlmExpenseBenchTest`），报告按模型分文件写入 `docs/`，带完整复现指纹
 
 ---
 

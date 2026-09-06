@@ -127,3 +127,10 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+// ExpenseBench 评测：EXPENSEBENCH_* 环境变量变化时强制重跑（默认 test 任务对 env 不敏感，会 UP-TO-DATE 跳过）
+tasks.withType<Test>().configureEach {
+    inputs.property("expensebenchModel") { System.getenv("EXPENSEBENCH_MODEL").orEmpty() }
+    inputs.property("expensebenchLimit") { System.getenv("EXPENSEBENCH_LIMIT").orEmpty() }
+    inputs.property("expensebenchConcurrency") { System.getenv("EXPENSEBENCH_CONCURRENCY").orEmpty() }
+}

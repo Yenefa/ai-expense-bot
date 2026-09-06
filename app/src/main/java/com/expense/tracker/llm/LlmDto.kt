@@ -11,6 +11,11 @@ data class ChatCompletionRequest(
     val messages: List<ChatMsg>,
     /** null = 不发送该字段（沿用供应商默认）；评测路径显式传 0.0 以保证可复现。 */
     val temperature: Double? = null,
+    /**
+     * DashScope Qwen3+ 思考模型专用：null = 不发送（沿用供应商默认，会输出长思维链，
+     * 记账这类结构化短任务上延迟不可接受）；false = 显式关闭思考。
+     */
+    @SerialName("enable_thinking") val enableThinking: Boolean? = null,
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
 )
 @Serializable data class ChatMsg(val role: String, val content: String)
