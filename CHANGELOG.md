@@ -5,6 +5,19 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.8.0 (versionCode 31) — 2026-09-06
+
+**Expense Agent v1：从 AI 解析器升级为带工具的智能体**
+
+新增：
+
+- Agent 层（`agent/` 包）：`AgentRouter` 本地确定性意图路由（记账/删改/闲聊 → 原管线；查询 → 工具轮），零成本零延迟
+- 本地工具：`query_expenses`（区间+分类过滤、合计、分类/商户聚合、明细）、`get_budget_status`（月度+分类预算 vs 实际，端侧确定性计算）
+- 查询轮把工具结果注入 system prompt，LLM 只负责组织语言 —— 数字来自本地数据库，不可能被编造；「这个月吃饭花多少」「预算还剩多少」现在能直接在对话里回答
+- 查询轮关闭"虚假记账话术"替换，合法回复（含"已记录 X 笔"）不再被误改
+- ExpenseBench v1：120 条标注数据集（basic / date_relative / multi / merchant / colloquial / explicit_date 六桶）+ 评测器（金额/分类/日期/商户/整笔全对/笔数全对）+ 端侧离线管道报告（`docs/expensebench-local-report.md`）+ LLM 评测入口（`LlmExpenseBenchTest`，设 `EXPENSEBENCH_API_KEY` 等环境变量按需运行，报告写 `docs/expensebench-llm-report.md`）
+- 新增 25 个单元测试（路由/时段/工具/Agent 端到端/评测器），全套 242 个单测通过
+
 ## 3.7.2 (versionCode 30) — 2026-08-13
 
 修正产品规则：AI 修改账目直接执行，只有删除账目需要用户确认。保留 v3.7.1 的单日期金额/笔数校验、逐笔日期时分锁定、桌面组件异步刷新及 Android 8 周期账单兼容修复。

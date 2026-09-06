@@ -77,6 +77,15 @@ class AppContainer(context: Context) {
         )
     }
 
+    /** Expense Agent：查询轮先执行本地工具，再把可信数据注入提示词。 */
+    private val expenseAgent: com.expense.tracker.agent.ExpenseAgent by lazy {
+        val toolContext = com.expense.tracker.agent.AgentToolContext(
+            expenseRepository = expenseRepo,
+            budgetSnapshotProvider = { budgetPrefs.snapshot.first() },
+        )
+        com.expense.tracker.agent.ExpenseAgent(chatLlmCoordinator, toolContext)
+    }
+
     val billImportHandler: suspend (String, UserPrefsSnapshot) -> BillImportResult = { ocrText, prefs ->
         val config = aiAccessResolver.resolve(prefs)
         importFromBillText(llmClient, config, ocrText)
@@ -87,8 +96,8 @@ class AppContainer(context: Context) {
         RecurringGenerator.runOnce(recurringDao, expenseRepo)
     }
 
-    /** 对话 LLM：先生成安全计划；仅删除需 UI 确认。 */
-    val llmHandler: suspend (String, UserPrefsSnapshot) -> LlmResult = chatLlmCoordinator::submit
+    /** 对话 LLM：Agent 先路由意图，记账/闲聊走原管线，查询轮注入本地工具结果。 */
+    val llmHandler: suspend (String, UserPrefsSnapshot) -> LlmResult = expenseAgent::submit
     val llmConfirmationHandler: suspend (String) -> LlmResult = chatLlmCoordinator::confirm
     val llmCancellationHandler: (String) -> Unit = { chatLlmCoordinator.cancel(it) }
 

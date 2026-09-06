@@ -17,6 +17,15 @@ typealias ChatJsonRequest = suspend (
     history: List<ChatMsg>,
 ) -> String
 
+/**
+ * Agent 层注入的单轮上下文：查询轮把本地工具结果拼进 system prompt，
+ * 并放宽"虚假记账话术"替换（查询回复合法地包含"已记录 X 笔"等词）。
+ */
+data class ChatTurnContext(
+    val systemPromptSuffix: String = "",
+    val suppressMutationGuard: Boolean = false,
+)
+
 class ChatLlmCoordinator(
     private val expenseRepository: ExpenseRepository,
     private val chatRepository: ChatRepository,
@@ -30,7 +39,11 @@ class ChatLlmCoordinator(
 
     private val pending = LinkedHashMap<String, PendingPlan>()
 
-    suspend fun submit(text: String, prefs: UserPrefsSnapshot): LlmResult = runCatching {
+    suspend fun submit(
+        text: String,
+        prefs: UserPrefsSnapshot,
+        turnContext: ChatTurnContext = ChatTurnContext(),
+    ): LlmResult = runCatching {
         val now = nowProvider()
         val interpreted = ExpenseTextInterpreter.interpret(text, now, zone)
         val requestText = interpreted.normalizedText
@@ -73,7 +86,7 @@ class ChatLlmCoordinator(
         val raw = requestJson(
             requestText,
             prefs,
-            LlmPrompt.systemPrompt(now, contextRecords, lastBatchIds),
+            LlmPrompt.systemPrompt(now, contextRecords, lastBatchIds) + turnContext.systemPromptSuffix.withLeadingBreak(),
             history,
         )
         val parsed = LlmResponseParser.parse(raw)
@@ -93,7 +106,14 @@ class ChatLlmCoordinator(
         )
 
         when {
-            plan.preview.count == 0 -> LlmResult.Ok(parsed.reply.withoutFalseMutationClaim(), emptyList())
+            plan.preview.count == 0 -> LlmResult.Ok(
+                replyText = if (turnContext.suppressMutationGuard) {
+                    parsed.reply
+                } else {
+                    parsed.reply.withoutFalseMutationClaim()
+                },
+                expenseIds = emptyList(),
+            )
             plan.requiresConfirmation -> {
                 val token = tokenProvider()
                 synchronized(pending) {
@@ -149,6 +169,9 @@ class ChatLlmCoordinator(
         } else {
             this
         }
+
+    private fun String.withLeadingBreak(): String =
+        if (isBlank()) this else "\n$this"
 
     private fun List<com.expense.tracker.data.db.ChatMessageEntity>.dropTrailingCurrentUser(
         currentText: String,

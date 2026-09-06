@@ -1,12 +1,39 @@
-# Y.E cost — AI 对话式记账 App
+# Y.E cost — Privacy-first Personal Finance Agent on Android
 
-> ChatGPT 风格 · 本地 SQLite · 大模型辅助 · Android 原生
+> 面向移动端的隐私优先个人财务智能体 · LLM Agent + Tool Calling · 本地 SQLite · Android 原生
 
 [![Release](https://img.shields.io/github/v/release/sca331613-commits/ai-expense-bot)](../../releases)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin)](https://kotlinlang.org)
 
 一款"像和 AI 聊天一样记账"的 Android 原生 App。所有数据**只存手机本地** SQLite，永不上云。
+
+---
+
+## 🤖 Expense Agent（v3.8+）
+
+不只是一个"LLM 解析器"。v3.8 起 Agent 层在每次对话前先做**本地意图路由**，查询类问题先在端侧执行确定性工具，再让 LLM 组织语言：
+
+```
+自然语言输入
+   ↓
+Agent Router（本地规则路由，零成本零延迟）
+   ├─ 记账 / 删改 → LLM 变更计划管线（原路径：结构化解析 + 逐字段守卫 + 确认门）
+   ├─ 查询 / 统计 → 端侧工具 query_expenses / get_budget_status
+   │                 ↓ 工具结果（合计/分类/商户聚合/预算）注入 system prompt
+   │               LLM 只负责把数字讲成人话 —— 数字来自 Room，不可能被编造
+   └─ 闲聊 → LLM 对话
+```
+
+- 「这个月吃饭花多少」「预算还剩多少」直接在对话里回答，不用翻统计页
+- 查询的数字由端侧确定性计算，LLM 拿到的是聚合结果 —— 隐私优先定位不变
+
+## 📊 ExpenseBench
+
+内置提取质量基准（协议见 [docs/expensebench.md](docs/expensebench.md)）：**120 条标注语录 × 6 个桶**（基础 / 相对日期 / 多笔 / 商户 / 口语 / 明确时间），评测金额、分类、日期、商户四个维度的准确率。
+
+- 端侧确定性管道报告随单测生成：`docs/expensebench-local-report.md`
+- LLM 评测按需运行（设置 `EXPENSEBENCH_API_KEY` 等环境变量后跑 `LlmExpenseBenchTest`），报告写 `docs/expensebench-llm-report.md`
 
 ---
 
@@ -169,6 +196,8 @@ app/src/main/java/com/expense/tracker/
 │   ├── prefs/                   # DataStore 用户偏好
 │   ├── repo/                    # ExpenseRepository / ChatRepository
 │   └── model/                   # Category / Period
+│
+├── agent/                       # Expense Agent：意图路由 + 本地查询/预算工具 + 提示词注入
 │
 ├── llm/                         # OpenAI 兼容 HTTP 客户端 + Prompt 注入 + 解析器
 └── util/                        # TimeRanges 时间区间计算

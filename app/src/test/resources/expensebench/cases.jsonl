@@ -1,0 +1,120 @@
+{"id":"b001","bucket":"basic","text":"午饭35","expect":[{"amount_cents":3500,"category":"food","date":null,"note_contains":null}]}
+{"id":"b002","bucket":"basic","text":"咖啡18","expect":[{"amount_cents":1800,"category":"drink","date":null,"note_contains":null}]}
+{"id":"b003","bucket":"basic","text":"打车23.5","expect":[{"amount_cents":2350,"category":"transport","date":null,"note_contains":null}]}
+{"id":"b004","bucket":"basic","text":"地铁4块","expect":[{"amount_cents":400,"category":"transport","date":null,"note_contains":null}]}
+{"id":"b005","bucket":"basic","text":"晚饭28","expect":[{"amount_cents":2800,"category":"food","date":null,"note_contains":null}]}
+{"id":"b006","bucket":"basic","text":"早餐12","expect":[{"amount_cents":1200,"category":"food","date":null,"note_contains":null}]}
+{"id":"b007","bucket":"basic","text":"奶茶16.5","expect":[{"amount_cents":1650,"category":"drink","date":null,"note_contains":null}]}
+{"id":"b008","bucket":"basic","text":"电影票45","expect":[{"amount_cents":4500,"category":"entertainment","date":null,"note_contains":null}]}
+{"id":"b009","bucket":"basic","text":"房租2000","expect":[{"amount_cents":200000,"category":"housing","date":null,"note_contains":null}]}
+{"id":"b010","bucket":"basic","text":"充话费50","expect":[{"amount_cents":5000,"category":"other","date":null,"note_contains":"话费"}]}
+{"id":"b011","bucket":"basic","text":"买药32.8","expect":[{"amount_cents":3280,"category":"medical","date":null,"note_contains":null}]}
+{"id":"b012","bucket":"basic","text":"游戏月卡30","expect":[{"amount_cents":3000,"category":"entertainment","date":null,"note_contains":null}]}
+{"id":"b013","bucket":"basic","text":"买书89","expect":[{"amount_cents":8900,"category":"education","date":null,"note_contains":null}]}
+{"id":"b014","bucket":"basic","text":"加油300","expect":[{"amount_cents":30000,"category":"transport","date":null,"note_contains":null}]}
+{"id":"b015","bucket":"basic","text":"买水果27.4","expect":[{"amount_cents":2740,"category":"shopping","date":null,"note_contains":null}]}
+{"id":"b016","bucket":"basic","text":"网费一个月100","expect":[{"amount_cents":10000,"category":"housing","date":null,"note_contains":"网费"}]}
+{"id":"b017","bucket":"basic","text":"超市购物128.6","expect":[{"amount_cents":12860,"category":"shopping","date":null,"note_contains":null}]}
+{"id":"b018","bucket":"basic","text":"停车费10","expect":[{"amount_cents":1000,"category":"transport","date":null,"note_contains":"停车"}]}
+{"id":"b019","bucket":"basic","text":"基金定投500","expect":[{"amount_cents":50000,"category":"investment","date":null,"note_contains":null}]}
+{"id":"b020","bucket":"basic","text":"会员季卡58","expect":[{"amount_cents":5800,"category":"entertainment","date":null,"note_contains":"会员"}]}
+{"id":"b021","bucket":"basic","text":"挂号费25","expect":[{"amount_cents":2500,"category":"medical","date":null,"note_contains":null}]}
+{"id":"b022","bucket":"basic","text":"宵夜21.8","expect":[{"amount_cents":2180,"category":"food","date":null,"note_contains":null}]}
+{"id":"b023","bucket":"basic","text":"火锅168","expect":[{"amount_cents":16800,"category":"food","date":null,"note_contains":null}]}
+{"id":"b024","bucket":"basic","text":"烧烤88","expect":[{"amount_cents":8800,"category":"food","date":null,"note_contains":null}]}
+{"id":"b025","bucket":"basic","text":"买机票620","expect":[{"amount_cents":62000,"category":"transport","date":null,"note_contains":null}]}
+{"id":"b026","bucket":"basic","text":"交物业费240","expect":[{"amount_cents":24000,"category":"housing","date":null,"note_contains":"物业"}]}
+{"id":"b027","bucket":"basic","text":"拼多多9.9","expect":[{"amount_cents":990,"category":"shopping","date":null,"note_contains":null}]}
+{"id":"b028","bucket":"basic","text":"学费定金500","expect":[{"amount_cents":50000,"category":"education","date":null,"note_contains":null}]}
+{"id":"b029","bucket":"basic","text":"日用品32","expect":[{"amount_cents":3200,"category":"shopping","date":null,"note_contains":null}]}
+{"id":"b030","bucket":"basic","text":"打车去机场52","expect":[{"amount_cents":5200,"category":"transport","date":null,"note_contains":"机场"}]}
+{"id":"d001","bucket":"date_relative","text":"昨天午饭35","expect":[{"amount_cents":3500,"category":"food","date":"2026-09-05","note_contains":null}]}
+{"id":"d002","bucket":"date_relative","text":"前天打车28.8","expect":[{"amount_cents":2880,"category":"transport","date":"2026-09-04","note_contains":null}]}
+{"id":"d003","bucket":"date_relative","text":"今天咖啡18","expect":[{"amount_cents":1800,"category":"drink","date":"2026-09-06","note_contains":null}]}
+{"id":"d004","bucket":"date_relative","text":"上周三买了本参考书45","expect":[{"amount_cents":4500,"category":"education","date":"2026-08-26","note_contains":null}]}
+{"id":"d005","bucket":"date_relative","text":"上周五和同学唱K120","expect":[{"amount_cents":12000,"category":"entertainment","date":"2026-08-28","note_contains":null}]}
+{"id":"d006","bucket":"date_relative","text":"3天前加油260","expect":[{"amount_cents":26000,"category":"transport","date":"2026-09-03","note_contains":null}]}
+{"id":"d007","bucket":"date_relative","text":"2天前奶茶13.5","expect":[{"amount_cents":1350,"category":"drink","date":"2026-09-04","note_contains":null}]}
+{"id":"d008","bucket":"date_relative","text":"9月1日交房租1800","expect":[{"amount_cents":180000,"category":"housing","date":"2026-09-01","note_contains":null}]}
+{"id":"d009","bucket":"date_relative","text":"8月28日烧烤96","expect":[{"amount_cents":9600,"category":"food","date":"2026-08-28","note_contains":null}]}
+{"id":"d010","bucket":"date_relative","text":"2026-08-15充话费100","expect":[{"amount_cents":10000,"category":"other","date":"2026-08-15","note_contains":"话费"}]}
+{"id":"d011","bucket":"date_relative","text":"昨天地铁4块","expect":[{"amount_cents":400,"category":"transport","date":"2026-09-05","note_contains":null}]}
+{"id":"d012","bucket":"date_relative","text":"上周一买书59","expect":[{"amount_cents":5900,"category":"education","date":"2026-08-24","note_contains":null}]}
+{"id":"d013","bucket":"date_relative","text":"昨天晚上吃了顿火锅218","expect":[{"amount_cents":21800,"category":"food","date":"2026-09-05","note_contains":null}]}
+{"id":"d014","bucket":"date_relative","text":"今天早上买了包子6.5","expect":[{"amount_cents":650,"category":"food","date":"2026-09-06","note_contains":null}]}
+{"id":"d015","bucket":"date_relative","text":"上周日打车34","expect":[{"amount_cents":3400,"category":"transport","date":"2026-08-30","note_contains":null}]}
+{"id":"d016","bucket":"date_relative","text":"7月20日买机票850","expect":[{"amount_cents":85000,"category":"transport","date":"2026-07-20","note_contains":null}]}
+{"id":"d017","bucket":"date_relative","text":"昨天买水果31.2","expect":[{"amount_cents":3120,"category":"shopping","date":"2026-09-05","note_contains":null}]}
+{"id":"d018","bucket":"date_relative","text":"前天停车费8","expect":[{"amount_cents":800,"category":"transport","date":"2026-09-04","note_contains":null}]}
+{"id":"d019","bucket":"date_relative","text":"上周四看电影45","expect":[{"amount_cents":4500,"category":"entertainment","date":"2026-08-27","note_contains":null}]}
+{"id":"d020","bucket":"date_relative","text":"今天中午外卖22.5","expect":[{"amount_cents":2250,"category":"food","date":"2026-09-06","note_contains":null}]}
+{"id":"d021","bucket":"date_relative","text":"9月3日充值视频会员25","expect":[{"amount_cents":2500,"category":"entertainment","date":"2026-09-03","note_contains":"会员"}]}
+{"id":"d022","bucket":"date_relative","text":"昨天早上8点买了肠粉9块","expect":[{"amount_cents":900,"category":"food","date":"2026-09-05","note_contains":null}]}
+{"id":"d023","bucket":"date_relative","text":"上周二买日用品47.3","expect":[{"amount_cents":4730,"category":"shopping","date":"2026-08-25","note_contains":null}]}
+{"id":"d024","bucket":"date_relative","text":"8月31日打车回学校56","expect":[{"amount_cents":5600,"category":"transport","date":"2026-08-31","note_contains":null}]}
+{"id":"d025","bucket":"date_relative","text":"上周日充油卡200","expect":[{"amount_cents":20000,"category":"transport","date":"2026-08-30","note_contains":null}]}
+{"id":"m001","bucket":"multi","text":"午饭35 咖啡18","expect":[{"amount_cents":3500,"category":"food","date":null,"note_contains":null},{"amount_cents":1800,"category":"drink","date":null,"note_contains":null}]}
+{"id":"m002","bucket":"multi","text":"昨天打车23 矿泉水3","expect":[{"amount_cents":2300,"category":"transport","date":"2026-09-05","note_contains":null},{"amount_cents":300,"category":"drink","date":"2026-09-05","note_contains":null}]}
+{"id":"m003","bucket":"multi","text":"今天午饭28.5 晚饭32","expect":[{"amount_cents":2850,"category":"food","date":"2026-09-06","note_contains":null},{"amount_cents":3200,"category":"food","date":"2026-09-06","note_contains":null}]}
+{"id":"m004","bucket":"multi","text":"早上豆浆4 包子3.5","expect":[{"amount_cents":400,"category":"drink","date":null,"note_contains":null},{"amount_cents":350,"category":"food","date":null,"note_contains":null}]}
+{"id":"m005","bucket":"multi","text":"9月2日加油280 9月4日停车15","expect":[{"amount_cents":28000,"category":"transport","date":"2026-09-02","note_contains":null},{"amount_cents":1500,"category":"transport","date":"2026-09-04","note_contains":null}]}
+{"id":"m006","bucket":"multi","text":"昨天奶茶16.5 电影票39.9","expect":[{"amount_cents":1650,"category":"drink","date":"2026-09-05","note_contains":null},{"amount_cents":3990,"category":"entertainment","date":"2026-09-05","note_contains":null}]}
+{"id":"m007","bucket":"multi","text":"午饭35.5，晚饭26.8，宵夜15","expect":[{"amount_cents":3550,"category":"food","date":null,"note_contains":null},{"amount_cents":2680,"category":"food","date":null,"note_contains":null},{"amount_cents":1500,"category":"food","date":null,"note_contains":null}]}
+{"id":"m008","bucket":"multi","text":"今天地铁4块 瑞幸15 中午外卖21","expect":[{"amount_cents":400,"category":"transport","date":"2026-09-06","note_contains":null},{"amount_cents":1500,"category":"drink","date":"2026-09-06","note_contains":"瑞幸"},{"amount_cents":2100,"category":"food","date":"2026-09-06","note_contains":null}]}
+{"id":"m009","bucket":"multi","text":"前天购物88.8 昨天购物45.2","expect":[{"amount_cents":8880,"category":"shopping","date":"2026-09-04","note_contains":null},{"amount_cents":4520,"category":"shopping","date":"2026-09-05","note_contains":null}]}
+{"id":"m010","bucket":"multi","text":"昨天水果19.8 今天水果21.3","expect":[{"amount_cents":1980,"category":"shopping","date":"2026-09-05","note_contains":null},{"amount_cents":2130,"category":"shopping","date":"2026-09-06","note_contains":null}]}
+{"id":"m011","bucket":"multi","text":"早上打车14 下午打车17","expect":[{"amount_cents":1400,"category":"transport","date":null,"note_contains":null},{"amount_cents":1700,"category":"transport","date":null,"note_contains":null}]}
+{"id":"m012","bucket":"multi","text":"8月30日房租1800 8月31日网费100","expect":[{"amount_cents":180000,"category":"housing","date":"2026-08-30","note_contains":null},{"amount_cents":10000,"category":"housing","date":"2026-08-31","note_contains":"网费"}]}
+{"id":"m013","bucket":"multi","text":"今天买书120 买笔15","expect":[{"amount_cents":12000,"category":"education","date":"2026-09-06","note_contains":null},{"amount_cents":1500,"category":"education","date":"2026-09-06","note_contains":null}]}
+{"id":"m014","bucket":"multi","text":"昨天午饭35 下午咖啡18 晚上烧烤78","expect":[{"amount_cents":3500,"category":"food","date":"2026-09-05","note_contains":null},{"amount_cents":1800,"category":"drink","date":"2026-09-05","note_contains":null},{"amount_cents":7800,"category":"food","date":"2026-09-05","note_contains":null}]}
+{"id":"m015","bucket":"multi","text":"3天前加油260 今天加油300","expect":[{"amount_cents":26000,"category":"transport","date":"2026-09-03","note_contains":null},{"amount_cents":30000,"category":"transport","date":"2026-09-06","note_contains":null}]}
+{"id":"r001","bucket":"merchant","text":"瑞幸拿铁15.9","expect":[{"amount_cents":1590,"category":"drink","date":null,"note_contains":"瑞幸"}]}
+{"id":"r002","bucket":"merchant","text":"星巴克拿铁30","expect":[{"amount_cents":3000,"category":"drink","date":null,"note_contains":"星巴克"}]}
+{"id":"r003","bucket":"merchant","text":"麦当劳套餐32","expect":[{"amount_cents":3200,"category":"food","date":null,"note_contains":"麦当劳"}]}
+{"id":"r004","bucket":"merchant","text":"肯德基疯狂星期四39.9","expect":[{"amount_cents":3990,"category":"food","date":null,"note_contains":"肯德基"}]}
+{"id":"r005","bucket":"merchant","text":"滴滴打车26.3","expect":[{"amount_cents":2630,"category":"transport","date":null,"note_contains":"滴滴"}]}
+{"id":"r006","bucket":"merchant","text":"京东买数据线29.9","expect":[{"amount_cents":2990,"category":"shopping","date":null,"note_contains":"京东"}]}
+{"id":"r007","bucket":"merchant","text":"淘宝买T恤79","expect":[{"amount_cents":7900,"category":"shopping","date":null,"note_contains":"淘宝"}]}
+{"id":"r008","bucket":"merchant","text":"美团外卖22","expect":[{"amount_cents":2200,"category":"food","date":null,"note_contains":"美团"}]}
+{"id":"r009","bucket":"merchant","text":"饿了么外卖25.8","expect":[{"amount_cents":2580,"category":"food","date":null,"note_contains":"饿了么"}]}
+{"id":"r010","bucket":"merchant","text":"蜜雪冰城柠檬水6","expect":[{"amount_cents":600,"category":"drink","date":null,"note_contains":"蜜雪"}]}
+{"id":"r011","bucket":"merchant","text":"喜茶多肉葡萄19","expect":[{"amount_cents":1900,"category":"drink","date":null,"note_contains":"喜茶"}]}
+{"id":"r012","bucket":"merchant","text":"海底捞286","expect":[{"amount_cents":28600,"category":"food","date":null,"note_contains":"海底捞"}]}
+{"id":"r013","bucket":"merchant","text":"万达电影票42","expect":[{"amount_cents":4200,"category":"entertainment","date":null,"note_contains":"万达"}]}
+{"id":"r014","bucket":"merchant","text":"山姆会员店购物356","expect":[{"amount_cents":35600,"category":"shopping","date":null,"note_contains":"山姆"}]}
+{"id":"r015","bucket":"merchant","text":"中石化加油280","expect":[{"amount_cents":28000,"category":"transport","date":null,"note_contains":"中石化"}]}
+{"id":"r016","bucket":"merchant","text":"中国移动充话费50","expect":[{"amount_cents":5000,"category":"other","date":null,"note_contains":"移动"}]}
+{"id":"r017","bucket":"merchant","text":"瑞幸生椰拿铁9.9","expect":[{"amount_cents":990,"category":"drink","date":null,"note_contains":"瑞幸"}]}
+{"id":"r018","bucket":"merchant","text":"库迪咖啡12","expect":[{"amount_cents":1200,"category":"drink","date":null,"note_contains":"库迪"}]}
+{"id":"r019","bucket":"merchant","text":"华为应用市场会员18","expect":[{"amount_cents":1800,"category":"entertainment","date":null,"note_contains":"会员"}]}
+{"id":"r020","bucket":"merchant","text":"大参林买感冒药36.5","expect":[{"amount_cents":3650,"category":"medical","date":null,"note_contains":"药"}]}
+{"id":"r021","bucket":"merchant","text":"携程订机票720","expect":[{"amount_cents":72000,"category":"transport","date":null,"note_contains":"携程"}]}
+{"id":"r022","bucket":"merchant","text":"12306高铁票263","expect":[{"amount_cents":26300,"category":"transport","date":null,"note_contains":"高铁"}]}
+{"id":"r023","bucket":"merchant","text":"网易云音乐年卡88","expect":[{"amount_cents":8800,"category":"entertainment","date":null,"note_contains":"网易云"}]}
+{"id":"r024","bucket":"merchant","text":"得到课程199","expect":[{"amount_cents":19900,"category":"education","date":null,"note_contains":"课"}]}
+{"id":"r025","bucket":"merchant","text":"盒马买菜86.4","expect":[{"amount_cents":8640,"category":"shopping","date":null,"note_contains":"盒马"}]}
+{"id":"c001","bucket":"colloquial","text":"中午吃了碗牛肉面16","expect":[{"amount_cents":1600,"category":"food","date":null,"note_contains":null}]}
+{"id":"c002","bucket":"colloquial","text":"打了个车回家21.5","expect":[{"amount_cents":2150,"category":"transport","date":null,"note_contains":null}]}
+{"id":"c003","bucket":"colloquial","text":"给车加了200块的油","expect":[{"amount_cents":20000,"category":"transport","date":null,"note_contains":"油"}]}
+{"id":"c004","bucket":"colloquial","text":"早上买了俩包子5","expect":[{"amount_cents":500,"category":"food","date":null,"note_contains":null}]}
+{"id":"c005","bucket":"colloquial","text":"充了个B站大会员148","expect":[{"amount_cents":14800,"category":"entertainment","date":null,"note_contains":"会员"}]}
+{"id":"c006","bucket":"colloquial","text":"买了个手机壳25","expect":[{"amount_cents":2500,"category":"shopping","date":null,"note_contains":"手机壳"}]}
+{"id":"c007","bucket":"colloquial","text":"点了个猪脚饭22","expect":[{"amount_cents":2200,"category":"food","date":null,"note_contains":"猪脚饭"}]}
+{"id":"c008","bucket":"colloquial","text":"药店买了盒感冒灵28","expect":[{"amount_cents":2800,"category":"medical","date":null,"note_contains":"感冒"}]}
+{"id":"c009","bucket":"colloquial","text":"跟朋友吃了顿烧烤128","expect":[{"amount_cents":12800,"category":"food","date":null,"note_contains":"烧烤"}]}
+{"id":"c010","bucket":"colloquial","text":"充了50块话费","expect":[{"amount_cents":5000,"category":"other","date":null,"note_contains":"话费"}]}
+{"id":"c011","bucket":"colloquial","text":"昨天忘了记，午饭18","expect":[{"amount_cents":1800,"category":"food","date":"2026-09-05","note_contains":null}]}
+{"id":"c012","bucket":"colloquial","text":"拼多多砍了一单6.8的纸巾","expect":[{"amount_cents":680,"category":"shopping","date":null,"note_contains":"纸巾"}]}
+{"id":"c013","bucket":"colloquial","text":"昨天下午三点打了滴滴回家24.6","expect":[{"amount_cents":2460,"category":"transport","date":"2026-09-05","note_contains":"滴滴"}]}
+{"id":"c014","bucket":"colloquial","text":"买了两杯瑞幸一共29.6","expect":[{"amount_cents":2960,"category":"drink","date":null,"note_contains":"瑞幸"}]}
+{"id":"c015","bucket":"colloquial","text":"停了一小时车收费6","expect":[{"amount_cents":600,"category":"transport","date":null,"note_contains":"停车"}]}
+{"id":"e001","bucket":"explicit_date","text":"8月15日12:30吃了兰州拉面18","expect":[{"amount_cents":1800,"category":"food","date":"2026-08-15","note_contains":"拉面"}]}
+{"id":"e002","bucket":"explicit_date","text":"2026-08-20 18:00 打车回家31","expect":[{"amount_cents":3100,"category":"transport","date":"2026-08-20","note_contains":null}]}
+{"id":"e003","bucket":"explicit_date","text":"9月1号9点地铁4块","expect":[{"amount_cents":400,"category":"transport","date":"2026-09-01","note_contains":null}]}
+{"id":"e004","bucket":"explicit_date","text":"8月30日晚上8点火锅176","expect":[{"amount_cents":17600,"category":"food","date":"2026-08-30","note_contains":null}]}
+{"id":"e005","bucket":"explicit_date","text":"9月4日21:15瑞幸14.8","expect":[{"amount_cents":1480,"category":"drink","date":"2026-09-04","note_contains":"瑞幸"}]}
+{"id":"e006","bucket":"explicit_date","text":"7月18日买了教资网课299","expect":[{"amount_cents":29900,"category":"education","date":"2026-07-18","note_contains":null}]}
+{"id":"e007","bucket":"explicit_date","text":"8月25日中石化加油240","expect":[{"amount_cents":24000,"category":"transport","date":"2026-08-25","note_contains":"中石化"}]}
+{"id":"e008","bucket":"explicit_date","text":"2026年8月8日买了个键盘99.9","expect":[{"amount_cents":9990,"category":"shopping","date":"2026-08-08","note_contains":null}]}
+{"id":"e009","bucket":"explicit_date","text":"9月2日充视频会员季卡72","expect":[{"amount_cents":7200,"category":"entertainment","date":"2026-09-02","note_contains":"会员"}]}
+{"id":"e010","bucket":"explicit_date","text":"8月31日21:40买了夜宵12.8","expect":[{"amount_cents":1280,"category":"food","date":"2026-08-31","note_contains":null}]}
