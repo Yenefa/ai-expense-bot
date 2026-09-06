@@ -37,6 +37,7 @@ object AgentPeriodResolver {
     )
     private val dayFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd（EEE）")
     private val monthFmt = DateTimeFormatter.ofPattern("yyyy-MM")
+    private val dayRangeFmt = DateTimeFormatter.ofPattern("MM-dd")
 
     fun resolve(text: String, nowMillis: Long, zone: ZoneId): AgentPeriodSpec? {
         val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
@@ -117,4 +118,46 @@ object AgentPeriodResolver {
             fromMillis = from.atStartOfDay(zone).toInstant().toEpochMilli(),
             toMillis = toExclusive.atStartOfDay(zone).toInstant().toEpochMilli(),
         )
+
+    /** 与 [spec] 紧邻其前的上一期区间（环比基准）：日历对齐优先，避免 30/31 天错位。 */
+    fun previousOf(spec: AgentPeriodSpec, zone: ZoneId): AgentPeriodSpec {
+        val fromDate = Instant.ofEpochMilli(spec.fromMillis).atZone(zone).toLocalDate()
+        val toDate = Instant.ofEpochMilli(spec.toMillis).atZone(zone).toLocalDate()
+
+        // 整月：上个月 1 号到本月 1 号
+        if (fromDate.dayOfMonth == 1 && toDate.dayOfMonth == 1 && fromDate.plusMonths(1) == toDate) {
+            val prev = fromDate.minusMonths(1)
+            return AgentPeriodSpec(
+                label = "上一期（${monthFmt.format(prev)}）",
+                fromMillis = prev.atStartOfDay(zone).toInstant().toEpochMilli(),
+                toMillis = fromDate.atStartOfDay(zone).toInstant().toEpochMilli(),
+            )
+        }
+        // 整周：上周一到本周一
+        if (fromDate.dayOfWeek == DayOfWeek.MONDAY && toDate.dayOfWeek == DayOfWeek.MONDAY &&
+            fromDate.plusWeeks(1) == toDate
+        ) {
+            val prev = fromDate.minusWeeks(1)
+            return AgentPeriodSpec(
+                label = "上一期（${dayRangeFmt.format(prev)} ~ ${dayRangeFmt.format(toDate.minusDays(1))}）",
+                fromMillis = prev.atStartOfDay(zone).toInstant().toEpochMilli(),
+                toMillis = fromDate.atStartOfDay(zone).toInstant().toEpochMilli(),
+            )
+        }
+        // 单日
+        if (fromDate.plusDays(1) == toDate) {
+            val prev = fromDate.minusDays(1)
+            return AgentPeriodSpec(
+                label = "上一期（${dayRangeFmt.format(prev)}）",
+                fromMillis = prev.atStartOfDay(zone).toInstant().toEpochMilli(),
+                toMillis = fromDate.atStartOfDay(zone).toInstant().toEpochMilli(),
+            )
+        }
+        // 兜底：等长回退
+        return AgentPeriodSpec(
+            label = "上一期（${dayRangeFmt.format(fromDate.minusDays(toDate.toEpochDay() - fromDate.toEpochDay()))} ~ ${dayRangeFmt.format(fromDate.minusDays(1))}）",
+            fromMillis = spec.fromMillis - (spec.toMillis - spec.fromMillis),
+            toMillis = spec.fromMillis,
+        )
+    }
 }

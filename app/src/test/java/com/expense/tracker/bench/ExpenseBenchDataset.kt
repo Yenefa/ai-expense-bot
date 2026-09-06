@@ -43,4 +43,15 @@ object ExpenseBenchDataset {
                     .getOrElse { error("数据集第 ${index + 1} 行解析失败：${it.message}") }
             }
     }
+
+    /** 数据集内容哈希：报告里记录它，保证"同一张表"可以复现。 */
+    fun datasetSha256(): String {
+        val stream = ExpenseBenchDataset::class.java.getResourceAsStream("/expensebench/cases.jsonl")
+            ?: error("找不到测试资源 expensebench/cases.jsonl")
+        return sha256Hex(stream.use { it.readBytes() })
+    }
+
+    fun sha256Hex(bytes: ByteArray): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) }
 }

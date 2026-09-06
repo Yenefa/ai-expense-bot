@@ -39,12 +39,24 @@ class LlmExpenseBenchTest {
         val cases = ExpenseBenchDataset.load().take(limit)
         val client = LlmClient()
         val systemPrompt = LlmPrompt.systemPrompt(ExpenseBenchDataset.benchNowMillis)
+        // 可复现协议：固定 temperature=0.0，报告记录数据集与 prompt 哈希（见 docs/expensebench.md）
+        val promptSha256 = ExpenseBenchDataset.sha256Hex(systemPrompt.toByteArray(Charsets.UTF_8))
+        val ranAt = java.time.OffsetDateTime.now()
         val predictions = LinkedHashMap<String, List<com.expense.tracker.llm.ParsedExpense>>()
         var failures = 0
 
         cases.forEachIndexed { index, case ->
             val raw = runCatching {
-                runBlocking { client.chatJson(baseUrl, apiKey, model, case.text, systemPrompt) }
+                runBlocking {
+                    client.chatJson(
+                        baseUrl = baseUrl,
+                        apiKey = apiKey,
+                        model = model,
+                        userText = case.text,
+                        systemPrompt = systemPrompt,
+                        temperature = 0.0,
+                    )
+                }
             }.getOrElse { error ->
                 failures++
                 System.err.println("[${case.id}] 请求失败：${error.message}")
@@ -67,6 +79,13 @@ class LlmExpenseBenchTest {
         val markdown = report.toMarkdown(
             model = "$model @ ${baseUrl.removePrefix("https://").removePrefix("http://")}",
             source = "LLM 实测（失败请求 $failures 次，全部按 0 笔计）",
+            metadata = listOf(
+                "temperature = 0.0（固定）",
+                "dataset_sha256 = ${ExpenseBenchDataset.datasetSha256()}",
+                "prompt_sha256 = $promptSha256",
+                "ran_at = $ranAt",
+                "复现：同哈希数据集 + 同 prompt + temperature=0 + 同模型快照 ⇒ 结果应一致（±供应商非确定性）",
+            ),
         )
         val outFile = File(repoRoot(), "docs/expensebench-llm-report.md")
         outFile.parentFile?.mkdirs()

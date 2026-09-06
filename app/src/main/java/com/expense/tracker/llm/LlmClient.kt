@@ -29,6 +29,7 @@ class LlmClient(
         systemPrompt: String = LlmPrompt.systemPrompt(),
         installationId: String? = null,
         history: List<ChatMsg> = emptyList(),
+        temperature: Double? = null,
     ): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "API Key 为空，请到设置中填写" }
 
@@ -52,6 +53,7 @@ class LlmClient(
                 addAll(boundedHistory)
                 add(ChatMsg(role = "user", content = userText.take(MAX_MESSAGE_CHARS)))
             },
+            temperature = temperature,
         )
         val body = json.encodeToString(ChatCompletionRequest.serializer(), requestPayload)
             .toRequestBody("application/json".toMediaType())

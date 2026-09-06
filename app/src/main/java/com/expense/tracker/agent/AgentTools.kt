@@ -63,6 +63,40 @@ data class BudgetToolResult(
     val daysLeftInMonth: Int,
 )
 
+/** analyze_expenses 的对比与预测结果（全部端侧确定性计算）。 */
+data class PeriodTotals(val label: String, val totalCents: Long, val count: Int)
+
+data class CategoryTrend(
+    val categoryId: String,
+    val currentCents: Long,
+    val previousCents: Long,
+) {
+    val deltaCents: Long get() = currentCents - previousCents
+
+    /** 环比百分比；上月为 0 时返回 null（防 +∞%，由调用方改写为"新增支出"）。 */
+    fun percentLabel(): String? = when {
+        previousCents <= 0L -> null
+        currentCents <= 0L -> "-100%"
+        else -> "%+.0f%%".format((currentCents - previousCents) * 100.0 / previousCents)
+    }
+}
+
+data class MonthEndForecast(
+    val projectedCents: Long,
+    /** 外推依据，如 "daily_average"；LLM 必须把依据转述给用户。 */
+    val basis: String,
+    val elapsedDays: Int,
+    val totalDays: Int,
+)
+
+data class AnalyzeToolResult(
+    val current: PeriodTotals,
+    val previous: PeriodTotals?,
+    /** 非投资类趋势，按 |环比变化| 降序。 */
+    val trends: List<CategoryTrend>,
+    val forecast: MonthEndForecast?,
+)
+
 /**
  * Agent 本地工具集：查询与统计在端侧确定性完成，LLM 只负责把结果讲成人话，
  * 数字不可能被模型编造（对齐 privacy-first 定位）。
@@ -144,4 +178,75 @@ object AgentTools {
             daysLeftInMonth = today.lengthOfMonth() - today.dayOfMonth + 1,
         )
     }
+
+    /**
+     * analyze_expenses(spec)：本期 vs 上期 + 分类趋势 + 月底 pace 预测。
+     * 预测门槛：本期覆盖"现在"且已过 7 天（样本不足时宁可不预测，见 InsightPolicy 同款约束）。
+     */
+    suspend fun analyzeExpenses(
+        context: AgentToolContext,
+        spec: AgentPeriodSpec,
+        nowMillis: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): AnalyzeToolResult {
+        val currentRows = context.activeInRange(spec.fromMillis, spec.toMillis)
+        val currentTotals = totalsOf(spec.label, currentRows)
+        val previousSpec = AgentPeriodResolver.previousOf(spec, zone)
+        val previousRows = context.activeInRange(previousSpec.fromMillis, previousSpec.toMillis)
+        val previousTotals = totalsOf(previousSpec.label, previousRows)
+
+        val previousByCategory = previousRows.groupBy { it.categoryId }
+            .mapValues { (_, items) -> items.filterNot { Category.byIdOrOther(it.categoryId).isInvestment }.sumOf { it.amountCents } }
+        val trends = currentRows.groupBy { it.categoryId }
+            .filterNot { (id, _) -> Category.byIdOrOther(id).isInvestment }
+            .map { (id, items) ->
+                CategoryTrend(
+                    categoryId = id,
+                    currentCents = items.sumOf { it.amountCents },
+                    previousCents = previousByCategory[id] ?: 0L,
+                )
+            }
+            .filter { it.currentCents > 0L || it.previousCents > 0L }
+            .sortedByDescending { kotlin.math.abs(it.deltaCents) }
+            .take(MAX_TREND_ROWS)
+
+        val forecast = forecastOf(spec, currentRows.sumOf { it.amountCents }, nowMillis, zone)
+        return AnalyzeToolResult(
+            current = currentTotals,
+            previous = previousTotals.takeIf { previousTotals.count > 0 },
+            trends = trends,
+            forecast = forecast,
+        )
+    }
+
+    private fun totalsOf(label: String, rows: List<com.expense.tracker.data.db.ExpenseEntity>): PeriodTotals =
+        PeriodTotals(
+            label = label,
+            totalCents = rows.filterNot { Category.byIdOrOther(it.categoryId).isInvestment }.sumOf { it.amountCents },
+            count = rows.size,
+        )
+
+    private fun forecastOf(
+        spec: AgentPeriodSpec,
+        currentCents: Long,
+        nowMillis: Long,
+        zone: ZoneId,
+    ): MonthEndForecast? {
+        val lenDays = ((spec.toMillis - spec.fromMillis) / DAY_MS).toInt()
+        if (lenDays < 25 || lenDays > 31) return null // 只对整月做预测
+        val elapsedDays = (((nowMillis - spec.fromMillis) / DAY_MS).toInt() + 1)
+        if (nowMillis !in spec.fromMillis until spec.toMillis || elapsedDays < MIN_FORECAST_DAYS) return null
+        if (currentCents <= 0L) return null
+        val dailyAvg = currentCents.toDouble() / elapsedDays
+        return MonthEndForecast(
+            projectedCents = (dailyAvg * lenDays).toLong(),
+            basis = "daily_average",
+            elapsedDays = elapsedDays,
+            totalDays = lenDays,
+        )
+    }
+
+    const val MAX_TREND_ROWS = 6
+    const val MIN_FORECAST_DAYS = 7
+    private const val DAY_MS = 86_400_000L
 }

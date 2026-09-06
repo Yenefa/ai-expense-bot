@@ -66,4 +66,19 @@ object AgentRouter {
     private val QUERY_TOPIC = Regex("花|消费|支出|用掉|开销")
     private val QUESTION_TONE = Regex("吗|呢|？|\\?")
     private val BUDGET_INTENT = Regex("预算|还剩|超支|超预算")
+
+    /**
+     * 升级触发判定：规则路由落到 CHAT，但文本带疑问/分析特征 → 发一次
+     * Intent Escalation 轻量调用确认是否需要工具（deterministic first, probabilistic fallback）。
+     */
+    fun needsEscalation(text: String): Boolean {
+        val normalized = text.trim()
+        if (STRONG_QUERY.containsMatchIn(normalized)) return false
+        if (QUERY_TOPIC.containsMatchIn(normalized) && QUESTION_TONE.containsMatchIn(normalized)) return false
+        return ESCALATION_HINTS.containsMatchIn(normalized)
+    }
+
+    private val ESCALATION_HINTS = Regex(
+        "是不是|要不要|该不该|怎么办|该怎么|正常吗|合理吗|值得吗|严重吗|怎么看|太多|花多|花太快|超了|超标|建议|帮我看看|帮我分析|分析一下",
+    )
 }

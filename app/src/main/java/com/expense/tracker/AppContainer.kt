@@ -77,13 +77,30 @@ class AppContainer(context: Context) {
         )
     }
 
-    /** Expense Agent：查询轮先执行本地工具，再把可信数据注入提示词。 */
+    /** Expense Agent：查询轮先执行本地工具注入提示词；模糊意图发一次轻量升级调用。 */
     private val expenseAgent: com.expense.tracker.agent.ExpenseAgent by lazy {
         val toolContext = com.expense.tracker.agent.AgentToolContext(
             expenseRepository = expenseRepo,
             budgetSnapshotProvider = { budgetPrefs.snapshot.first() },
         )
-        com.expense.tracker.agent.ExpenseAgent(chatLlmCoordinator, toolContext)
+        val escalator: suspend (String) -> com.expense.tracker.agent.IntentEscalation? = { text ->
+            val config = aiAccessResolver.resolve(userPrefs.snapshot.first())
+            val raw = llmClient.chatJson(
+                baseUrl = config.baseUrl,
+                apiKey = config.apiKey,
+                model = config.model,
+                userText = text.take(200),
+                systemPrompt = com.expense.tracker.agent.IntentEscalationPrompt.systemPrompt(),
+                installationId = config.installationId,
+                temperature = 0.0,
+            )
+            com.expense.tracker.agent.IntentEscalationParser.parse(raw)
+        }
+        com.expense.tracker.agent.ExpenseAgent(
+            coordinator = chatLlmCoordinator,
+            toolContext = toolContext,
+            escalateIntent = escalator,
+        )
     }
 
     val billImportHandler: suspend (String, UserPrefsSnapshot) -> BillImportResult = { ocrText, prefs ->

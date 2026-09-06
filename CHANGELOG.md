@@ -5,6 +5,18 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.9.0 (versionCode 32) — 2026-09-06
+
+**两级路由 + analyze_expenses：Agent 从"能查"到"能分析"**
+
+新增：
+
+- `analyze_expenses` 工具：本期 vs 上期环比（日历对齐，整月/整周/单日各自对齐，不丢天）、分类趋势（按 |环比变化| 降序）、按日均 pace 的月底预测；环比分母为零输出"新增支出"而非 +∞%，样本不足 7 天或非整月区间不预测，预测强制携带推算依据（daily_average）
+- Intent Escalation 两级路由：规则快路径不命中但句子带分析特征（是不是/要不要/花太多/帮我看看…）时，才发一次轻量 LLM 调用（独立小协议 `{"intent","requires_tools","tool_candidates"}`），判为分析意图才走工具轮；升级失败/判为 chat/record 一律回退原管线，记账协议零污染
+- 查询轮默认同时注入 query_expenses + analyze_expenses（+按需 get_budget_status），「比上个月多花了吗」这类问题直接可答
+- 评测可复现协议：`ChatCompletionRequest.temperature` 改为可空（null=不发送，生产行为不变；线上此前从未发送该字段），LLM Bench 显式固定 temperature=0.0，报告记录 dataset_sha256 / prompt_sha256 / ran_at
+- 新增 15 个测试（analyze 数学保护、升级触发与解析、升级流转、temperature 线上行为），全套 257 个单测通过
+
 ## 3.8.0 (versionCode 31) — 2026-09-06
 
 **Expense Agent v1：从 AI 解析器升级为带工具的智能体**

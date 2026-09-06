@@ -29,6 +29,7 @@ class ExpenseAgentTest {
         budget: BudgetSnapshot = BudgetSnapshot(),
         onCapture: (CapturedRequest) -> Unit,
         responseJson: String,
+        escalateIntent: (suspend (String) -> IntentEscalation?)? = null,
     ): ExpenseAgent {
         val chatDao = FakeChatDao()
         val coordinator = ChatLlmCoordinator(
@@ -47,12 +48,27 @@ class ExpenseAgentTest {
             budgetSnapshotProvider = { budget },
             zone = zone,
         )
-        return ExpenseAgent(coordinator, toolContext, nowProvider = { now }, zone = zone)
+        return ExpenseAgent(
+            coordinator = coordinator,
+            toolContext = toolContext,
+            escalateIntent = escalateIntent,
+            nowProvider = { now },
+            zone = zone,
+        )
     }
 
     private fun prefs() = UserPrefsSnapshot(true, "https://example.com", "key", "test-model", com.expense.tracker.data.prefs.ThemeMode.SYSTEM)
 
     private suspend fun seed(dao: FakeExpenseDao) {
+        dao.insert(
+            ExpenseEntity(
+                amountCents = 2000,
+                categoryId = "food",
+                note = "八月午饭",
+                occurredAt = LocalDate.of(2026, 8, 15).atTime(12, 0).atZone(zone).toInstant().toEpochMilli(),
+                createdAt = now,
+            ),
+        )
         dao.insert(
             ExpenseEntity(
                 amountCents = 3500,
@@ -124,6 +140,73 @@ class ExpenseAgentTest {
         )
 
         val result = agent.submit("打车花了23块5", prefs())
+
+        assertThat(captures.single().systemPrompt).doesNotContain("【查询结果")
+        assertThat(result).isInstanceOf(LlmResult.Ok::class.java)
+    }
+
+    @Test
+    fun `查询轮同时注入环比分析`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        seed(dao)
+        val captures = mutableListOf<CapturedRequest>()
+        val agent = agent(dao, onCapture = { captures.add(it) }, responseJson = "{\"reply\":\"ok\",\"expenses\":[],\"actions\":[]}")
+
+        agent.submit("这个月花了多少？", prefs())
+
+        assertThat(captures.single().systemPrompt).contains("【对比分析")
+        assertThat(captures.single().systemPrompt).contains("上期（")
+    }
+
+    @Test
+    fun `升级判定为分析时走工具路径`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        seed(dao)
+        val captures = mutableListOf<CapturedRequest>()
+        val agent = agent(
+            dao,
+            onCapture = { captures.add(it) },
+            responseJson = "{\"reply\":\"ok\",\"expenses\":[],\"actions\":[]}",
+            escalateIntent = { IntentEscalation(intent = "analysis", requiresTools = true) },
+        )
+
+        agent.submit("我最近吃饭是不是有点多", prefs())
+
+        val prompt = captures.single().systemPrompt
+        assertThat(prompt).contains("【查询结果")
+        assertThat(prompt).contains("【对比分析")
+    }
+
+    @Test
+    fun `升级判定为chat时回退原管线`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        seed(dao)
+        val captures = mutableListOf<CapturedRequest>()
+        val agent = agent(
+            dao,
+            onCapture = { captures.add(it) },
+            responseJson = "{\"reply\":\"好的\",\"expenses\":[],\"actions\":[]}",
+            escalateIntent = { IntentEscalation(intent = "chat", requiresTools = false) },
+        )
+
+        agent.submit("我最近吃饭是不是有点多", prefs())
+
+        assertThat(captures.single().systemPrompt).doesNotContain("【查询结果")
+    }
+
+    @Test
+    fun `升级调用失败也回退原管线`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        seed(dao)
+        val captures = mutableListOf<CapturedRequest>()
+        val agent = agent(
+            dao,
+            onCapture = { captures.add(it) },
+            responseJson = "{\"reply\":\"好的\",\"expenses\":[],\"actions\":[]}",
+            escalateIntent = { null },
+        )
+
+        val result = agent.submit("我最近吃饭是不是有点多", prefs())
 
         assertThat(captures.single().systemPrompt).doesNotContain("【查询结果")
         assertThat(result).isInstanceOf(LlmResult.Ok::class.java)

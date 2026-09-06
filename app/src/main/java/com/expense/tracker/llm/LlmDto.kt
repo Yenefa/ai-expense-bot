@@ -9,7 +9,8 @@ import kotlinx.serialization.json.JsonElement
 data class ChatCompletionRequest(
     val model: String,
     val messages: List<ChatMsg>,
-    val temperature: Double = 0.0,
+    /** null = 不发送该字段（沿用供应商默认）；评测路径显式传 0.0 以保证可复现。 */
+    val temperature: Double? = null,
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
 )
 @Serializable data class ChatMsg(val role: String, val content: String)

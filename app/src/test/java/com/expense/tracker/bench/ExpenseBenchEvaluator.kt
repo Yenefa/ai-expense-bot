@@ -64,12 +64,17 @@ object ExpenseBenchEvaluator {
             countOkCases = buckets.sumOf { it.countOkCases },
         )
 
-        fun toMarkdown(model: String, source: String): String = buildString {
+        fun toMarkdown(
+            model: String,
+            source: String,
+            metadata: List<String> = emptyList(),
+        ): String = buildString {
             appendLine("# ExpenseBench v1 — 提取精度报告")
             appendLine()
             appendLine("- 数据集：`${ExpenseBenchDataset.BENCH_NOW_ISO}` 为基准时刻，共 $totalCases 条 / $totalExpects 笔预期")
             appendLine("- 被测对象：$model")
             appendLine("- 数据来源：$source")
+            metadata.forEach { appendLine("- $it") }
             appendLine()
             appendLine("| 桶 | 条数 | 笔数 | 金额 | 分类 | 日期 | 商户 | 整笔全对 | 笔数全对 |")
             appendLine("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
