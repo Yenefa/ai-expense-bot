@@ -59,11 +59,10 @@ object AgentPrompts {
             appendLine("分类变化：")
             analyze.trends.forEach { trend ->
                 val name = AgentCategories.displayName(trend.categoryId)
-                val percent = trend.percentLabel()
                 val change = when {
-                    percent != null -> "$percent"
                     trend.previousCents <= 0L -> "新增支出"
-                    else -> "已清零"
+                    trend.currentCents <= 0L -> "已清零"
+                    else -> trend.percentLabel().orEmpty()
                 }
                 appendLine("- $name 本期 ¥${Money.formatYuan(trend.currentCents)}，上期 ¥${Money.formatYuan(trend.previousCents)}，$change")
             }
@@ -81,7 +80,7 @@ object AgentPrompts {
         appendLine("=== 本轮是查询轮：用户在问数据，不是在记账 ===")
         appendLine("- 优先直接回答问题，所有金额、笔数、占比、环比、预测必须来自【查询结果】或【对比分析】，禁止编造或口算出不同数字")
         appendLine("- 引用预测时必须说明是按当前消费节奏推算的估算值")
-        appendLine("- expenses 与 actions 输出空数组；除非用户本轮明确报了新账目（金额+内容），才照常输出 expenses")
+        appendLine("- 本轮只读：expenses 与 actions 必须输出空数组；代码层会拒绝本轮的任何写操作")
         appendLine("- 查询结果为空时如实说明该时段没有匹配记录，不要编造")
         appendLine("- reply ≤120 字，先给结论再给 1-2 个关键数字")
     }

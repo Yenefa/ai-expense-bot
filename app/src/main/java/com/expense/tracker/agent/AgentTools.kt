@@ -195,14 +195,20 @@ object AgentTools {
         val previousRows = context.activeInRange(previousSpec.fromMillis, previousSpec.toMillis)
         val previousTotals = totalsOf(previousSpec.label, previousRows)
 
-        val previousByCategory = previousRows.groupBy { it.categoryId }
-            .mapValues { (_, items) -> items.filterNot { Category.byIdOrOther(it.categoryId).isInvestment }.sumOf { it.amountCents } }
-        val trends = currentRows.groupBy { it.categoryId }
-            .filterNot { (id, _) -> Category.byIdOrOther(id).isInvestment }
-            .map { (id, items) ->
+        val currentByCategory = currentRows
+            .filterNot { Category.byIdOrOther(it.categoryId).isInvestment }
+            .groupBy { it.categoryId }
+            .mapValues { (_, items) -> items.sumOf { it.amountCents } }
+        val previousByCategory = previousRows
+            .filterNot { Category.byIdOrOther(it.categoryId).isInvestment }
+            .groupBy { it.categoryId }
+            .mapValues { (_, items) -> items.sumOf { it.amountCents } }
+        // 趋势集合 = 本期 ∪ 上期：上期有、本期清零的分类也必须出现，才能显示"已清零"。
+        val trends = (currentByCategory.keys + previousByCategory.keys)
+            .map { id ->
                 CategoryTrend(
                     categoryId = id,
-                    currentCents = items.sumOf { it.amountCents },
+                    currentCents = currentByCategory[id] ?: 0L,
                     previousCents = previousByCategory[id] ?: 0L,
                 )
             }
@@ -210,7 +216,8 @@ object AgentTools {
             .sortedByDescending { kotlin.math.abs(it.deltaCents) }
             .take(MAX_TREND_ROWS)
 
-        val forecast = forecastOf(spec, currentRows.sumOf { it.amountCents }, nowMillis, zone)
+        // 预测与消费合计口径一致：投资类不计入（见 totalsOf / queryExpenses）。
+        val forecast = forecastOf(spec, currentTotals.totalCents, nowMillis, zone)
         return AnalyzeToolResult(
             current = currentTotals,
             previous = previousTotals.takeIf { previousTotals.count > 0 },

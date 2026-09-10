@@ -15,6 +15,7 @@ typealias ChatJsonRequest = suspend (
     prefs: UserPrefsSnapshot,
     systemPrompt: String,
     history: List<ChatMsg>,
+    structuredRequest: Boolean,
 ) -> String
 
 /**
@@ -24,6 +25,16 @@ typealias ChatJsonRequest = suspend (
 data class ChatTurnContext(
     val systemPromptSuffix: String = "",
     val suppressMutationGuard: Boolean = false,
+    /**
+     * 查询轮只读开关。false 时本轮的 expenses/actions 在进入变更计划器之前就被丢弃，
+     * 代码层保证模型输出任何内容都无法修改数据库（不依赖提示词自觉）。
+     */
+    val allowMutations: Boolean = true,
+    /**
+     * 本轮是否要求模型输出结构化 JSON。true 时对 Qwen 思考模型显式关闭思考
+     * （见 [LlmThinkingPolicy]），普通 CHAT 保持 null 沿用供应商默认。
+     */
+    val structuredRequest: Boolean = false,
 )
 
 class ChatLlmCoordinator(
@@ -88,9 +99,22 @@ class ChatLlmCoordinator(
             prefs,
             LlmPrompt.systemPrompt(now, contextRecords, lastBatchIds) + turnContext.systemPromptSuffix.withLeadingBreak(),
             history,
+            turnContext.structuredRequest,
         )
         val parsed = LlmResponseParser.parse(raw)
         PrivacySafeLog.llmResponseParsed(parsed.expenses.size, parsed.actions.size)
+
+        // 查询轮只读：即使模型被提示词注入诱导返回 expenses/actions，也在进入变更计划器之前丢弃。
+        if (!turnContext.allowMutations) {
+            if (parsed.expenses.isNotEmpty() || parsed.actions.isNotEmpty()) {
+                PrivacySafeLog.llmMutationsBlocked(parsed.expenses.size, parsed.actions.size)
+            }
+            return@runCatching LlmResult.Ok(
+                replyText = parsed.reply,
+                expenseIds = emptyList(),
+            )
+        }
+
         val sourceExpenseHints = interpreted.expenseHints
             .takeIf { parsed.expenses.isNotEmpty() && interpreted.hasCompleteExpenseHints }
             .orEmpty()

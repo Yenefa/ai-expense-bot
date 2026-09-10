@@ -20,6 +20,7 @@ import com.expense.tracker.data.repo.RoomTransactionRunner
 import com.expense.tracker.llm.LlmClient
 import com.expense.tracker.llm.LlmPrompt
 import com.expense.tracker.llm.LlmResponseParser
+import com.expense.tracker.llm.LlmThinkingPolicy
 import com.expense.tracker.llm.ChatLlmCoordinator
 import com.expense.tracker.llm.AnalyticsInsightsParser
 import com.expense.tracker.llm.BillImportResult
@@ -61,7 +62,7 @@ class AppContainer(context: Context) {
         ChatLlmCoordinator(
             expenseRepository = expenseRepo,
             chatRepository = chatRepo,
-            requestJson = { text, prefs, systemPrompt, history ->
+            requestJson = { text, prefs, systemPrompt, history, structuredRequest ->
                 val config = aiAccessResolver.resolve(prefs)
                 llmClient.chatJson(
                     baseUrl = config.baseUrl,
@@ -71,6 +72,7 @@ class AppContainer(context: Context) {
                     systemPrompt = systemPrompt,
                     installationId = config.installationId,
                     history = history,
+                    enableThinking = LlmThinkingPolicy.enableThinkingFor(structuredRequest, config.model),
                 )
             },
             applyPlan = llmMutationApplier::apply,
@@ -93,6 +95,7 @@ class AppContainer(context: Context) {
                 systemPrompt = com.expense.tracker.agent.IntentEscalationPrompt.systemPrompt(),
                 installationId = config.installationId,
                 temperature = 0.0,
+                enableThinking = LlmThinkingPolicy.enableThinkingFor(structuredRequest = true, model = config.model),
             )
             com.expense.tracker.agent.IntentEscalationParser.parse(raw)
         }
@@ -155,6 +158,7 @@ class AppContainer(context: Context) {
                 userText = prompt,
                 systemPrompt = LlmPrompt.analyticsSystemPrompt(),
                 installationId = config.installationId,
+                enableThinking = LlmThinkingPolicy.enableThinkingFor(structuredRequest = true, model = config.model),
             )
             AnalyticsInsightsParser.parse(raw)
         }.getOrElse { listOf("分析失败：${it.message ?: "未知错误"}") }

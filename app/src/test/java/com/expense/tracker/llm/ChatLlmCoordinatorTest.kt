@@ -42,7 +42,7 @@ class ChatLlmCoordinatorTest {
         val coordinator = ChatLlmCoordinator(
             expenseRepository = ExpenseRepository(expenseDao),
             chatRepository = ChatRepository(chatDao),
-            requestJson = { text, _, _, _ ->
+            requestJson = { text, _, _, _, _ ->
                 if (text.contains("删")) {
                     """{"reply":"删除候选","expenses":[],"actions":[{"action":"delete","expense_id":7}]}"""
                 } else {
@@ -104,7 +104,7 @@ class ChatLlmCoordinatorTest {
         val coordinator = ChatLlmCoordinator(
             expenseRepository = ExpenseRepository(expenseDao),
             chatRepository = ChatRepository(chatDao),
-            requestJson = { _, _, _, _ ->
+            requestJson = { _, _, _, _, _ ->
                 """{"reply":"删除候选","expenses":[],"actions":[{"action":"delete","expense_id":7}]}"""
             },
             applyPlan = {
@@ -125,7 +125,7 @@ class ChatLlmCoordinatorTest {
         val coordinator = ChatLlmCoordinator(
             expenseRepository = ExpenseRepository(CoordinatorExpenseDao()),
             chatRepository = ChatRepository(CoordinatorChatDao()),
-            requestJson = { _, _, _, _ ->
+            requestJson = { _, _, _, _, _ ->
                 """{"reply":"已将全部20条记录日期改好","expenses":[],"actions":[]}"""
             },
             applyPlan = { error("不应执行空计划") },
@@ -141,7 +141,7 @@ class ChatLlmCoordinatorTest {
         val coordinator = ChatLlmCoordinator(
             expenseRepository = ExpenseRepository(CoordinatorExpenseDao()),
             chatRepository = ChatRepository(CoordinatorChatDao()),
-            requestJson = { _, _, _, _ -> throw CancellationException("cancelled") },
+            requestJson = { _, _, _, _, _ -> throw CancellationException("cancelled") },
             applyPlan = { error("不应执行") },
         )
 
@@ -170,7 +170,7 @@ class ChatLlmCoordinatorTest {
             val coordinator = ChatLlmCoordinator(
                 expenseRepository = ExpenseRepository(CoordinatorExpenseDao(listOf(existing))),
                 chatRepository = ChatRepository(chatDao),
-                requestJson = { text, _, prompt, history ->
+                requestJson = { text, _, prompt, history, _ ->
                     requestedText = text
                     requestedPrompt = prompt
                     requestedHistory = history
@@ -198,7 +198,7 @@ class ChatLlmCoordinatorTest {
         val coordinator = ChatLlmCoordinator(
             expenseRepository = ExpenseRepository(CoordinatorExpenseDao()),
             chatRepository = ChatRepository(CoordinatorChatDao()),
-            requestJson = { _, _, _, _ ->
+            requestJson = { _, _, _, _, _ ->
                 """{"reply":"只识别一笔","expenses":[
                     {"amount":6,"category":"food","note":"早餐","occurred_at":null}
                 ],"actions":[]}""".trimIndent()
@@ -235,7 +235,7 @@ class ChatLlmCoordinatorTest {
         val coordinator = ChatLlmCoordinator(
             expenseRepository = ExpenseRepository(CoordinatorExpenseDao(listOf(expense))),
             chatRepository = ChatRepository(CoordinatorChatDao()),
-            requestJson = { _, _, _, _ ->
+            requestJson = { _, _, _, _, _ ->
                 """{"reply":"候选修改","expenses":[],"actions":[
                     {"action":"update","expense_id":7,"amount":20}
                 ]}""".trimIndent()
@@ -256,6 +256,39 @@ class ChatLlmCoordinatorTest {
 
         assertThat(result).isInstanceOf(LlmResult.Ok::class.java)
         assertThat(applyCalls).isEqualTo(1)
+    }
+
+    @Test fun queryTurnDropsModelMutationsAtCodeLevel() = runBlocking {
+        var applyCalls = 0
+        var capturedStructured: Boolean? = null
+        val coordinator = ChatLlmCoordinator(
+            expenseRepository = ExpenseRepository(CoordinatorExpenseDao()),
+            chatRepository = ChatRepository(CoordinatorChatDao()),
+            requestJson = { _, _, _, _, structured ->
+                capturedStructured = structured
+                """{"reply":"已记录35元","expenses":[
+                    {"amount":35,"category":"food","note":"午饭","occurred_at":null}
+                ],"actions":[]}""".trimIndent()
+            },
+            applyPlan = {
+                applyCalls++
+                MutationApplyResult(listOf(1L), listOf(1L), assistantMessageId = 1L)
+            },
+            nowProvider = { 1_786_000_000_000L },
+        )
+
+        val result = coordinator.submit(
+            "这个月吃饭花了多少？",
+            prefs(),
+            ChatTurnContext(allowMutations = false, suppressMutationGuard = true, structuredRequest = true),
+        )
+
+        assertThat(capturedStructured).isTrue()
+        val ok = result as LlmResult.Ok
+        assertThat(ok.replyText).isEqualTo("已记录35元")
+        assertThat(ok.expenseIds).isEmpty()
+        // 若不拦截，本轮的 expenses 会走"新增直接执行"路径真实落库。
+        assertThat(applyCalls).isEqualTo(0)
     }
 
     private fun prefs() = UserPrefsSnapshot(

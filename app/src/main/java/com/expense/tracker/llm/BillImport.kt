@@ -30,6 +30,7 @@ suspend fun importFromBillText(
         userText = LlmPrompt.billImportPrompt(ocrText),
         systemPrompt = LlmPrompt.billImportSystemPrompt(),
         installationId = config.installationId,
+        enableThinking = LlmThinkingPolicy.enableThinkingFor(structuredRequest = true, model = config.model),
     )
     val parsed = BillImportParser.parseResult(raw)
     BillImportResult.Ok(expenses = parsed.expenses, reply = parsed.reply)

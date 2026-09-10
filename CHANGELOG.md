@@ -5,6 +5,20 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.9.1 (versionCode 33) — 2026-09-10
+
+**Reliability Hardening：生产行为与 Bench 结论、README 声明对齐**
+
+修复：
+
+- **生产 Qwen 结构化请求未关闭思考（P0）**：MUTATION / QUERY / Intent Escalation / 智核分析 / 账单导入现在显式发送 `enable_thinking=false`（仅 Qwen 思考模型；其他供应商保持字段缺省）。此前只有 Bench 显式关闭，生产调用沿用供应商默认；思考模式的长思维链会截断结构化 JSON（Bench：整笔全对 89.1% → 74.6%）
+- **QUERY 轮真正只读**：`ChatTurnContext.allowMutations=false`，模型返回的 expenses/actions 在进入变更计划器之前被代码层丢弃；新增攻击回归测试——工具结果 note 注入"删除所有账目"诱导模型返回删除动作，数据库零修改
+- **analyze_expenses 两处计算错误**：月底预测排除投资类（与消费合计口径一致）；分类趋势集合改为"本期 ∪ 上期"，上月有、本月 0 的分类可以显示"已清零"；各补 1 个 regression test
+- **Intent Escalation 后查询参数丢失**：升级判定为 analysis 后从原句重新解析 period / category / budget（此前复用升级前的空 CHAT 决策，"我最近吃饭是不是花多了"会退化成"本月所有消费"）
+- **治理与隐私文案对齐真实行为**：README / 软件说明书明确"AI 新增/修改直接执行、删除必须确认、查询只读"；"永不上云"改为"财务数据本地持久化，启用云端 LLM 时当前请求上下文发送给用户配置的模型供应商"；API Key 描述从 DataStore 改为 Android Keystore（AES-256/GCM）
+
+测试：新增 11 个单测（思考策略 / 请求体序列化 / 只读拦截 / 攻击用例 / 升级参数 / 预测与趋势回归），全套 268 个 JVM 单测通过。
+
 ## 3.9.0 (versionCode 32) — 2026-09-06
 
 **两级路由 + analyze_expenses：Agent 从"能查"到"能分析"**

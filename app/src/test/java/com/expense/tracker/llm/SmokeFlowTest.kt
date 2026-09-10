@@ -41,7 +41,7 @@ class SmokeFlowTest {
     ): ChatLlmCoordinator = ChatLlmCoordinator(
         expenseRepository = ExpenseRepository(expenseDao),
         chatRepository = ChatRepository(chatDao),
-        requestJson = { _, _, _, _ -> responseJson },
+        requestJson = { _, _, _, _, _ -> responseJson },
         applyPlan = LlmMutationApplier(
             ExpenseRepository(expenseDao),
             ChatRepository(chatDao),

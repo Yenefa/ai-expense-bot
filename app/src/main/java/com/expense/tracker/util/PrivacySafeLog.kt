@@ -14,6 +14,10 @@ internal object PrivacySafeLog {
         "llm_response_parsed expense_count=$expenseCount action_count=$actionCount"
     }
 
+    fun llmMutationsBlocked(expenseCount: Int, actionCount: Int) = debug {
+        "llm_mutations_blocked expense_count=$expenseCount action_count=$actionCount"
+    }
+
     fun llmRequestFailed() = debug { "llm_request_failed" }
 
     private inline fun debug(message: () -> String) {

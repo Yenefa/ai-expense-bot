@@ -24,3 +24,20 @@
 ## 下一步
 - 大统领 tcb login 后部署云函数 + 下载站
 - 实体手机覆盖安装复测
+
+---
+
+# AGENT_LOG.md — 2026-09-10 v3.9.1 Reliability Hardening（opencode）
+
+## 范围（owner 下发的 6 条验收，全部达成）
+1. 结构化 Qwen 请求 thinking=false（MUTATION/QUERY/Escalation/智核分析/账单导入，仅 Qwen；CHAT 保持供应商默认）
+2. QUERY 代码层只读（ChatTurnContext.allowMutations=false，含工具结果注入攻击回归）
+3. analyze_expenses 两处计算修复（预测排除投资；趋势取本期∪上期显示"已清零"）
+4. Escalation 后重解析 period/category/budget（不再复用空 CHAT 决策）
+5. README / 软件说明书与真实行为一致（新增/修改直接执行、删除确认；云端 LLM 上下文披露；API Key = Android Keystore）
+6. 全量 JVM tests green：257 → 268，0 failed
+
+## 记录
+- 变更、决策与技术选型全文：`docs/v3.9.1-reliability-hardening.md`
+- 新增 11 个单测：LlmThinkingPolicyTest / LlmClientThinkingTest / ChatLlmCoordinatorTest / ExpenseAgentTest / AgentToolsAnalyzeTest
+- 未实施（下一阶段）：ExpenseBench v2 四桶 — negative false-positive / multi-temporal / router-ambiguous / multi-turn

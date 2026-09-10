@@ -67,7 +67,7 @@ fun UserManualScreen(onClose: () -> Unit) {
 
             Spacer(Modifier.size(16.dp))
             Text(
-                "欢迎使用 Y.E cost — 一款对话式智能记账 Android App。所有数据只存在你的手机本地。",
+                "欢迎使用 Y.E cost — 一款对话式智能记账 Android App。财务数据只存在你的手机本地；启用云端 LLM 时，当前请求所需的上下文会发送给你配置的模型服务。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = AppColors.TextSecondary,
             )
@@ -90,6 +90,7 @@ fun UserManualScreen(onClose: () -> Unit) {
                 title = "思考模式 — 自然语言记账",
                 lines = listOf(
                     "示例：「午饭35块，下午买了杯18的咖啡」 → AI 自动拆成两笔记账",
+                    "写操作规则：AI 新增/修改账目直接执行，删除账目必须先确认；查询轮为只读，模型不会修改任何数据",
                     "也可以闲聊：「今天天气真好」 → AI 正常对话，不会强行记账",
                     "支持相对时间：「昨天买了双鞋200」「上周三花了50打车」 → AI 基于真实当前时间算出绝对日期",
                     "回复会逐字打字出现，配合三点跳动的思考动画",
@@ -158,7 +159,7 @@ fun UserManualScreen(onClose: () -> Unit) {
                 title = "数据安全",
                 lines = listOf(
                     "记账数据存在手机本地 SQLite（/data/data 私有目录）",
-                    "API Key 存在本地 DataStore，仅在发起 AI 请求时发送给你配置的模型服务，且不会写入完整备份文件",
+                    "API Key 由 Android Keystore 加密保存在手机本地，仅在发起 AI 请求时随请求发送给你配置的模型服务，且不会写入完整备份文件",
                     "App 不收集、不联网上传任何用户行为数据",
                     "唯一会发请求的就是你配置的 LLM API（地址由你自己填）",
                     "升级 App（同签名）数据不会丢；签名变了或卸载会清空",

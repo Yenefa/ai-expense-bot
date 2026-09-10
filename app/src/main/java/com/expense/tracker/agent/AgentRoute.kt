@@ -26,7 +26,8 @@ data class AgentDecision(
 /**
  * 意图路由（v3.8 Agent 层）：本地确定性规则，零成本、零延迟，
  * 决定消息走记账管线还是先执行查询工具。
- * 误判兜底：QUERY 轮的 LLM 仍可输出 expenses/actions，记账不会因路由丢失。
+ * QUERY 轮只读：即使 LLM 输出 expenses/actions 也会被代码层拒绝，
+ * 被误判为查询的记账请求需要用户重新表述（安全优先于便利）。
  */
 object AgentRouter {
 
@@ -37,13 +38,7 @@ object AgentRouter {
         }
         val softQuery = QUERY_TOPIC.containsMatchIn(normalized) && QUESTION_TONE.containsMatchIn(normalized)
         if (STRONG_QUERY.containsMatchIn(normalized) || softQuery) {
-            return AgentDecision(
-                route = AgentRoute.QUERY,
-                period = AgentPeriodResolver.resolve(normalized, nowMillis, zone)
-                    ?: AgentPeriodResolver.defaultMonth(nowMillis, zone),
-                categories = AgentCategories.resolve(normalized),
-                wantBudget = BUDGET_INTENT.containsMatchIn(normalized),
-            )
+            return queryDecision(normalized, nowMillis, zone)
         }
         val interpretation = ExpenseTextInterpreter.interpret(normalized, nowMillis, zone)
         return if (interpretation.amountMentionCount > 0) {
@@ -51,6 +46,21 @@ object AgentRouter {
         } else {
             AgentDecision(AgentRoute.CHAT)
         }
+    }
+
+    /**
+     * 从原句重新解析查询参数（时段 / 分类 / 预算）。Intent Escalation 把路由从 CHAT
+     * 升级为分析时，必须重新跑这里，不能复用升级前的空 CHAT 决策。
+     */
+    fun queryDecision(text: String, nowMillis: Long, zone: ZoneId = ZoneId.systemDefault()): AgentDecision {
+        val normalized = text.trim()
+        return AgentDecision(
+            route = AgentRoute.QUERY,
+            period = AgentPeriodResolver.resolve(normalized, nowMillis, zone)
+                ?: AgentPeriodResolver.defaultMonth(nowMillis, zone),
+            categories = AgentCategories.resolve(normalized),
+            wantBudget = BUDGET_INTENT.containsMatchIn(normalized),
+        )
     }
 
     private val MUTATION_INTENT = Regex(

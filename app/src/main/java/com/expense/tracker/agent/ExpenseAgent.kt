@@ -28,9 +28,10 @@ class ExpenseAgent(
         val decision = AgentRouter.route(text, nowProvider(), zone)
         return when {
             decision.route == AgentRoute.QUERY -> submitQuery(text, prefs, decision)
+            decision.route == AgentRoute.MUTATION -> coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
             decision.route == AgentRoute.CHAT &&
                 escalateIntent != null &&
-                AgentRouter.needsEscalation(text) -> submitEscalated(text, prefs, decision)
+                AgentRouter.needsEscalation(text) -> submitEscalated(text, prefs)
             else -> coordinator.submit(text, prefs)
         }
     }
@@ -40,12 +41,15 @@ class ExpenseAgent(
     fun cancel(token: String): Boolean = coordinator.cancel(token)
 
     /** 升级路径：确认是分析意图才执行工具；升级失败或判为 record/chat 都回退原管线。 */
-    private suspend fun submitEscalated(text: String, prefs: UserPrefsSnapshot, decision: AgentDecision): LlmResult {
+    private suspend fun submitEscalated(text: String, prefs: UserPrefsSnapshot): LlmResult {
         val escalation = runCatching { escalateIntent?.invoke(text) }.getOrNull()
-        return if (escalation != null && escalation.isAnalysis && escalation.requiresTools) {
-            submitQuery(text, prefs, decision)
-        } else {
-            coordinator.submit(text, prefs)
+        return when {
+            escalation != null && escalation.isAnalysis && escalation.requiresTools ->
+                // 升级前是 CHAT 决策（时段/分类/预算都是空的），必须用原句重新解析，
+                // 否则"我最近吃饭是不是花多了"会退化成"本月所有消费分析"。
+                submitQuery(text, prefs, AgentRouter.queryDecision(text, nowProvider(), zone))
+            escalation?.intent == "record" -> coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
+            else -> coordinator.submit(text, prefs)
         }
     }
 
@@ -70,7 +74,14 @@ class ExpenseAgent(
             turnContext = ChatTurnContext(
                 systemPromptSuffix = suffix,
                 suppressMutationGuard = true,
+                allowMutations = false,
+                structuredRequest = true,
             ),
         )
+    }
+
+    private companion object {
+        /** 记账/删改轮：要求结构化 JSON，Qwen 下显式关闭思考。 */
+        val MUTATION_TURN_CONTEXT = ChatTurnContext(structuredRequest = true)
     }
 }

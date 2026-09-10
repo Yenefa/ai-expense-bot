@@ -79,6 +79,45 @@ class AgentToolsAnalyzeTest {
     }
 
     @Test
+    fun `月底预测排除投资类`() = runBlocking<Unit> {
+        dao.insert(entity(3500, "food", LocalDate.of(2026, 9, 5)))
+        dao.insert(entity(100_000, "investment", LocalDate.of(2026, 9, 7)))
+        val result = AgentTools.analyzeExpenses(context(), monthSpec(), epoch(2026, 9, 9), zone)
+        assertThat(result.forecast).isNotNull()
+        // 预测口径 = 消费合计（不含投资）：3500/9 * 30，而不是 (3500+100000)/9 * 30。
+        assertThat(result.forecast!!.projectedCents).isEqualTo(3500L * 30 / 9)
+    }
+
+    @Test
+    fun `上月有本月零的分类进入趋势并显示已清零`() = runBlocking<Unit> {
+        dao.insert(entity(2000, "food", LocalDate.of(2026, 9, 3)))
+        dao.insert(entity(1800, "drink", LocalDate.of(2026, 8, 10)))
+        val result = AgentTools.analyzeExpenses(context(), monthSpec(), epoch(2026, 9, 9), zone)
+
+        val drink = result.trends.first { it.categoryId == "drink" }
+        assertThat(drink.currentCents).isEqualTo(0L)
+        assertThat(drink.previousCents).isEqualTo(1800L)
+
+        val rendered = AgentPrompts.toolResultBlock(
+            QueryToolResult(
+                periodLabel = "2026-09（本月）",
+                filteredCategories = emptySet(),
+                totalCents = 2000L,
+                totalCount = 1,
+                byCategory = emptyList(),
+                investmentCents = 0L,
+                topNotes = emptyList(),
+                records = emptyList(),
+                recordsTruncated = false,
+            ),
+            budget = null,
+            analyze = result,
+        )
+        assertThat(rendered).contains("饮品")
+        assertThat(rendered).contains("已清零")
+    }
+
+    @Test
     fun `非整月区间不预测`() = runBlocking<Unit> {
         seed()
         val spec = AgentPeriodSpec(

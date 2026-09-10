@@ -6,13 +6,13 @@
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin)](https://kotlinlang.org)
 
-一款"像和 AI 聊天一样记账"的 Android 原生 App。所有数据**只存手机本地** SQLite，永不上云。
+一款"像和 AI 聊天一样记账"的 Android 原生 App。**财务数据本地持久化**（SQLite）；启用云端 LLM 时，完成当前请求所需的上下文会发送给**你配置的模型供应商**。
 
 ---
 
 ## 🤖 Expense Agent（v3.9）
 
-不只是一个"LLM 解析器"。Agent 层在每次对话前先做**两级路由**：读路径走端侧确定性工具，写路径全部经过确认门。
+不只是一个"LLM 解析器"。Agent 层在每次对话前先做**两级路由**：读路径走端侧确定性工具，写路径按产品规则执行确认。
 
 ```
                  用户
@@ -22,13 +22,13 @@
      读路径                  写路径
        │                       │
  规则快路径                LLM 变更计划
- （本地正则，零延迟）            │
-       │                 确认门（Human Confirm）
- 意图升级 Escalation           │
- （快路径不命中但句子带     Commit → Room
-  分析特征时，才发一次
-  轻量 LLM 调用判意图）
-       │
+（本地正则，零延迟）       ┌─────┴─────┐
+       │              新增/修改      删除
+ 意图升级 Escalation      │            │
+（规则不命中但句子带    直接执行   确认门（Human Confirm）
+ 分析特征时，才发一次      │            │
+ 轻量 LLM 调用判意图）     └─────┬─────┘
+       │                     Commit → Room
  端侧工具（数字来自 Room，不可能被编造）
  query_expenses / analyze_expenses / get_budget_status
        │
@@ -36,8 +36,10 @@
 ```
 
 - 「这个月吃饭花多少」「预算还剩多少」「比上个月多花了吗」直接在对话里回答，不用翻统计页
-- `analyze_expenses`：本期 vs 上期环比、分类趋势、按日均 pace 的月底预测 —— 环比分母为零时输出"新增支出"而不是 +∞%；样本不足 7 天宁可不给预测；预测必须标注推算依据
-- **治理原则：AI 辅助决策，用户拥有最终控制权** —— 读路径全自动，所有写操作（记账/删改/预算/记忆）必须人工确认后才落库
+- 查询轮**代码层只读**：即使模型被提示词注入诱导返回 expenses/actions，也会在进入变更计划器之前被丢弃，数据库零修改
+- `analyze_expenses`：本期 vs 上期环比、分类趋势（含"上月有、本月 0 → 已清零"）、按日均 pace 的月底预测（投资类不计入）—— 环比分母为零时输出"新增支出"而不是 +∞%；样本不足 7 天宁可不给预测；预测必须标注推算依据
+- **治理原则：AI 辅助决策，用户拥有最终控制权** —— 读路径全自动且只读；写路径中**新增/修改按产品规则直接执行，删除必须人工确认**后才落库
+- **Qwen 结构化请求显式关闭思考**：MUTATION / QUERY / Intent Escalation / 智核分析 / 账单导入均发送 `enable_thinking=false`；普通闲聊保持供应商默认。ExpenseBench 实测思考模式会把整笔全对从 89.1% 拉到 74.6%
 
 ## 📊 ExpenseBench
 
@@ -154,7 +156,7 @@ JDK 要求：**JDK 17**（Android Studio 自带的 JBR 即可，`export JAVA_HOM
    - **Model**：模型名（`deepseek-chat` / `gpt-4o-mini` / `doubao-pro-32k` 等）
 4. 保存返回，点亮 🧠，开始用自然语言记账
 
-API Key **只存手机本地** DataStore，不上传任何第三方。
+API Key 由 **Android Keystore（AES-256/GCM）加密**保存在手机本地（`shared_prefs/secure_api_key.xml` 密文），仅在发起 AI 请求时随请求发送给你配置的模型服务，不上传任何其他第三方，也不会写入完整备份文件。
 
 ---
 
@@ -164,6 +166,8 @@ API Key **只存手机本地** DataStore，不上传任何第三方。
 
 ```bash
 # 1. 用 ADB 把旧 APP 的私有数据拉出来（debug 版可直接 run-as）
+#    注意：API Key 的密文在 shared_prefs/secure_api_key.xml（Keystore 加密且排除备份），
+#    换机迁移不在本流程内，需要在新安装里重新填写。
 adb exec-out run-as com.expense.tracker tar c databases files > app-private.tar
 tar -xf app-private.tar    # 得到 databases/expense.db 和 files/datastore/
 
@@ -185,7 +189,8 @@ adb shell am force-stop com.expense.tracker
 cat expense.db | adb exec-in run-as com.expense.tracker sh -c 'cat > databases/expense.db'
 adb shell run-as com.expense.tracker chmod 660 databases/expense.db
 
-# 7. （可选）恢复 LLM 配置
+# 7. （可选）恢复 Base URL / 模型名等非敏感配置；API Key 与订阅令牌
+#    由 Keystore 加密并排除备份，需在新安装的 LLM 设置里重新填写
 cat user_prefs.preferences_pb | adb exec-in run-as com.expense.tracker \
     sh -c 'mkdir -p files/datastore && cat > files/datastore/user_prefs.preferences_pb'
 ```
@@ -214,7 +219,7 @@ app/src/main/java/com/expense/tracker/
 │
 ├── data/
 │   ├── db/                      # Room Entity / DAO / AppDatabase
-│   ├── prefs/                   # DataStore 用户偏好
+│   ├── prefs/                   # DataStore 用户偏好（API Key 密文在 shared_prefs/secure_api_key.xml）
 │   ├── repo/                    # ExpenseRepository / ChatRepository
 │   └── model/                   # Category / Period
 │
@@ -232,7 +237,8 @@ app/src/main/java/com/expense/tracker/
 |---|---|---|
 | 记账记录 | `/data/data/com.expense.tracker/databases/expense.db` | **同签名升级不丢**；签名不同/卸载会丢 |
 | 聊天记录 | 同上（`chat_messages` 表） | 同上 |
-| LLM 配置（API Key、模型） | `files/datastore/user_prefs.preferences_pb` | 同上 |
+| LLM 配置（Base URL、模型名等） | `files/datastore/user_prefs.preferences_pb` | 同上 |
+| API Key / 订阅令牌 | `shared_prefs/secure_api_key.xml`、`shared_prefs/secure_subscription_credential.xml`（Android Keystore AES-GCM 密文） | 同签名升级保留；排除系统备份/迁移，换机、重装需重新填写 |
 | 导出的 schema | `app/schemas/com.expense.tracker.data.db.AppDatabase/N.json`（git 跟踪） | - |
 
 Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有版本升级显式注册 `Migration`。缺少迁移时应用会拒绝打开数据库，绝不会通过清空用户数据来兜底。
@@ -255,7 +261,7 @@ Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有�
 | v2.1-v2.2 | LLM 时间注入（system prompt 加 `当前时间(基准)`，杜绝瞎编日期） |
 | v2.3 | 思考三点动画 + LLM 回复逐字打字机 + 闪烁光标 |
 | v2.4 | LLM 纯文本回复容错（不再红色异常）+ 💹 投资分类（自动排除消费分析） |
-| **v2.5** | **长按消息复制 / 编辑**（user 消息 + 关联 expense 同步更新）+ **修复"返回主页时聊天列表从顶滑到底"冗余动画**（rememberSaveable 持久化滚动状态）+ **数据导出**（JSON 完整 / CSV 仅记账，系统文件选择器，离线零云上传） |
+| **v2.5** | **长按消息复制 / 编辑**（user 消息 + 关联 expense 同步更新）+ **修复"返回主页时聊天列表从顶滑到底"冗余动画**（rememberSaveable 持久化滚动状态）+ **数据导出**（JSON 完整 / CSV 仅记账，系统文件选择器，导出全程本地完成、不经过任何服务器） |
 | **v2.6** | **设置页新增 📖 软件说明书** — 9 节卡片式说明，覆盖快速开始 / 思考模式 / 模板模式 / 长按操作 / 分析 / 历史 / 设置 / 数据安全 / 小技巧 |
 | **v2.7** | **删除聊天消息编辑（无意义功能）** — 长按消息只保留"复制"。**历史明细点击行直接编辑消费记录**：金额 / 分类 / 备注 / 日期 / 时间，UPDATE 真实数据库 |
 | **v2.8** | **聊天输入框草稿持久化**（跨页面切换不丢）+ **历史明细页右上角加📅日历视图**（月历方格、每格金额+笔数，可翻月、点格筛选当天明细）+ **支出分析默认显示"周"**（更贴合日常） |
@@ -267,6 +273,9 @@ Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有�
 | **v3.5** | **🌓 深色模式** - 新增浅色 / 深色 / 跟随系统 三选一（默认跟随系统），设置页「深色模式」入口接通 ThemePickerDialog；AppColors 从静态 object 重构为 @Composable getter 委托 CompositionLocal，185 处调用零改动适配深浅色；所有 TextPrimary 背景按钮 / 卡片 / 对话框反色与层次适配；新增 ErrorBg 语义色 |
 | **v3.6** | **📥 CSV 导入 + 数据安全第一阶段** - CSV 导入支持预览、校验和去重；数据库金额改为整数分并提供无损迁移，移除破坏性迁移兜底；完整 JSON 可恢复账目（含回收站）、聊天和非敏感设置；永久删除增加二次确认 |
 | **v3.7.0** | **📊 预算 + 🔔 记账提醒 + 🔁 周期账单 + 🧩 桌面组件 + 📥 平台 CSV** - 月度/分类预算（90% 黄警/超支红警、分析页预算卡片、记账后预警）；每日补记提醒（WorkManager + 通知）；房租/订阅/工资周期账单自动生成防重复；桌面组件（本月支出 + 预算进度 + 快捷记账）；微信/支付宝账单 CSV 自动导入（平台识别、只导支出、关键词分类、GBK/UTF-8 自适应）；数据库 v4→v5（recurring_rules，迁移已验证）；完整备份含周期账单 |
+| **v3.8.0** | **Expense Agent v1** - 两级路由（记账/删改/闲聊/查询）+ 端侧工具 `query_expenses` / `get_budget_status`，查询结果注入 system prompt；ExpenseBench v1（120 条 × 6 桶） |
+| **v3.9.0** | **Intent Escalation + analyze_expenses** - 规则不命中时轻量升级调用；环比/趋势/月底预测工具；查询轮默认注入对比分析 |
+| **v3.9.1** | **Reliability Hardening** - Qwen 结构化请求显式 `enable_thinking=false`；查询轮代码层只读（注入攻击也零修改）；修复预测含投资、趋势漏"已清零"、升级后查询参数丢失；README/说明书与真实行为对齐（新增/修改直接执行、删除确认；API Key = Android Keystore） |
 
 > 版本管理规范（2026-08-08 起）：每次交付 versionCode +1、versionName 语义化递增，变更记录维护在 `CHANGELOG.md`。
 
