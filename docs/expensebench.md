@@ -82,8 +82,6 @@ LLM 评测报告必须携带完整环境指纹，否则数字不可信：
 - 「2块5」类口语金额、退款/免单语义未纳入 v1
 - LLM 评测结果依赖所接模型，不同供应商数据不可混读
 
-## 7. v2 规划（按失败分析定向扩充，不做无差别加量）
+## 7. v2（已实现）
 
-- **模糊意图桶**：「我最近是不是花太多？」→ 测 Router 升级路径的判定准确率（Router Bench）
-- **多轮上下文桶**：上一轮「我下午喝瑞幸18元」+ 本轮「昨天那杯咖啡」→ 测指代消解（LlmClient 已支持 history 注入）
-- 扩充原则：跑 → 失败分类 → 针对失败模式补例 → 再跑；失败类型比数量重要
+ExpenseBench v2 / AgentBehaviorBench 已落地：110 条 × 4 桶（negative_false_positive / multi_temporal / router_ambiguous / multi_turn），评测从"提取准确率"升级为"Agent 行为可靠性"——路由、工具选择、变更笔数、删除确认门、日期绑定、**False Mutation Rate**、端到端成功率。协议与指标见 [expensebench-v2.md](expensebench-v2.md)；离线基线见 `docs/expensebench-v2-local-report.md`。

@@ -15,6 +15,8 @@ class AgentToolContext(
     private val expenseRepository: ExpenseRepository,
     private val budgetSnapshotProvider: suspend () -> BudgetSnapshot,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    /** Bench/监控观测点：生产默认 no-op，不影响行为。 */
+    val onToolCall: (String) -> Unit = {},
 ) {
     suspend fun activeInRange(fromMillis: Long, toMillis: Long) =
         expenseRepository.observeInRange(fromMillis, toMillis).first().filter { it.deletedAt == null }
@@ -113,6 +115,7 @@ object AgentTools {
         categories: Set<String>,
         zone: ZoneId = ZoneId.systemDefault(),
     ): QueryToolResult {
+        context.onToolCall(TOOL_QUERY_EXPENSES)
         val rows = context.activeInRange(spec.fromMillis, spec.toMillis)
         val filtered = if (categories.isEmpty()) rows else rows.filter { it.categoryId in categories }
         val investmentCents = filtered
@@ -155,6 +158,7 @@ object AgentTools {
         nowMillis: Long,
         zone: ZoneId = ZoneId.systemDefault(),
     ): BudgetToolResult? {
+        context.onToolCall(TOOL_BUDGET_STATUS)
         val snapshot = context.budgetSnapshot()
         if (snapshot.monthlyLimitCents <= 0L && snapshot.categoryLimitsCents.isEmpty()) return null
         val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
@@ -189,6 +193,7 @@ object AgentTools {
         nowMillis: Long,
         zone: ZoneId = ZoneId.systemDefault(),
     ): AnalyzeToolResult {
+        context.onToolCall(TOOL_ANALYZE_EXPENSES)
         val currentRows = context.activeInRange(spec.fromMillis, spec.toMillis)
         val currentTotals = totalsOf(spec.label, currentRows)
         val previousSpec = AgentPeriodResolver.previousOf(spec, zone)
@@ -255,5 +260,8 @@ object AgentTools {
 
     const val MAX_TREND_ROWS = 6
     const val MIN_FORECAST_DAYS = 7
+    const val TOOL_QUERY_EXPENSES = "query_expenses"
+    const val TOOL_ANALYZE_EXPENSES = "analyze_expenses"
+    const val TOOL_BUDGET_STATUS = "get_budget_status"
     private const val DAY_MS = 86_400_000L
 }

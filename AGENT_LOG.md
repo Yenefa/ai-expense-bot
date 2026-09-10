@@ -40,4 +40,35 @@
 ## 记录
 - 变更、决策与技术选型全文：`docs/v3.9.1-reliability-hardening.md`
 - 新增 11 个单测：LlmThinkingPolicyTest / LlmClientThinkingTest / ChatLlmCoordinatorTest / ExpenseAgentTest / AgentToolsAnalyzeTest
-- 未实施（下一阶段）：ExpenseBench v2 四桶 — negative false-positive / multi-temporal / router-ambiguous / multi-turn
+
+---
+
+# AGENT_LOG.md — 2026-09-10 ExpenseBench v2 / AgentBehaviorBench（opencode）
+
+## 交付
+- 数据集：`app/src/test/resources/expensebench/cases-v2.jsonl`，110 条 × 4 桶（negative_false_positive 30 / multi_temporal 30 / router_ambiguous 30 / multi_turn 20）
+- 评测器：`AgentBehaviorEvaluator` — Router / Query Recall / Mutation Precision / **False Mutation Rate** / Tool Selection / Expense Count / Date Binding / E2E
+- 离线层：`LocalAgentBehaviorBenchTest` — 数据集完整性 + 前置路由与工具基线 + 多日期逐笔绑定回归 → `docs/expensebench-v2-local-report.md`
+- LLM 端到端层：`LlmAgentBehaviorBenchTest` — 真实模型 + 真实 Router/Escalation/Tools/Planner/Applier + 内存数据库（env-gated）
+- 观测钩子（生产 no-op）：`AgentToolContext.onToolCall`、`ExpenseAgent.onRouteResolved`
+- 协议：`docs/expensebench-v2.md`；README 增补 v2 段
+- 仓库卫生：`AGENT_PLAN.md` 重写为当前执行线；`KNOWN_ISSUES.md` 复核；`docs/expensebench.md` §7 指向 v2
+
+## 离线基线发现（2026-09-10）
+- 前置路由 58/80（Escalation 依赖项不在离线口径）；工具选择 9/9；多日期绑定回归通过
+- 首要发现：无元/块的裸金额（如「午饭35」）不进入 MUTATION 结构化路径 → 连带 Qwen 思考开关未显式关闭（v3.9.2 候选 #1）
+- 其他缺口：更正触发词（记错了/不对/说错了）、查询回承（那上个月呢/那这周呢/再看下饮品）
+
+## 测试
+- 全量 JVM：**278 passed / 0 failed**（v3.9.1 时 268；v2 新增 10）
+
+## owner 判断（本阶段方向，由 Yenefa 定义）
+- 阶段定性：从"模型提取准确率"升级到"Agent 行为可靠性评测"
+- 首批只做 4 桶 110 条，不直接冲 500；失败类型比数量重要
+- 首要指标 False Mutation Rate，目标 0%（"漏回答可以接受，凭空记一笔非常恶心"）
+- v2 不能只测 LLM：必须新增 AgentBehaviorBench，测完整链路的数据库终态
+- Bench v2 必须先于 Memory Governance（"我月收入8000"不能被识别成 ¥8000 支出）
+- 顺手处理仓库卫生：AGENT_PLAN 过时、KNOWN_ISSUES 待复核
+
+## 待 owner
+- 用真实模型跑 `LlmAgentBehaviorBenchTest` 全量，产出 `docs/expensebench-v2-llm-report-<model>.md`；按失败分类排 v3.9.2 修复清单

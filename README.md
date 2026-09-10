@@ -58,6 +58,13 @@
 - 端侧确定性管道报告随单测生成：`docs/expensebench-local-report.md`
 - LLM 评测按需运行（设置 `EXPENSEBENCH_API_KEY` 等环境变量后跑 `LlmExpenseBenchTest`），报告按模型分文件写入 `docs/`，带完整复现指纹
 
+### 🧭 Agent 行为基准（v2）
+
+**ExpenseBench v2 / AgentBehaviorBench**（协议见 [docs/expensebench-v2.md](docs/expensebench-v2.md)）：**110 条 × 4 桶**（negative_false_positive / multi_temporal / router_ambiguous / multi_turn），在真实 Agent 管线上端到端评测路由、工具选择、变更笔数、删除确认门、日期绑定与 **False Mutation Rate（首要指标，目标 0%）**。
+
+- 离线行为基线随单测生成：`docs/expensebench-v2-local-report.md`
+- LLM 端到端按需运行：设置 `EXPENSEBENCH_*` 后跑 `LlmAgentBehaviorBenchTest`，报告写 `docs/expensebench-v2-llm-report-<model>.md`
+
 ---
 
 ## ✨ 功能

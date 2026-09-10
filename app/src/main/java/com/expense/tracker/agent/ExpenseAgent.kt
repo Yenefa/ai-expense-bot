@@ -22,17 +22,28 @@ class ExpenseAgent(
     private val escalateIntent: (suspend (String) -> IntentEscalation?)? = null,
     private val nowProvider: () -> Long = System::currentTimeMillis,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    /** Bench/监控观测点：每轮最终生效路由（含升级结果），生产默认 no-op。 */
+    private val onRouteResolved: (AgentRoute) -> Unit = {},
 ) {
 
     suspend fun submit(text: String, prefs: UserPrefsSnapshot): LlmResult {
         val decision = AgentRouter.route(text, nowProvider(), zone)
         return when {
-            decision.route == AgentRoute.QUERY -> submitQuery(text, prefs, decision)
-            decision.route == AgentRoute.MUTATION -> coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
+            decision.route == AgentRoute.QUERY -> {
+                onRouteResolved(AgentRoute.QUERY)
+                submitQuery(text, prefs, decision)
+            }
+            decision.route == AgentRoute.MUTATION -> {
+                onRouteResolved(AgentRoute.MUTATION)
+                coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
+            }
             decision.route == AgentRoute.CHAT &&
                 escalateIntent != null &&
                 AgentRouter.needsEscalation(text) -> submitEscalated(text, prefs)
-            else -> coordinator.submit(text, prefs)
+            else -> {
+                onRouteResolved(AgentRoute.CHAT)
+                coordinator.submit(text, prefs)
+            }
         }
     }
 
@@ -44,12 +55,20 @@ class ExpenseAgent(
     private suspend fun submitEscalated(text: String, prefs: UserPrefsSnapshot): LlmResult {
         val escalation = runCatching { escalateIntent?.invoke(text) }.getOrNull()
         return when {
-            escalation != null && escalation.isAnalysis && escalation.requiresTools ->
+            escalation != null && escalation.isAnalysis && escalation.requiresTools -> {
+                onRouteResolved(AgentRoute.QUERY)
                 // 升级前是 CHAT 决策（时段/分类/预算都是空的），必须用原句重新解析，
                 // 否则"我最近吃饭是不是花多了"会退化成"本月所有消费分析"。
                 submitQuery(text, prefs, AgentRouter.queryDecision(text, nowProvider(), zone))
-            escalation?.intent == "record" -> coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
-            else -> coordinator.submit(text, prefs)
+            }
+            escalation?.intent == "record" -> {
+                onRouteResolved(AgentRoute.MUTATION)
+                coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
+            }
+            else -> {
+                onRouteResolved(AgentRoute.CHAT)
+                coordinator.submit(text, prefs)
+            }
         }
     }
 
