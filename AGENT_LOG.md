@@ -70,5 +70,14 @@
 - Bench v2 必须先于 Memory Governance（"我月收入8000"不能被识别成 ¥8000 支出）
 - 顺手处理仓库卫生：AGENT_PLAN 过时、KNOWN_ISSUES 待复核
 
+## 首轮真实评测（2026-09-11，qwen3.7-flash @ DashScope，3 轮）
+- 报告：`docs/expensebench-v2-llm-report-qwen3.7-flash.md`（含逐条失败明细）
+- 归因：`docs/expensebench-v2-triage-2026-09-11.md`
+- 关键数字：**False Mutation Rate 1.9% / 5.6% / 5.6%**（目标 0%，未达标，且 temperature=0 下仍有波动）；
+  E2E 75.5% / 72.7% / 72.7%；Query Recall 68.8%；Date Binding 92.0% / 87.4% / 86.2%
+- 假变更样本：nfp-03 年终奖3万到账 / nfp-21 房租还是2500没变 / nfp-23 信用卡欠12000 / nfp-29 标价899（均裸金额、CHAT 路径）
+- 数据丢失样本：mtp-15、mt-12（模型返回纯日期 `occurred_at` → parser 拒整批）；mtp-27（hints 误杀正确提取）
+- bench 工具升级：报告新增"失败明细"（`AgentBehaviorEvaluator.describeFailures`），每条失败可归因
+
 ## 待 owner
-- 用真实模型跑 `LlmAgentBehaviorBenchTest` 全量，产出 `docs/expensebench-v2-llm-report-<model>.md`；按失败分类排 v3.9.2 修复清单
+- 依据归因记录定义 v3.9.2 范围（候选：假变更治理 P0 → 纯日期容错 → hints 误杀 → 上下文触发词 → 查询回承）；修完重跑 3 轮对比

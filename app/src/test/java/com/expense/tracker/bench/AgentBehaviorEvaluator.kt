@@ -95,6 +95,7 @@ data class BehaviorReport(
         model: String,
         source: String,
         metadata: List<String> = emptyList(),
+        caseFailureLines: List<String> = emptyList(),
     ): String = buildString {
         val all = overall()
         appendLine("# ExpenseBench v2 — Agent 行为可靠性报告")
@@ -138,6 +139,12 @@ data class BehaviorReport(
         appendLine()
         val failed = observations.filterValues { it.error != null }
         appendLine("请求失败/管线报错：${failed.size} 条" + if (failed.isEmpty()) "" else "（" + failed.keys.take(10).joinToString("、") + "）")
+        if (caseFailureLines.isNotEmpty()) {
+            appendLine()
+            appendLine("## 失败明细")
+            appendLine()
+            caseFailureLines.forEach { appendLine("- $it") }
+        }
     }.trimEnd() + "\n"
 
     private fun pct(value: Double): String = if (value.isNaN()) "N/A" else "%.1f%%".format(value * 100)
@@ -163,6 +170,7 @@ object AgentBehaviorEvaluator {
         val falseMutation: Boolean,
         val dateScored: Int,
         val dateOk: Int,
+        val expectOk: Boolean,
         val e2eOk: Boolean,
     )
 
@@ -173,7 +181,7 @@ object AgentBehaviorEvaluator {
     ): BehaviorReport {
         val perBucket = cases.groupBy { it.bucket }
             .map { (bucket, bucketCases) ->
-                val results = bucketCases.map { evalCase(it, observations[it.id] ?: BehaviorObservation(), zone) }
+                val results = bucketCases.map { evaluateCase(it, observations[it.id] ?: BehaviorObservation(), zone) }
                 BucketBehaviorStat(
                     bucket = bucket,
                     cases = results.size,
@@ -198,7 +206,8 @@ object AgentBehaviorEvaluator {
         return BehaviorReport(perBucket, observations)
     }
 
-    private fun evalCase(case: BehaviorCase, obs: BehaviorObservation, zone: ZoneId): CaseResult {
+    /** 单条用例的逐项判定；`describeFailures` 在此基础上生成人读失败原因。 */
+    fun evaluateCase(case: BehaviorCase, obs: BehaviorObservation, zone: ZoneId = ExpenseBenchDataset.benchZone): CaseResult {
         val expectedRoute = case.expected_route
         val routerScored = expectedRoute != null
         val routerOk = routerScored && obs.route == expectedRoute
@@ -257,8 +266,50 @@ object AgentBehaviorEvaluator {
             falseMutation = falseMutation,
             dateScored = dateScored,
             dateOk = dateOk,
+            expectOk = expectOk,
             e2eOk = e2eOk,
         )
+    }
+
+    /** 失败原因（供 LLM 报告"失败明细"与 v3.9.2 归因）。 */
+    fun describeFailures(
+        case: BehaviorCase,
+        obs: BehaviorObservation,
+        zone: ZoneId = ExpenseBenchDataset.benchZone,
+    ): List<String> {
+        val result = evaluateCase(case, obs, zone)
+        if (result.e2eOk) return emptyList()
+        val reasons = mutableListOf<String>()
+        obs.error?.let { reasons += "error=$it" }
+        if (result.routerScored && !result.routerOk) {
+            reasons += "route expect=${case.expected_route} actual=${obs.route ?: "none"}"
+        }
+        if (result.toolScored && !result.toolOk) {
+            reasons += "tools expect=${case.expected_tools} actual=${obs.tools}"
+        }
+        if (result.countScored && !result.countOk) {
+            reasons += "count expect=${case.expected_mutation_count} " +
+                "actual=${obs.proposedCount}(applied=${obs.appliedCount},pending=${obs.pendingCount})"
+        }
+        if (case.expected_pending != obs.pending) {
+            reasons += "pending expect=${case.expected_pending} actual=${obs.pending}"
+        }
+        if (case.expected_active_count != null && obs.activeCount != case.expected_active_count) {
+            reasons += "active expect=${case.expected_active_count} actual=${obs.activeCount ?: "?"}"
+        }
+        if (result.falseMutation) {
+            reasons += "FALSE_MUTATION applied=${obs.appliedItems.map { it.amountCents }} pending=${obs.pendingCount}"
+        }
+        if (!result.expectOk) {
+            val expected = case.expect.joinToString { "${it.amount_cents}/${it.category}/${it.date}" }
+            val actual = obs.appliedItems.joinToString { "${it.amountCents}/${it.categoryId}/${localDate(it, zone)}" }
+            reasons += "final expect=[$expected] actual=[$actual]"
+        }
+        if (result.dateScored > 0 && result.dateOk != result.dateScored) {
+            reasons += "dates ok=${result.dateOk}/${result.dateScored}"
+        }
+        if (reasons.isEmpty()) reasons += "e2e=false"
+        return reasons
     }
 
     private fun matchItems(

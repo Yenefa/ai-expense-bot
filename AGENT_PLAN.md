@@ -21,10 +21,10 @@
 - 数据集：110 条 × 4 桶（negative_false_positive 30 / multi_temporal 30 / router_ambiguous 30 / multi_turn 20）
 - 首要指标：**False Mutation Rate（目标 0%）**；另有 Router / Query Recall / Mutation Precision / Tool / Count / Date Binding / E2E
 - 协议：`docs/expensebench-v2.md`；离线基线：`docs/expensebench-v2-local-report.md`
-- 下一步：
-  1. owner 用真实模型跑 `LlmAgentBehaviorBenchTest`（全量 110 条），产出 `docs/expensebench-v2-llm-report-<model>.md`
-  2. 按报告失败分类列出 v3.9.2 修复清单（候选已在 v2 协议 §7：裸金额路由、更正触发词、查询回承）
-  3. 修复后重跑对比 False Mutation Rate 与 E2E
+- 首轮真实评测已完成（qwen3.7-flash，2026-09-11，3 轮）：
+  - 报告 `docs/expensebench-v2-llm-report-qwen3.7-flash.md`；归因 `docs/expensebench-v2-triage-2026-09-11.md`
+  - **FMR 1.9% / 5.6% / 5.6%（目标 0%，未达标）**；E2E ~73%；Query Recall 68.8%；Date Binding ~87%
+- 下一步（等 owner 定 v3.9.2 范围；候选见归因记录）：假变更治理（P0）→ 纯日期 `occurred_at` 容错 → hints 误杀 → 上下文触发词 → 查询回承；每条修完重跑 3 轮对比
 
 ## Memory Governance（下一阶段，未开工）
 

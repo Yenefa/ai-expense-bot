@@ -101,6 +101,15 @@ class LlmAgentBehaviorBenchTest {
         }
 
         val report = AgentBehaviorEvaluator.evaluate(cases, observations)
+        val failureLines = cases.mapNotNull { case ->
+            val observation = observations[case.id] ?: return@mapNotNull null
+            val reasons = AgentBehaviorEvaluator.describeFailures(case, observation)
+            if (reasons.isEmpty()) {
+                null
+            } else {
+                "${case.id} [${case.bucket}] 「${case.text.take(24)}」：${reasons.joinToString("；")}"
+            }
+        }
         val dataPromptSha = ExpenseBenchDataset.sha256Hex(
             LlmPrompt.systemPrompt(ExpenseBenchDataset.benchNowMillis).toByteArray(Charsets.UTF_8),
         )
@@ -120,6 +129,7 @@ class LlmAgentBehaviorBenchTest {
                 "ran_at = $ranAt",
                 "复现：同哈希数据 + 同 prompt + temperature=0 + 同模型快照 ⇒ 结果应一致（±供应商非确定性）",
             ),
+            caseFailureLines = failureLines,
         )
         val safeModel = model.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val outFile = File(repoRoot(), "docs/expensebench-v2-llm-report-$safeModel.md")

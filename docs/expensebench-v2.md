@@ -93,12 +93,13 @@ EXPENSEBENCH_CONCURRENCY=4 \
 - Bench 不自动确认删除，`expected_pending` 用例验证的是"拟删除且未落库"
 - 费用口径：`expected_mutation_count` 统计拟变更（insert/update/delete）笔数，不按金额
 
-## 7. 后续（评测驱动修复）
+## 7. 首轮真实评测与归因（qwen3.7-flash，2026-09-11）
 
-跑完 LLM 版后按失败分类修复（候选）：
+- 自动报告（含逐条失败明细）：`docs/expensebench-v2-llm-report-qwen3.7-flash.md`
+- 归因记录（证据 + 候选修复，不含代码改动）：`docs/expensebench-v2-triage-2026-09-11.md`
+- 三轮关键数字：**FMR 1.9% / 5.6% / 5.6%**（目标 0%，未达标且 temperature=0 下仍有波动）；
+  E2E 75.5% / 72.7% / 72.7%；Query Recall 68.8%；Date Binding 92.0% / 87.4% / 86.2%
+- 结论：按 owner 规则，Memory Governance / Proactive Insight 后压，v3.9.2 安全性与可靠性优先
+- v3.9.2 候选（未实施，按证据排序）：假变更治理（P0）→ 纯日期 `occurred_at` 容错 → `hints` 误杀 → 上下文触发词最小规则 → 查询回承
 
-1. 前置路由：`午饭35` 这类无元/块的金额没有进入 MUTATION 结构化路径（连带 Qwen 思考开关未关闭）
-2. 更正/指代语境触发词：`记错了` / `不对` / `说错了` 不触发变更上下文加载
-3. 回承查询语境：`那上个月呢` / `那这周呢` / `再看下饮品`
-
-修完重跑全量，对比 False Mutation Rate 与 E2E。
+修完任意一条：同协议重跑全量 3 轮，对比 FMR / E2E / Query Recall / Date Binding。
