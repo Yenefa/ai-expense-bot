@@ -2,7 +2,7 @@
 
 > 面向移动端的隐私优先个人财务智能体 · LLM Agent + Tool Calling · 本地 SQLite · Android 原生
 
-[![Release](https://img.shields.io/github/v/release/sca331613-commits/ai-expense-bot)](../../releases)
+[![Release](https://img.shields.io/github/v/release/Yenefa/ai-expense-bot)](../../releases)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin)](https://kotlinlang.org)
 
@@ -10,7 +10,7 @@
 
 ---
 
-## 🤖 Expense Agent（v3.9）
+## 🤖 Expense Agent（v3.9.1）
 
 不只是一个"LLM 解析器"。Agent 层在每次对话前先做**两级路由**：读路径走端侧确定性工具，写路径按产品规则执行确认。
 
@@ -138,7 +138,7 @@
 ### 方式二：自己编译
 
 ```bash
-git clone https://github.com/sca331613-commits/ai-expense-bot.git
+git clone https://github.com/Yenefa/ai-expense-bot.git
 cd ai-expense-bot
 # 在 local.properties 里配好你的 Android SDK 路径，例如：
 #   sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
