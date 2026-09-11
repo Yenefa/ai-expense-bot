@@ -74,7 +74,7 @@ fun BudgetScreen(
     }
 
     Box(Modifier.fillMaxSize().background(AppColors.Bg)) {
-        Column(Modifier.fillMaxSize().padding(20.dp)) {
+        Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier

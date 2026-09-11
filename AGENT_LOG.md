@@ -301,3 +301,18 @@
 
 ## 坑
 - Git Bash（MSYS）会把 `/ye-cost` 转成 `A:/Git/Git/ye-cost`；`tcb hosting deploy/delete/list` 必须加 `MSYS_NO_PATHCONV=1`（已写入本记录）
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.13.1 滚动显示修复（opencode，owner 真机反馈）
+
+## 问题
+- owner 截图：预算管理页分类列表超出屏幕、底部被截断且**无法滚动**（保存按钮够不到）
+- 根因：`BudgetScreen` 内容区缺少 `verticalScroll`（文件内已有该 import 却未使用）；同类问题潜伏于 `SettingsMenuScreen` / `DataExportScreen`（无滚动 + `weight(1f)` 底部占位）
+
+## 修复
+- 三页统一：内容 Column 接入 `verticalScroll(rememberScrollState())`；移除滚动列中无效的 `weight(1f)` 占位（固定间距替代）
+- 版本 v3.13.1（versionCode 42）；release APK 重新签名，下载站同步更新
+
+## 验收
+- JVM 356/356；`assembleRelease` 成功；新 APK SHA-256 与下载站一致

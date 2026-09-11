@@ -5,6 +5,14 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.13.1 (versionCode 42) — 2026-09-11
+
+**修复：预算 / 设置页内容超出屏幕且无法滚动（owner 真机反馈）**
+
+- `BudgetScreen`：分类预算较多时底部被截断、保存按钮够不到（文件内导入了 `verticalScroll` 但未使用）→ 内容区接入 `verticalScroll(rememberScrollState())`
+- `SettingsMenuScreen` / `DataExportScreen`：同类隐患一并修复（无滚动 + `weight(1f)` 底部占位改为固定间距，避免与滚动冲突）
+- 测试：JVM 356/356 不变；release APK 重新签名并更新下载站
+
 ## 3.13.0 (versionCode 41) — 2026-09-11
 
 **P2 主动提醒通知投递 + 提醒中心 / P3 储蓄节奏接入画像计算（纯本地验收）**

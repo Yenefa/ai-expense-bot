@@ -3,6 +3,8 @@ package com.expense.tracker.ui.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,7 +76,7 @@ fun SettingsMenuScreen(
     }
 
     Box(Modifier.fillMaxSize().background(AppColors.Bg)) {
-        Column(Modifier.fillMaxSize().padding(20.dp)) {
+        Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
             // 左上返回
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -116,7 +118,7 @@ fun SettingsMenuScreen(
                 scope.launch { snackbarHost.showSnackbar("Y.E cost v$versionName — 对话式智能记账") }
             })
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.size(16.dp))
             Text(
                 "© 2026 Y.E cost · 数据仅存储在手机本地",
                 style = MaterialTheme.typography.labelSmall,

@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -174,7 +176,7 @@ fun DataExportScreen(onClose: () -> Unit) {
     }
 
     Box(Modifier.fillMaxSize().background(AppColors.Bg)) {
-        Column(Modifier.fillMaxSize().padding(20.dp)) {
+        Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
             // 顶部栏
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -289,7 +291,7 @@ fun DataExportScreen(onClose: () -> Unit) {
                 }
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.size(24.dp))
             Text(
                 "提示：完整备份可恢复全部账目、回收站、聊天和长期记忆；API Key 不会写入明文文件。",
                 style = MaterialTheme.typography.labelSmall,
