@@ -159,6 +159,7 @@ fun UserManualScreen(onClose: () -> Unit) {
                 title = "数据安全",
                 lines = listOf(
                     "记账数据存在手机本地 SQLite（/data/data 私有目录）",
+                    "长期记忆（如月收入/储蓄目标）只在你确认后才会保存；取消或过期一律不写入",
                     "API Key 由 Android Keystore 加密保存在手机本地，仅在发起 AI 请求时随请求发送给你配置的模型服务，且不会写入完整备份文件",
                     "App 不收集、不联网上传任何用户行为数据",
                     "唯一会发请求的就是你配置的 LLM API（地址由你自己填）",

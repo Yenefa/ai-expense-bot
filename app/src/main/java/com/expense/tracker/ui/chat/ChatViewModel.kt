@@ -35,6 +35,14 @@ sealed interface LlmResult {
         val token: String,
         val preview: MutationPreview,
     ) : LlmResult
+
+    /** Memory v1：长期记忆提案待人类确认（确认前不写任何持久化存储）。 */
+    data class MemoryProposalRequired(
+        val token: String,
+        val summary: String,
+        val typeLabel: String,
+    ) : LlmResult
+
     data class Error(val message: String) : LlmResult
 }
 
@@ -45,6 +53,8 @@ class ChatViewModel(
     private val llmHandler: LlmHandler,
     private val confirmationHandler: LlmConfirmationHandler = { LlmResult.Error("确认已失效") },
     private val cancellationHandler: LlmCancellationHandler = {},
+    private val memoryConfirmationHandler: LlmConfirmationHandler = { LlmResult.Error("确认已失效") },
+    private val memoryCancellationHandler: LlmCancellationHandler = {},
     private val budgetWarningProvider: suspend () -> String? = { null },
 ) : ViewModel() {
 
@@ -78,7 +88,7 @@ class ChatViewModel(
     /** 关闭 LLM 时的快速记账。 */
     fun submitTemplate(amountCents: Long, note: String = "") {
         if (amountCents <= 0L) return
-        if (internal.value.sending || internal.value.pendingConfirmation != null) return
+        if (internal.value.sending || internal.value.pendingConfirmation != null || internal.value.pendingMemory != null) return
         val cat = Category.byIdOrOther(internal.value.selectedCategoryId)
         val trimmedNote = note.trim()
         internal.update { it.copy(sending = true) }
@@ -107,7 +117,7 @@ class ChatViewModel(
     fun submitFreeText(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
-        if (internal.value.sending || internal.value.pendingConfirmation != null) return
+        if (internal.value.sending || internal.value.pendingConfirmation != null || internal.value.pendingMemory != null) return
         // 在启动协程前同步占用发送门，避免同一帧内的连续点击启动两个请求。
         internal.update { it.copy(sending = true, inputDraft = "") }
         viewModelScope.launch {
@@ -136,12 +146,43 @@ class ChatViewModel(
                 is LlmResult.ConfirmationRequired -> {
                     internal.update { it.copy(pendingConfirmation = result) }
                 }
+                is LlmResult.MemoryProposalRequired -> {
+                    internal.update { it.copy(pendingMemory = result) }
+                }
                 is LlmResult.Error -> {
                     appendError(result)
                 }
             }
             internal.update { it.copy(sending = false) }
         }
+    }
+
+    /** 确认写入长期记忆（唯一持久化入口由确认触发）。 */
+    fun confirmPendingMemory() {
+        val memory = internal.value.pendingMemory ?: return
+        internal.update { it.copy(pendingMemory = null, sending = true, thinking = true) }
+        viewModelScope.launch {
+            val result = runCatching { memoryConfirmationHandler(memory.token) }
+                .getOrElse {
+                    if (it is CancellationException) throw it
+                    LlmResult.Error(it.message ?: "保存失败，本次未记住。")
+                }
+            internal.update { it.copy(thinking = false) }
+            when (result) {
+                is LlmResult.Ok -> appendFinalResult(result)
+                is LlmResult.Error -> appendError(result)
+                else -> appendError(LlmResult.Error("确认状态异常，本次未记住。"))
+            }
+            internal.update { it.copy(sending = false) }
+        }
+    }
+
+    /** 取消记忆提案：丢弃 token，不写任何存储。 */
+    fun cancelPendingMemory() {
+        val memory = internal.value.pendingMemory ?: return
+        memoryCancellationHandler(memory.token)
+        internal.update { it.copy(pendingMemory = null) }
+        viewModelScope.launch { chatRepo.appendAssistant("已取消，这条信息不会被记住。") }
     }
 
     fun confirmPending() {
@@ -157,7 +198,7 @@ class ChatViewModel(
             when (result) {
                 is LlmResult.Ok -> appendFinalResult(result)
                 is LlmResult.Error -> appendError(result)
-                is LlmResult.ConfirmationRequired -> appendError(LlmResult.Error("确认状态异常，本次未修改。"))
+                else -> appendError(LlmResult.Error("确认状态异常，本次未修改。"))
             }
             internal.update { it.copy(sending = false) }
         }

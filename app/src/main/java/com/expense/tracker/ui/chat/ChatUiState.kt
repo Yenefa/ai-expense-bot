@@ -15,4 +15,6 @@ data class ChatUiState(
     val inputDraft: String = "",
     /** 多笔或删改操作的本地确认门；确认前数据库不会发生变化。 */
     val pendingConfirmation: LlmResult.ConfirmationRequired? = null,
+    /** 长期记忆提案确认门（v4 Memory Governance）；确认前不写记忆。 */
+    val pendingMemory: LlmResult.MemoryProposalRequired? = null,
 )

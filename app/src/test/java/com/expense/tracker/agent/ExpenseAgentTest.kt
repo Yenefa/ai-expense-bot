@@ -9,6 +9,8 @@ import com.expense.tracker.data.repo.LlmMutationApplier
 import com.expense.tracker.data.repo.MutationApplyResult
 import com.expense.tracker.data.repo.TransactionRunner
 import com.expense.tracker.llm.ChatLlmCoordinator
+import com.expense.tracker.memory.FakeUserProfileStore
+import com.expense.tracker.memory.MemoryGovernor
 import com.expense.tracker.ui.chat.LlmResult
 import com.google.common.truth.Truth.assertThat
 import java.time.Instant
@@ -41,6 +43,7 @@ class ExpenseAgentTest {
         escalateIntent: (suspend (String) -> IntentEscalation?)? = null,
         onApply: () -> Unit = {},
         initialContext: ConversationActionContext = ConversationActionContext(),
+        memoryGovernor: MemoryGovernor? = null,
     ): ExpenseAgent {
         val chatDao = FakeChatDao()
         val coordinator = ChatLlmCoordinator(
@@ -69,6 +72,7 @@ class ExpenseAgentTest {
             nowProvider = { now },
             zone = zone,
             initialConversationContext = initialContext,
+            memoryGovernor = memoryGovernor,
         )
     }
 
@@ -439,5 +443,54 @@ class ExpenseAgentTest {
         assertThat(rows).hasSize(2)
         assertThat(Instant.ofEpochMilli(rows[1].occurredAt).atZone(zone).toLocalDate())
             .isEqualTo(LocalDate.of(2026, 9, 6))
+    }
+
+    @Test
+    fun `记忆提案不调用模型也不写账目`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        val store = FakeUserProfileStore()
+        val governor = MemoryGovernor(store, nowProvider = { now }, tokenProvider = { "mem-1" })
+        val captures = mutableListOf<CapturedRequest>()
+        var applyCalls = 0
+        val agent = agent(
+            dao,
+            onCapture = { captures.add(it) },
+            onApply = { applyCalls++ },
+            responseJson = "{\"reply\":\"ok\",\"expenses\":[],\"actions\":[]}",
+            memoryGovernor = governor,
+        )
+
+        val result = agent.submit("我月收入8000", prefs())
+
+        assertThat(result).isInstanceOf(LlmResult.MemoryProposalRequired::class.java)
+        assertThat(captures).isEmpty()
+        assertThat(applyCalls).isEqualTo(0)
+        assertThat(dao.state.value).isEmpty()
+        // 确认前零写入
+        assertThat(store.snapshot()).isEmpty()
+        val pending = result as LlmResult.MemoryProposalRequired
+        assertThat(pending.typeLabel).contains("月收入")
+        assertThat(pending.summary).contains("8000")
+    }
+
+    @Test
+    fun `普通记账不被记忆检测拦截`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        val store = FakeUserProfileStore()
+        val governor = MemoryGovernor(store, nowProvider = { now })
+        val captures = mutableListOf<CapturedRequest>()
+        val agent = agent(
+            dao,
+            onCapture = { captures.add(it) },
+            responseJson = "{\"reply\":\"ok\",\"expenses\":[],\"actions\":[]}",
+            memoryGovernor = governor,
+        )
+
+        val result = agent.submit("午饭35", prefs())
+
+        assertThat(result).isInstanceOf(LlmResult.Ok::class.java)
+        assertThat(captures).hasSize(1)
+        assertThat(governor.pendingCount()).isEqualTo(0)
+        assertThat(store.snapshot()).isEmpty()
     }
 }

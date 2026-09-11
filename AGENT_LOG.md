@@ -120,4 +120,27 @@
 
 ## 决定
 - 真实 LLM Bench 仍暂停；待免费额度/替代模型/明确指令
-- 未做（后续候选）：分类灰区 gold 复核；Memory Governance 继续后压
+- 未做（后续候选）：分类灰区 gold 复核
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.10.0 Memory Governance v1（opencode）
+
+## 范围（owner：长期记忆与会话状态分离；LLM 不得从闲聊写记忆）
+- 四类长期记忆：monthly_income / savings_goal / merchant_alias / category_preference
+- 路径：用户表达 → Memory Proposal（本地确定性检测）→ 类型校验 → 预览 → Human Confirm → UserProfile
+- 唯一写入口 `MemoryGovernor.confirm`；提案阶段零写入、零 LLM 调用、零账目写入
+- UI：聊天页确认弹窗（记住/取消）；取消/过期 token 零写入
+- 存储：`user_profile_prefs` DataStore，排除系统备份与设备迁移（backup_rules/data_extraction_rules）
+
+## Bench（MemoryGovernanceBench v1，36 条）
+- 四类各 6 + 拒绝集 12；报告 `docs/memory-governance-local-report.md`
+- **Silent Memory Write Rate = 0.0%（0/36）**；提案准确率 36/36；路由 12/12；确认后持久化 24/24；提案轮 LLM 调用 0
+- 拒绝集包含：午饭35（正常记账）、预算、负债、估值、第三方收入、年终奖、无效别名分类等
+
+## 验收（本地）
+- JVM 单测 295 → **311，0 failed**（新增 16：检测 7 / 治理 5 / Agent 拦截 2 / Bench 2）
+
+## 决定 / 边界
+- v1 只保存不消费（分析/建议不注入画像）；无画像管理页
+- 后续候选：画像管理页、消费端注入、预算等扩展类型，再进 Proactive Insight

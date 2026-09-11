@@ -26,6 +26,8 @@ import com.expense.tracker.llm.AnalyticsInsightsParser
 import com.expense.tracker.llm.BillImportResult
 import com.expense.tracker.llm.importFromBillText
 import com.expense.tracker.llm.AiAccessResolver
+import com.expense.tracker.memory.MemoryGovernor
+import com.expense.tracker.memory.UserProfilePrefs
 import com.expense.tracker.ocr.MlKitOcrRecognizer
 import com.expense.tracker.ocr.OcrRecognizer
 import com.expense.tracker.ui.chat.LlmResult
@@ -38,6 +40,8 @@ class AppContainer(context: Context) {
 
     val db: AppDatabase by lazy { AppDatabase.get(appCtx) }
     val userPrefs: UserPrefs by lazy { UserPrefs.fromContext(appCtx) }
+    /** 长期记忆（UserProfile）：独立 DataStore；写入口只有 MemoryGovernor.confirm。 */
+    val memoryGovernor: MemoryGovernor by lazy { MemoryGovernor(UserProfilePrefs.create(appCtx)) }
     val subscriptionPrefs: SubscriptionPrefs by lazy { SubscriptionPrefs.fromContext(appCtx) }
     val budgetPrefs: BudgetPrefs by lazy { BudgetPrefs.fromContext(appCtx) }
     val reminderPrefs: ReminderPrefs by lazy { ReminderPrefs.fromContext(appCtx) }
@@ -103,6 +107,7 @@ class AppContainer(context: Context) {
             coordinator = chatLlmCoordinator,
             toolContext = toolContext,
             escalateIntent = escalator,
+            memoryGovernor = memoryGovernor,
         )
     }
 
@@ -120,6 +125,14 @@ class AppContainer(context: Context) {
     val llmHandler: suspend (String, UserPrefsSnapshot) -> LlmResult = expenseAgent::submit
     val llmConfirmationHandler: suspend (String) -> LlmResult = chatLlmCoordinator::confirm
     val llmCancellationHandler: (String) -> Unit = { chatLlmCoordinator.cancel(it) }
+
+    /** 长期记忆确认：唯一的 persist 触发点（人类确认）。 */
+    val llmMemoryConfirmationHandler: suspend (String) -> LlmResult = { token ->
+        memoryGovernor.confirm(token)?.let { fact ->
+            LlmResult.Ok(replyText = "✅ 已记住：${fact.summary()}")
+        } ?: LlmResult.Error("这条记忆确认已失效，请重新说一次。")
+    }
+    val llmMemoryCancellationHandler: (String) -> Unit = { memoryGovernor.cancel(it) }
 
     /** 记账后的预算预警文案（达到 90% 或超支时非空）。 */
     val budgetWarningProvider: suspend () -> String? = suspend {

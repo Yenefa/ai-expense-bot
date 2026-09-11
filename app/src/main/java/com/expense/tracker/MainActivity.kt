@@ -72,6 +72,8 @@ class MainActivity : ComponentActivity() {
                 llmHandler = container.llmHandler,
                 confirmationHandler = container.llmConfirmationHandler,
                 cancellationHandler = container.llmCancellationHandler,
+                memoryConfirmationHandler = container.llmMemoryConfirmationHandler,
+                memoryCancellationHandler = container.llmMemoryCancellationHandler,
                 budgetWarningProvider = container.budgetWarningProvider,
             ) as T
         }

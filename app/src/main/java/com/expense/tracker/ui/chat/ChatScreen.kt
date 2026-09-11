@@ -60,10 +60,12 @@ fun ChatScreen(
 
     // 任意弹窗打开时拦截系统返回键，只关弹窗，不退出 App
     BackHandler(
-        enabled = bubbleCategoryId != null || actionSheetTarget != null || state.pendingConfirmation != null,
+        enabled = bubbleCategoryId != null || actionSheetTarget != null ||
+            state.pendingConfirmation != null || state.pendingMemory != null,
     ) {
         when {
             state.pendingConfirmation != null -> vm.cancelPending()
+            state.pendingMemory != null -> vm.cancelPendingMemory()
             actionSheetTarget != null -> actionSheetTarget = null
             else -> bubbleCategoryId = null
         }
@@ -188,6 +190,26 @@ fun ChatScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = vm::cancelPending) { Text("取消") }
+                },
+            )
+        }
+
+        // Memory v1：长期记忆提案需要人类确认；确认前不写任何存储。
+        state.pendingMemory?.let { memory ->
+            AlertDialog(
+                onDismissRequest = vm::cancelPendingMemory,
+                title = { Text("记住这条长期信息？") },
+                text = {
+                    Column {
+                        Text("${memory.typeLabel}：${memory.summary}")
+                        Text("只有你确认后才会保存到本地画像；也可以随时取消。")
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = vm::confirmPendingMemory) { Text("记住") }
+                },
+                dismissButton = {
+                    TextButton(onClick = vm::cancelPendingMemory) { Text("取消") }
                 },
             )
         }

@@ -31,16 +31,20 @@
   - `ConversationActionContext`：条件更正（上一轮记账 + 最近账目 + 更正词）、条件续记（也是35）、Query 回承（那X呢/再看下X）
   - 离线基线：前置路由 74/80 → **80/80**；Query 前置召回 14/16 → **16/16**；工具 16/16；JVM **295/295**
 - **LLM Bench 暂停**：不再自动三轮全量；待免费额度/替代模型/明确指令先跑 smoke
-- 后续候选：分类灰区 gold 复核；Memory Governance 继续后压
+- 后续候选：分类灰区 gold 复核
 
-## Memory Governance（下一阶段，未开工）
+## Memory Governance（v3.10.0 v1 已完成，2026-09-11）
 
-「我月收入8000」→ 不是 Expense → Memory Proposal → 预览 → Confirm → UserProfile。
-v2 的 negative_false_positive 桶保证它不会被识别成 ¥8000 支出。
+- 路径：用户表达 → Memory Proposal（本地确定性检测）→ 类型校验 → 预览 → **Human Confirm** → UserProfile
+- 四类：monthly_income / savings_goal / merchant_alias / category_preference；唯一写入口 `MemoryGovernor.confirm`，LLM 无写接口
+- MemoryGovernanceBench 36 条（四类 + 拒绝集）：**Silent Memory Write Rate = 0%**；提案轮 llmCalls = 0
+- v1 边界：只保存不消费；无画像管理页
+- 下一步候选：画像管理页（查看/删除）、消费端注入（分析/建议读取画像）、预算等扩展类型，再进 Proactive Insight
 
 ## 历史里程碑（简）
 
 v3.6 AI 安全（日期/确认/解析提速）→ v3.7 预算/提醒/周期账单/桌面组件 → v3.8 Agent v1 + ExpenseBench v1 →
 v3.9 Intent Escalation + analyze_expenses → v3.9.1 Reliability Hardening（thinking 门控 / QUERY 只读 / analyze 修复 / Escalation 参数 / 文案对齐）→
 v3.9.2 本地安全加固（CHAT write firewall / Router 收敛 / 纯日期容错 / partial hints）→
-v3.9.3 会话上下文路由（条件更正 / 条件续记 / Query 回承）
+v3.9.3 会话上下文路由（条件更正 / 条件续记 / Query 回承）→
+v3.10.0 Memory Governance v1（四类提案 / 确认门 / Silent Memory Write Rate = 0）

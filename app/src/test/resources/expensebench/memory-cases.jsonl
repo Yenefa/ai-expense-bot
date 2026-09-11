@@ -1,0 +1,36 @@
+{"id":"mem-01","bucket":"propose_income","text":"我月收入8000","expect_type":"monthly_income","expect_amount_cents":800000}
+{"id":"mem-02","bucket":"propose_income","text":"我月薪1万","expect_type":"monthly_income","expect_amount_cents":1000000}
+{"id":"mem-03","bucket":"propose_income","text":"每月工资到手9500","expect_type":"monthly_income","expect_amount_cents":950000}
+{"id":"mem-04","bucket":"propose_income","text":"工资是8000块","expect_type":"monthly_income","expect_amount_cents":800000}
+{"id":"mem-05","bucket":"propose_income","text":"我每个月收入2万","expect_type":"monthly_income","expect_amount_cents":2000000}
+{"id":"mem-06","bucket":"propose_income","text":"月薪8000元","expect_type":"monthly_income","expect_amount_cents":800000}
+{"id":"mem-07","bucket":"propose_savings","text":"我每月想存2000","expect_type":"savings_goal","expect_amount_cents":200000}
+{"id":"mem-08","bucket":"propose_savings","text":"储蓄目标是5万","expect_type":"savings_goal","expect_amount_cents":5000000}
+{"id":"mem-09","bucket":"propose_savings","text":"每次发工资先攒3000","expect_type":"savings_goal","expect_amount_cents":300000,"note":"收入与储蓄同句：取离金额更近的关键词"}
+{"id":"mem-10","bucket":"propose_savings","text":"计划每月存1500","expect_type":"savings_goal","expect_amount_cents":150000}
+{"id":"mem-11","bucket":"propose_savings","text":"我要攒够2万","expect_type":"savings_goal","expect_amount_cents":2000000}
+{"id":"mem-12","bucket":"propose_savings","text":"每月存500块","expect_type":"savings_goal","expect_amount_cents":50000}
+{"id":"mem-13","bucket":"propose_alias","text":"以后瑞幸都算饮品","expect_type":"merchant_alias","expect_merchant":"瑞幸","expect_category":"drink"}
+{"id":"mem-14","bucket":"propose_alias","text":"把星巴克记成饮品","expect_type":"merchant_alias","expect_merchant":"星巴克","expect_category":"drink"}
+{"id":"mem-15","bucket":"propose_alias","text":"麦当劳算餐饮","expect_type":"merchant_alias","expect_merchant":"麦当劳","expect_category":"food"}
+{"id":"mem-16","bucket":"propose_alias","text":"肯德基都归餐饮","expect_type":"merchant_alias","expect_merchant":"肯德基","expect_category":"food"}
+{"id":"mem-17","bucket":"propose_alias","text":"以后滴滴都算交通","expect_type":"merchant_alias","expect_merchant":"滴滴","expect_category":"transport"}
+{"id":"mem-18","bucket":"propose_alias","text":"把瑞幸记到咖啡","expect_type":"merchant_alias","expect_merchant":"瑞幸","expect_category":"drink"}
+{"id":"mem-19","bucket":"propose_preference","text":"我主要的花销都在吃饭","expect_type":"category_preference","expect_category":"food"}
+{"id":"mem-20","bucket":"propose_preference","text":"平时消费最多的是交通","expect_type":"category_preference","expect_category":"transport"}
+{"id":"mem-21","bucket":"propose_preference","text":"我的大部分支出都是房租","expect_type":"category_preference","expect_category":"housing"}
+{"id":"mem-22","bucket":"propose_preference","text":"主要开销是吃饭","expect_type":"category_preference","expect_category":"food"}
+{"id":"mem-23","bucket":"propose_preference","text":"大多数消费都在购物","expect_type":"category_preference","expect_category":"shopping"}
+{"id":"mem-24","bucket":"propose_preference","text":"平时花钱最多的是娱乐","expect_type":"category_preference","expect_category":"entertainment"}
+{"id":"mem-25","bucket":"reject","text":"午饭35","expect_route":"MUTATION","expect_mutation_count":1,"note":"正常记账不受 Memory 检测影响"}
+{"id":"mem-26","bucket":"reject","text":"这个月花了多少？","expect_route":"QUERY","expect_mutation_count":0}
+{"id":"mem-27","bucket":"reject","text":"你好呀","expect_route":"CHAT","expect_mutation_count":0}
+{"id":"mem-28","bucket":"reject","text":"预算是2000","expect_route":"QUERY","expect_mutation_count":0,"note":"v1 不做预算记忆；QUERY 只读不落库"}
+{"id":"mem-29","bucket":"reject","text":"我想存钱","expect_route":"CHAT","expect_mutation_count":0,"note":"无金额，不构成储蓄提案"}
+{"id":"mem-30","bucket":"reject","text":"这手机3500值不值","expect_route":"CHAT","expect_mutation_count":0}
+{"id":"mem-31","bucket":"reject","text":"信用卡还欠着12000","expect_route":"CHAT","expect_mutation_count":0}
+{"id":"mem-32","bucket":"reject","text":"同事月薪两万","expect_route":"CHAT","expect_mutation_count":0,"note":"第三方收入不能记成我的月收入"}
+{"id":"mem-33","bucket":"reject","text":"年终奖3万到账了","expect_route":"CHAT","expect_mutation_count":0,"note":"v1 只做 monthly_income"}
+{"id":"mem-34","bucket":"reject","text":"把昨天那杯咖啡记成20","expect_route":"MUTATION","note":"无效分类必须被类型校验拒绝"}
+{"id":"mem-35","bucket":"reject","text":"我月收入还没确定","expect_route":"CHAT","expect_mutation_count":0,"note":"无金额不提案"}
+{"id":"mem-36","bucket":"reject","text":"记账：晚饭45","expect_route":"MUTATION","expect_mutation_count":1}

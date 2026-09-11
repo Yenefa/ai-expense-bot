@@ -3,6 +3,7 @@ package com.expense.tracker.agent
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.llm.ChatLlmCoordinator
 import com.expense.tracker.llm.ChatTurnContext
+import com.expense.tracker.memory.MemoryGovernor
 import com.expense.tracker.ui.chat.LlmResult
 import com.expense.tracker.util.PrivacySafeLog
 import java.time.ZoneId
@@ -29,6 +30,8 @@ class ExpenseAgent(
     private val onRouteResolved: (AgentRoute) -> Unit = {},
     /** 会话起点上下文（测试/未来会话恢复用），默认空。 */
     initialConversationContext: ConversationActionContext = ConversationActionContext(),
+    /** 长期记忆治理器（Memory v1）；null = 不启用提案。 */
+    private val memoryGovernor: MemoryGovernor? = null,
 ) {
     private var conversationContext: ConversationActionContext = initialConversationContext
     private var lastTurn: TurnMeta? = null
@@ -40,6 +43,12 @@ class ExpenseAgent(
     )
 
     suspend fun submit(text: String, prefs: UserPrefsSnapshot): LlmResult {
+        // Memory v1：本地检测 + 类型校验后的提案优先于全部 LLM 路径。
+        // 本轮不调用模型、不写账目；且确认前不写记忆（提案只挂起）。
+        memoryGovernor?.propose(text)?.let { proposal ->
+            lastTurn = null
+            return LlmResult.MemoryProposalRequired(proposal.token, proposal.summary, proposal.typeLabel)
+        }
         val decision = AgentRouter.route(text, nowProvider(), zone, conversationContext)
         lastTurn = null
         val result = when {

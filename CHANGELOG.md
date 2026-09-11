@@ -5,6 +5,25 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.10.0 (versionCode 36) — 2026-09-11
+
+**Memory Governance v1：长期记忆只能经人类确认写入（纯本地验收）**
+
+新增：
+
+- **长期记忆四类**：`monthly_income` / `savings_goal` / `merchant_alias` / `category_preference`
+- **治理路径**：用户表达 → Memory Proposal → 类型校验 → 预览 → Human Confirm → UserProfile；唯一持久化入口是 `MemoryGovernor.confirm`（人类确认），**LLM 不持有任何记忆写接口**
+- **确定性提案**：本地检测（含金额邻近关键词校验、第三方转述拒绝）+ 独立类型校验（金额范围/分类合法性）；提案轮不调用模型、不写账目、不写记忆
+- **确认 UI**：聊天页记忆确认弹窗（记住 / 取消）；取消与过期 token 均零写入
+- **存储**：UserProfile 独立 DataStore（`user_profile_prefs`），排除系统备份与设备迁移
+- **MemoryGovernanceBench**：36 条（四类正例 + 12 条拒绝集），首要指标 **Silent Memory Write Rate = 0%**
+
+测试：295 → **311 个 JVM 单测全部通过**（新增 16：检测 7 / 治理 5 / Agent 拦截 2 / Bench 2）。
+
+边界（v1）：只保存不消费（分析/建议暂不注入画像）；无画像管理页；预算等其余记忆类型后续版本。
+
+> 真实 LLM Bench 仍暂停（owner 决定，纯本地验收）。
+
 ## 3.9.3 (versionCode 35) — 2026-09-11
 
 **会话上下文路由：条件更正 / 续记 / Query 回承（纯本地验收）**
