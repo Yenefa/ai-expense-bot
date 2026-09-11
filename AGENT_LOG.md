@@ -191,3 +191,21 @@
 ## 结果
 - 完整链路成型：Deterministic Routing → Short-term Context → Governed Memory → Scoped Memory Read → Deterministic Finance Tools → Controlled Mutation → Rule-governed Proactive Insight
 - 后续候选：系统通知投递与提醒中心、分类级异常基线、LLM 文案真实复测
+
+---
+
+# AGENT_LOG.md — 2026-09-11 真实模型复测（owner 指令，opencode）
+
+## 范围
+- `LlmAgentBehaviorBenchTest`，qwen3.7-flash @ DashScope，110 条 × 3 轮全量（temperature=0，enable_thinking=false）
+
+## 结果（加固前 → 加固后）
+- **False Mutation Rate：1.9%/5.6%/5.6% → 0.0%/0.0%/0.0%（0/54）**
+- Router 75% → **100%（80/80）**；Query Recall 68.8% → **100%（16/16）**；Tool 79.2% → **100%（24/24）**
+- Date Binding 86–92% → **98.9%（86/87）**；E2E 72.7–75.5% → **90.9–91.8%**；请求失败 4–8 条 → **0 条**
+- 剩余 9/110：分类灰区 gold 5 + 多轮重复记录 3（mt-02/03/16）+ 更新未产出 1（mt-15）
+- 报告：`docs/expensebench-v2-llm-report-qwen3.7-flash.md`；总结：`docs/expensebench-v2-verification-post-hardening.md`
+
+## 决定
+- 安全验收线（FMR 0% 连续 3 轮）达成；剩余问题与写安全无关
+- 后续候选（优先级）：分类灰区 gold 复核 → 多轮历史去重/最近批次约束 → 更新动作可靠性 → 系统通知投递

@@ -30,7 +30,10 @@
 - **v3.9.3 会话上下文路由已完成**（2026-09-11，纯本地验收）：
   - `ConversationActionContext`：条件更正（上一轮记账 + 最近账目 + 更正词）、条件续记（也是35）、Query 回承（那X呢/再看下X）
   - 离线基线：前置路由 74/80 → **80/80**；Query 前置召回 14/16 → **16/16**；工具 16/16；JVM **295/295**
-- **LLM Bench 暂停**：不再自动三轮全量；待免费额度/替代模型/明确指令先跑 smoke
+- **真实模型复测已完成（2026-09-11，owner 指令）**：qwen3.7-flash ×3 轮，
+  **False Mutation Rate 0.0%（0/54）**；Router 100% / Query Recall 100% / Tool 100%；Date Binding 98.9%；E2E 90.9–91.8%；
+  详见 `docs/expensebench-v2-verification-post-hardening.md`
+- LLM Bench 继续按需（不再自动跑）；剩余：分类灰区 gold 复核、多轮重复记录、更新未产出
 - 后续候选：分类灰区 gold 复核
 
 ## Memory Governance（v3.10 写 / v3.11 读+管理，已完成，2026-09-11）

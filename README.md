@@ -96,6 +96,7 @@
 
 - 离线行为基线随单测生成：`docs/expensebench-v2-local-report.md`
 - LLM 端到端按需运行：设置 `EXPENSEBENCH_*` 后跑 `LlmAgentBehaviorBenchTest`，报告写 `docs/expensebench-v2-llm-report-<model>.md`
+- **加固后真实模型复测（qwen3.7-flash ×3，2026-09-11）**：False Mutation Rate **0.0%（0/54）**；Router/Query Recall/Tool 100%；E2E ~91%（加固前 ~73%）—— 详见 [docs/expensebench-v2-verification-post-hardening.md](docs/expensebench-v2-verification-post-hardening.md)
 
 ---
 

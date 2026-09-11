@@ -117,3 +117,10 @@ EXPENSEBENCH_CONCURRENCY=4 \
 - `ConversationActionContext`：条件更正（上一轮记账 + 最近账目 + 更正词）、条件续记（也是35）、Query 回承（那X呢/再看下X，只覆盖 period/category）
 - 离线基线：前置路由 74/80 → **80/80**；Query 前置召回 14/16 → **16/16**；工具选择 16/16；JVM **295/295**
 - 正反例已固化：查询语境「你这个分析不对」保持非记账；无最近账目时「记错了」不升 MUTATION；无上一轮 QUERY 时「那上个月呢」不继承
+
+### 加固后真实模型复测（2026-09-11，qwen3.7-flash，3 轮）
+
+- **False Mutation Rate = 0.0% × 3 轮（0/54）**（加固前 1.9% / 5.6% / 5.6%）
+- Router 100%（80/80）、Query Recall 100%（16/16）、Mutation Precision 100%、Tool Selection 100%（24/24）
+- Date Binding 98.9%（86/87）；Mutation Count 95.5–96.4%；E2E 90.9–91.8%（加固前 ~73%）；请求失败 0
+- 剩余 9 条：分类灰区 gold 5 + 多轮重复记录 3 + 更新未产出 1（详见 `docs/expensebench-v2-verification-post-hardening.md`）
