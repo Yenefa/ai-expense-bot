@@ -1,8 +1,11 @@
-# CI 工作流：Android/Kotlin 单元测试 + Lint
+# CI 工作流：Android/Kotlin 单元测试 + Lint + Release 编译检查
 # 触发：push 到 dev/main 分支、任意 pull_request、以及手动 workflow_dispatch
 # 内容：JDK 17 (temurin，开启 Gradle 缓存) + Android SDK，
-#       执行 :app:testDebugUnitTest（Debug 单元测试）与 :app:lintDebug（Debug Lint）
-# 说明：不依赖任何 secrets；Debug 构建未提供订阅 API URL 时走 build.gradle.kts 中的默认回退
+#       依次执行 :app:testDebugUnitTest（Debug 单元测试）、:app:lintDebug（Debug Lint）、
+#       :app:assembleRelease（Release 编译检查，仅编译不签名不发布）
+# 失败时上传测试报告 artifacts，便于定位问题；最小权限（contents: read）
+# 说明：不依赖任何 secrets；Release 构建传入占位 YE_COST_SUBSCRIPTION_API_BASE_URL，
+#       未提供 keystore 环境变量时签名配置回退为 unsigned
 name: CI
 
 on:
@@ -12,6 +15,9 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test-and-lint:
@@ -32,3 +38,16 @@ jobs:
 
       - name: Run unit tests and lint
         run: ./gradlew :app:testDebugUnitTest :app:lintDebug --console=plain --no-daemon
+
+      - name: Compile release build (unsigned)
+        run: ./gradlew :app:assembleRelease -PYE_COST_SUBSCRIPTION_API_BASE_URL=https://invalid.local --console=plain --no-daemon
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            app/build/reports/tests/testDebugUnitTest/**
+            app/build/test-results/testDebugUnitTest/**
+          if-no-files-found: ignore

@@ -8,6 +8,7 @@ import com.expense.tracker.data.subscription.SubscriptionApiException
 import com.expense.tracker.data.subscription.SubscriptionPrefs
 import com.expense.tracker.data.subscription.SubscriptionStatus
 import com.expense.tracker.data.subscription.SubscriptionStatusResponse
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +42,8 @@ class SubscriptionViewModel(
     private val internal = MutableStateFlow(SubscriptionUiState())
     val uiState: StateFlow<SubscriptionUiState> = internal.asStateFlow()
 
+    private var healthPollJob: Job? = null
+
     init {
         viewModelScope.launch {
             launch {
@@ -60,8 +63,18 @@ class SubscriptionViewModel(
                 }
             }
             refreshServerStatus()
-            if (healthPollEnabled) pollServerHealth()
         }
+    }
+
+    /** 页面可见时启动健康轮询；离开页面（DisposableEffect onDispose）必须调用 [stopHealthPolling]，避免后台 30s 轮询耗电。 */
+    fun startHealthPolling() {
+        if (!healthPollEnabled || healthPollJob?.isActive == true) return
+        healthPollJob = viewModelScope.launch { pollServerHealth() }
+    }
+
+    fun stopHealthPolling() {
+        healthPollJob?.cancel()
+        healthPollJob = null
     }
 
     /** 周期性探测服务器在线状态与服务器时间，让用户确认时间在走、服务在云端。 */

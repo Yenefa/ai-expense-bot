@@ -229,8 +229,8 @@ private fun DayGrid(
 
 /** 把金额简短显示：999 内显示原值；上千用 k；上万用 w。避免方格被撑爆。 */
 private fun formatAmount(amount: Double): String = when {
-    amount >= 10000 -> "%.1fw".format(amount / 10000)
-    amount >= 1000 -> "%.1fk".format(amount / 1000)
-    amount >= 100 -> "%.0f".format(amount)
-    else -> "%.1f".format(amount)
+    amount >= 10000 -> "%.1fw".format(java.util.Locale.US, amount / 10000)
+    amount >= 1000 -> "%.1fk".format(java.util.Locale.US, amount / 1000)
+    amount >= 100 -> "%.0f".format(java.util.Locale.US, amount)
+    else -> "%.1f".format(java.util.Locale.US, amount)
 }

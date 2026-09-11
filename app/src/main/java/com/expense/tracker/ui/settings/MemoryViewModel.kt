@@ -17,9 +17,8 @@ class MemoryViewModel(
     val facts: StateFlow<List<MemoryFact>> = governor.facts
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    fun update(fact: MemoryFact) {
-        viewModelScope.launch { governor.update(fact) }
-    }
+    /** 用户管理：修改单条；返回是否保存成功，UI 据此决定是否关闭弹窗。 */
+    suspend fun update(fact: MemoryFact): Boolean = governor.update(fact)
 
     fun delete(id: String) {
         viewModelScope.launch { governor.delete(id) }

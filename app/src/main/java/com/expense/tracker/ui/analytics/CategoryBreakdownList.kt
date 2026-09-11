@@ -98,7 +98,7 @@ fun CategoryBreakdownList(
                 color = AppColors.TextSecondary,
             )
             Text(
-                "¥%.2f".format(total),
+                "¥%.2f".format(java.util.Locale.US, total),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = AppColors.TextPrimary,
@@ -140,14 +140,14 @@ fun CategoryBreakdownList(
                 }
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    "%.1f%%".format(percent),
+                    "%.1f%%".format(java.util.Locale.US, percent),
                     style = MaterialTheme.typography.labelMedium,
                     color = AppColors.TextSecondary,
                     modifier = Modifier.width(48.dp),
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "¥%.2f".format(amount),
+                    "¥%.2f".format(java.util.Locale.US, amount),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = AppColors.TextPrimary,

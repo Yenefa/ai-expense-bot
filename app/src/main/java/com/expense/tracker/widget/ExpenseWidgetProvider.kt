@@ -79,9 +79,13 @@ class ExpenseWidgetProvider : AppWidgetProvider() {
         val budgetPrefs = BudgetPrefs.fromContext(context)
         val budget = budgetPrefs.snapshot.first()
         val zone = ZoneId.systemDefault()
-        val monthStart = LocalDate.now(zone).withDayOfMonth(1).atStartOfDay(zone)
+        val monthStartDate = LocalDate.now(zone).withDayOfMonth(1)
+        val monthStart = monthStartDate.atStartOfDay(zone)
             .toInstant().toEpochMilli()
-        val list = repo.observeInRange(monthStart, Long.MAX_VALUE).first()
+        // 不含下月月初的上界，避免未来日期记录被计入本月
+        val monthEnd = monthStartDate.plusMonths(1).atStartOfDay(zone)
+            .toInstant().toEpochMilli()
+        val list = repo.observeInRange(monthStart, monthEnd).first()
             .filter { it.deletedAt == null }
         val spent = list.sumOf { it.amountCents }
         val spentByCategory = list

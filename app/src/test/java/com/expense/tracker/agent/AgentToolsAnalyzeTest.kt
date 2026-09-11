@@ -153,6 +153,19 @@ class AgentToolsAnalyzeTest {
     }
 
     @Test
+    fun `环比格式化不随系统语言变化`() {
+        val original = java.util.Locale.getDefault()
+        try {
+            // 德语等区域默认小数逗号；格式化必须固定 Locale.US，避免 +75,0% 之类的输出
+            java.util.Locale.setDefault(java.util.Locale.GERMANY)
+            val trend = CategoryTrend(categoryId = "food", currentCents = 3500L, previousCents = 2000L)
+            assertThat(trend.percentLabel()).isEqualTo("+75%")
+        } finally {
+            java.util.Locale.setDefault(original)
+        }
+    }
+
+    @Test
     fun `非整月区间不预测`() = runBlocking<Unit> {
         seed()
         val spec = AgentPeriodSpec(

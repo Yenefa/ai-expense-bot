@@ -230,7 +230,7 @@ fun InsightsScreen(
                             Period.Month -> "本月"
                             Period.Year -> "本年"
                         },
-                        value = "¥${"%.2f".format(state.totalAmount)}",
+                        value = "¥${"%.2f".format(java.util.Locale.US, state.totalAmount)}",
                     )
                     PeriodSummaryItem(
                         label = "消费笔数",

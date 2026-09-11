@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ import com.expense.tracker.ui.theme.softShadow
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
 
 private val createdFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
@@ -112,10 +114,7 @@ fun MemoryScreen(vm: MemoryViewModel, onClose: () -> Unit) {
             MemoryEditDialog(
                 fact = fact,
                 onDismiss = { editing = null },
-                onSave = { updated ->
-                    vm.update(updated)
-                    editing = null
-                },
+                onSave = { updated -> vm.update(updated) },
             )
         }
 
@@ -167,12 +166,18 @@ private fun MemoryCard(fact: MemoryFact, onEdit: () -> Unit, onDelete: () -> Uni
 }
 
 @Composable
-private fun MemoryEditDialog(fact: MemoryFact, onDismiss: () -> Unit, onSave: (MemoryFact) -> Unit) {
+private fun MemoryEditDialog(
+    fact: MemoryFact,
+    onDismiss: () -> Unit,
+    onSave: suspend (MemoryFact) -> Boolean,
+) {
+    val scope = rememberCoroutineScope()
     var amountText by remember {
         mutableStateOf(fact.amountCents?.let { Money.formatYuan(it) } ?: "")
     }
     var merchantText by remember { mutableStateOf(fact.merchant.orEmpty()) }
     var categoryId by remember { mutableStateOf(fact.categoryId ?: Category.ALL.first().id) }
+    var errorText by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -183,7 +188,10 @@ private fun MemoryEditDialog(fact: MemoryFact, onDismiss: () -> Unit, onSave: (M
                     MemoryType.MONTHLY_INCOME, MemoryType.SAVINGS_GOAL -> {
                         OutlinedTextField(
                             value = amountText,
-                            onValueChange = { amountText = it },
+                            onValueChange = {
+                                amountText = it
+                                errorText = null
+                            },
                             label = { Text("金额（元）") },
                             singleLine = true,
                         )
@@ -191,16 +199,33 @@ private fun MemoryEditDialog(fact: MemoryFact, onDismiss: () -> Unit, onSave: (M
                     MemoryType.MERCHANT_ALIAS -> {
                         OutlinedTextField(
                             value = merchantText,
-                            onValueChange = { merchantText = it },
+                            onValueChange = {
+                                merchantText = it
+                                errorText = null
+                            },
                             label = { Text("商户") },
                             singleLine = true,
                         )
                         Spacer(Modifier.size(8.dp))
-                        CategoryPicker(selected = categoryId, onSelect = { categoryId = it })
+                        CategoryPicker(selected = categoryId, onSelect = {
+                            categoryId = it
+                            errorText = null
+                        })
                     }
                     MemoryType.CATEGORY_PREFERENCE -> {
-                        CategoryPicker(selected = categoryId, onSelect = { categoryId = it })
+                        CategoryPicker(selected = categoryId, onSelect = {
+                            categoryId = it
+                            errorText = null
+                        })
                     }
+                }
+                errorText?.let {
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
                 Spacer(Modifier.size(8.dp))
                 Text("来源：「${fact.rawText}」", style = MaterialTheme.typography.labelSmall, color = AppColors.TextSecondary)
@@ -211,12 +236,22 @@ private fun MemoryEditDialog(fact: MemoryFact, onDismiss: () -> Unit, onSave: (M
                 val updated = when (fact.type) {
                     MemoryType.MONTHLY_INCOME, MemoryType.SAVINGS_GOAL -> {
                         val cents = runCatching { Money.parseYuanToCents(amountText.trim()) }.getOrNull()
+                        if (cents == null || cents <= 0L) {
+                            errorText = "金额无效"
+                            return@TextButton
+                        }
                         fact.copy(amountCents = cents)
                     }
                     MemoryType.MERCHANT_ALIAS -> fact.copy(merchant = merchantText.trim(), categoryId = categoryId)
                     MemoryType.CATEGORY_PREFERENCE -> fact.copy(categoryId = categoryId)
                 }
-                onSave(updated)
+                scope.launch {
+                    if (onSave(updated)) {
+                        onDismiss()
+                    } else {
+                        errorText = "保存失败，请检查输入"
+                    }
+                }
             }) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },

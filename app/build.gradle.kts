@@ -13,6 +13,32 @@ val escapedSubscriptionApiBaseUrl = subscriptionApiBaseUrl
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
 
+// 发布签名凭据（可选）：Gradle 属性优先，其次环境变量，两者都支持。
+// 四个值未全部提供时不启用 release 签名，assembleRelease 仍按现状产出
+// app-release-unsigned.apk；绝不自动回退 debug 签名（debug 证书仅用于测试）。
+val yeCostKeystorePath = providers
+    .gradleProperty("YE_COST_KEYSTORE_PATH")
+    .orElse(System.getenv("YE_COST_KEYSTORE_PATH").orEmpty())
+    .get()
+val yeCostKeystorePassword = providers
+    .gradleProperty("YE_COST_KEYSTORE_PASSWORD")
+    .orElse(System.getenv("YE_COST_KEYSTORE_PASSWORD").orEmpty())
+    .get()
+val yeCostKeyAlias = providers
+    .gradleProperty("YE_COST_KEY_ALIAS")
+    .orElse(System.getenv("YE_COST_KEY_ALIAS").orEmpty())
+    .get()
+val yeCostKeyPassword = providers
+    .gradleProperty("YE_COST_KEY_PASSWORD")
+    .orElse(System.getenv("YE_COST_KEY_PASSWORD").orEmpty())
+    .get()
+val hasReleaseSigning = listOf(
+    yeCostKeystorePath,
+    yeCostKeystorePassword,
+    yeCostKeyAlias,
+    yeCostKeyPassword,
+).all { it.isNotBlank() }
+
 android {
     namespace = "com.expense.tracker"
     compileSdk = 34
@@ -24,8 +50,8 @@ android {
         // - versionCode 每次交付 +1，永不回退
         // - versionName 语义化：主版本.次版本.修订（修复=修订+1，新功能=次版本+1）
         // - 每次版本变更必须同步更新 CHANGELOG.md
-        versionCode = 44
-        versionName = "3.14.0"
+        versionCode = 45
+        versionName = "3.14.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",
@@ -33,10 +59,26 @@ android {
             "\"$escapedSubscriptionApiBaseUrl\"",
         )
     }
+    signingConfigs {
+        // 仅当四个凭据全部提供时才创建 release 签名配置；
+        // 否则保持未签名（不回退 debug 签名），保证无凭据环境仍可 assembleRelease。
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(yeCostKeystorePath)
+                storePassword = yeCostKeystorePassword
+                keyAlias = yeCostKeyAlias
+                keyPassword = yeCostKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // 凭据齐全时才挂载 release 签名；否则维持 unsigned 现状
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {

@@ -53,7 +53,7 @@ object AgentPrompts {
         analyze.previous?.let { prev ->
             appendLine("上期（${prev.label}）：消费合计 ¥${Money.formatYuan(prev.totalCents)}，共 ${prev.count} 笔")
             analyze.current.totalCents.takeIf { prev.totalCents > 0L }?.let { cur ->
-                appendLine("环比：${"%+.0f%%".format((cur - prev.totalCents) * 100.0 / prev.totalCents)}")
+                appendLine("环比：${"%+.0f%%".format(java.util.Locale.US, (cur - prev.totalCents) * 100.0 / prev.totalCents)}")
             }
         }
         if (analyze.trends.isNotEmpty()) {

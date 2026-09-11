@@ -162,7 +162,7 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                     ) {
                                         Text(day.dateLabel, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-                                        Text("¥%.2f".format(day.total), fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                                        Text("¥%.2f".format(java.util.Locale.US, day.total), fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                                     }
                                 }
                                 items(day.items, key = { it.id }) { item ->
@@ -190,15 +190,15 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(state.groups, key = { it.dateLabel }) { day ->
-                        val expanded = expandedDays[day.dateLabel] ?: false
+                    items(state.groups, key = { it.dateIso }) { day ->
+                        val expanded = expandedDays[day.dateIso] ?: false
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .softShadow(elevation = 2.dp, cornerRadius = 16.dp, spotAlpha = 0.06f)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(AppColors.CardBg)
-                                .clickable { expandedDays[day.dateLabel] = !expanded },
+                                .clickable { expandedDays[day.dateIso] = !expanded },
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
@@ -209,7 +209,7 @@ fun HistoryScreen(vm: HistoryViewModel, onBack: () -> Unit) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text("¥", style = MaterialTheme.typography.labelSmall, color = AppColors.TextSecondary)
                                     Text(
-                                        "%.2f".format(day.total),
+                                        "%.2f".format(java.util.Locale.US, day.total),
                                         style = MaterialTheme.typography.titleLarge,
                                         color = AppColors.TextPrimary,
                                     )

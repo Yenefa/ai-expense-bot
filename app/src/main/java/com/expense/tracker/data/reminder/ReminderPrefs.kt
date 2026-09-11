@@ -19,7 +19,7 @@ data class ReminderSnapshot(
     val hour: Int = 21,
     val minute: Int = 0,
 ) {
-    val timeLabel: String get() = "%02d:%02d".format(hour, minute)
+    val timeLabel: String get() = "%02d:%02d".format(java.util.Locale.US, hour, minute)
 }
 
 /** 每日记账提醒设置。 */

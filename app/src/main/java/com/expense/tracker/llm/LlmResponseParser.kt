@@ -4,6 +4,7 @@ import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.model.Money
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.time.Instant
 import java.time.LocalDate
@@ -31,6 +32,9 @@ object LlmResponseParser {
 
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
+    /** 账目负载的顶层字段；候选块至少要含一个，否则视为无关 JSON 跳过。 */
+    private val payloadFields = setOf("reply", "expenses", "actions")
+
     /**
      * 解析 LLM 输出。
      *
@@ -42,19 +46,31 @@ object LlmResponseParser {
         // 1) 直接尝试整段解析
         runCatching { parseStrict(trimmed) }.getOrNull()?.let { return it }
 
-        // 2) 尝试从中间抽取第一个 {...} JSON 块
+        // 2) 尝试从中间抽取 {...} JSON 块。
+        //    跳过不含任何账目字段的无关 JSON（如 {"foo":1}），逐个尝试；
+        //    单个候选失败不放弃，记住第一个错误，全部失败后才抛出。
         val candidates = extractJsonObjects(trimmed)
-        candidates.forEach { candidate ->
+        var firstError: Exception? = null
+        for (candidate in candidates) {
+            if (!candidate.containsLlmPayloadField()) continue
             try {
                 return parseStrict(candidate)
             } catch (error: Exception) {
-                throw if (error is LlmParseException) error
-                else LlmParseException("AI 返回的账目 JSON 无效，本次未执行。", error)
+                if (firstError == null) firstError = error
             }
+        }
+        firstError?.let { error ->
+            throw if (error is LlmParseException) error
+            else LlmParseException("AI 返回的账目 JSON 无效，本次未执行。", error)
         }
 
         // 3) 完全失败 → 当作纯文本闲聊回复
         return LlmParseResult(reply = trimmed.ifBlank { "（空回复）" }, expenses = emptyList())
+    }
+
+    private fun String.containsLlmPayloadField(): Boolean {
+        val obj = runCatching { json.parseToJsonElement(this) }.getOrNull() as? JsonObject ?: return false
+        return payloadFields.any { it in obj }
     }
 
     /**

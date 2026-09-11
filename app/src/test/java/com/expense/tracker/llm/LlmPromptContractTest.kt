@@ -66,6 +66,25 @@ class LlmPromptContractTest {
         assertThat(prompt).contains("不是把历史里已记录的那笔重新记一遍")
     }
 
+    @Test fun analyticsPromptUsesDotDecimalsRegardlessOfSystemLocale() {
+        val original = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.GERMANY)
+            val prompt = LlmPrompt.analyticsPrompt(
+                periodName = "本月",
+                totalAmount = 1234.5,
+                count = 3,
+                topCategories = listOf("餐饮" to 999.99),
+            )
+
+            // 发给模型前必须是 "1234.50"/"999.99"，不能出现德语逗号小数
+            assertThat(prompt).contains("1234.50")
+            assertThat(prompt).contains("999.99")
+        } finally {
+            java.util.Locale.setDefault(original)
+        }
+    }
+
     @Test fun chatPromptRequiresUpdateActionWhenOnlyTheDateChanges() {
         val prompt = LlmPrompt.systemPrompt()
 

@@ -204,9 +204,14 @@ class AppContainer(context: Context) {
     /** 记账后的预算预警文案（达到 90% 或超支时非空）。 */
     val budgetWarningProvider: suspend () -> String? = suspend {
         val budget = budgetPrefs.snapshot.first()
-        val monthStart = LocalDate.now(ZoneId.systemDefault()).withDayOfMonth(1)
-            .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val list = expenseRepo.observeInRange(monthStart, Long.MAX_VALUE).first()
+        val zone = ZoneId.systemDefault()
+        val monthStartDate = LocalDate.now(zone).withDayOfMonth(1)
+        val monthStart = monthStartDate
+            .atStartOfDay(zone).toInstant().toEpochMilli()
+        // 不含下月月初的上界，避免未来日期记录触发错误预警
+        val monthEnd = monthStartDate.plusMonths(1)
+            .atStartOfDay(zone).toInstant().toEpochMilli()
+        val list = expenseRepo.observeInRange(monthStart, monthEnd).first()
         val spentByCategory = list
             .filter { it.deletedAt == null }
             .groupBy { it.categoryId }

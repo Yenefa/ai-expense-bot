@@ -102,6 +102,29 @@ class LlmResponseParserTest {
         assertThat(result.reply).isEqualTo("已记 ¥35")
     }
 
+    @Test fun skipsUnrelatedJsonBlockAndParsesLaterValidPayload() {
+        // 模型可能先输出无关的 {...} 再输出真正的账目 JSON；坏块不能阻断后续候选。
+        val raw = """一些解释 {"foo":1} {"reply":"ok","expenses":[{"amount":5,"category":"food","note":"","occurred_at":null}]}"""
+
+        val result = LlmResponseParser.parse(raw)
+
+        assertThat(result.reply).isEqualTo("ok")
+        assertThat(result.expenses).hasSize(1)
+        assertThat(result.expenses[0].amountCents).isEqualTo(500L)
+    }
+
+    @Test fun continuesAfterInvalidCandidateAndParsesLaterValidPayload() {
+        // 第一个候选是账目 JSON 但不合法（金额 0）；修复前会立刻抛异常，后续合法候选不会被尝试。
+        val raw = """{"reply":"bad","expenses":[{"amount":0,"category":"food","note":"","occurred_at":null}]} """ +
+            """{"reply":"ok","expenses":[{"amount":5,"category":"food","note":"","occurred_at":null}]}"""
+
+        val result = LlmResponseParser.parse(raw)
+
+        assertThat(result.reply).isEqualTo("ok")
+        assertThat(result.expenses).hasSize(1)
+        assertThat(result.expenses[0].amountCents).isEqualTo(500L)
+    }
+
     @Test fun emptyExpensesReturnsReply() {
         val result = LlmResponseParser.parse("""{"reply":"今天记了什么？","expenses":[]}""")
         assertThat(result.reply).isEqualTo("今天记了什么？")

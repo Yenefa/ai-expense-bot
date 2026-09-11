@@ -117,7 +117,7 @@ fun AnalyticsScreen(
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                StatItem("总支出", "¥%.2f".format(state.totalAmount))
+                StatItem("总支出", "¥%.2f".format(java.util.Locale.US, state.totalAmount))
                 StatItem("笔数", "${state.totalCount}")
             }
             Spacer(Modifier.height(16.dp))

@@ -126,9 +126,9 @@ object LlmPrompt {
         topCategories: List<Pair<String, Double>>,
     ): String = buildString {
         appendLine("请分析我的${periodName}支出：")
-        appendLine("总支出 ¥${"%.2f".format(totalAmount)}，共 $count 笔。")
+        appendLine("总支出 ¥${"%.2f".format(java.util.Locale.US, totalAmount)}，共 $count 笔。")
         append("主要消费在：")
-        appendLine(topCategories.joinToString("、") { "${it.first} ¥${"%.2f".format(it.second)}" })
+        appendLine(topCategories.joinToString("、") { "${it.first} ¥${"%.2f".format(java.util.Locale.US, it.second)}" })
         appendLine("请给出 3-5 条具体洞察：必须引用金额、笔数或分类；至少一条指出最大消费类别；至少一条给出下一步建议。")
         appendLine("严格按 system 要求输出 JSON。")
     }

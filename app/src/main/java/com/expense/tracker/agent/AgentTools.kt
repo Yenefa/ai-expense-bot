@@ -81,7 +81,7 @@ data class CategoryTrend(
     fun percentLabel(): String? = when {
         previousCents <= 0L -> null
         currentCents <= 0L -> "-100%"
-        else -> "%+.0f%%".format((currentCents - previousCents) * 100.0 / previousCents)
+        else -> "%+.0f%%".format(java.util.Locale.US, (currentCents - previousCents) * 100.0 / previousCents)
     }
 }
 

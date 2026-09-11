@@ -2,6 +2,7 @@ package com.expense.tracker.data.export
 
 import com.expense.tracker.data.db.ChatMessageEntity
 import com.expense.tracker.data.db.ExpenseEntity
+import com.expense.tracker.data.db.RecurringPeriodType
 import com.expense.tracker.data.db.RecurringRuleEntity
 import com.expense.tracker.data.db.toExpenseIdsCsvOrNull
 import com.expense.tracker.data.model.Category
@@ -205,6 +206,19 @@ object DataExporter {
             invalidIf(message.createdAt <= 0L, "聊天消息时间无效")
             invalidIf(message.relatedExpenseId != null && message.relatedExpenseId <= 0L, "关联账目 ID 无效")
             invalidIf(message.relatedExpenseIds().any { it <= 0L }, "关联账目批次 ID 无效")
+        }
+        data.recurringRules.forEach { rule ->
+            invalidIf(rule.amountCents <= 0L, "周期账单金额必须大于零")
+            invalidIf(Category.byId(rule.categoryId) == null, "未知周期账单分类：${rule.categoryId}")
+            invalidIf(
+                runCatching { RecurringPeriodType.valueOf(rule.periodType) }.isFailure,
+                "周期账单周期类型无效：${rule.periodType}",
+            )
+            invalidIf(rule.dayOfMonth !in 1..31, "周期账单日期无效：${rule.dayOfMonth}")
+            invalidIf(rule.dayOfWeek !in 1..7, "周期账单星期无效：${rule.dayOfWeek}")
+            invalidIf(rule.monthOfYear !in 1..12, "周期账单月份无效：${rule.monthOfYear}")
+            invalidIf(rule.nextDueAt <= 0L, "周期账单下次到期时间无效")
+            invalidIf(rule.createdAt < 0L, "周期账单创建时间无效")
         }
         invalidIf(data.memoryFacts.map { it.id }.toSet().size != data.memoryFacts.size, "记忆 ID 重复")
         data.memoryFacts.forEach { fact ->

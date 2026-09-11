@@ -53,10 +53,13 @@ class DailyReminderWorker(
     private fun buildMessage(context: Context, snapshot: ReminderSnapshot): String {
         val db = AppDatabase.get(context)
         val repo = ExpenseRepository(db.expenseDao())
-        val startOfDay = LocalDate.now(ZoneId.systemDefault()).atStartOfDay(ZoneId.systemDefault())
-            .toInstant().toEpochMilli()
+        val zone = ZoneId.systemDefault()
+        val todayDate = LocalDate.now(zone)
+        val startOfDay = todayDate.atStartOfDay(zone).toInstant().toEpochMilli()
+        // 明天 00:00 作为不含上界，避免把未来日期记录算进“今天”
+        val endOfDay = todayDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         val today = kotlinx.coroutines.runBlocking {
-            repo.observeInRange(startOfDay, Long.MAX_VALUE).first()
+            repo.observeInRange(startOfDay, endOfDay).first()
                 .filter { it.deletedAt == null }
         }
         if (today.isEmpty()) return "今天还没有记账，花一分钟补记今天的支出吧"

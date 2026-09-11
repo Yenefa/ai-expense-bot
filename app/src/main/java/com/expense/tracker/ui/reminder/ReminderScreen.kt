@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,11 +62,24 @@ fun ReminderScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snap by prefs.snapshot.collectAsState(initial = null)
+    var userEdited by remember { mutableStateOf(false) }
     var enabled by remember { mutableStateOf(snap?.enabled ?: false) }
     var hour by remember { mutableStateOf(snap?.hour ?: 21) }
     var minute by remember { mutableStateOf(snap?.minute ?: 0) }
     var timeLabel by remember { mutableStateOf(snap?.timeLabel ?: "21:00") }
     var notice by remember { mutableStateOf("") }
+
+    // 快照到达前先显示默认值；加载完成后若用户尚未手动修改，则同步为已保存的设置
+    LaunchedEffect(snap) {
+        snap?.let { s ->
+            if (!userEdited) {
+                enabled = s.enabled
+                hour = s.hour
+                minute = s.minute
+                timeLabel = s.timeLabel
+            }
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -123,6 +137,7 @@ fun ReminderScreen(
                 Switch(
                     checked = enabled,
                     onCheckedChange = { checked ->
+                        userEdited = true
                         enabled = checked
                         if (checked) requestPermissionIfNeeded()
                     },
@@ -135,9 +150,10 @@ fun ReminderScreen(
                     TimePickerDialog(
                         context,
                         { _, h, m ->
+                            userEdited = true
                             hour = h
                             minute = m
-                            timeLabel = "%02d:%02d".format(h, m)
+                            timeLabel = "%02d:%02d".format(java.util.Locale.US, h, m)
                         },
                         hour,
                         minute,
@@ -165,6 +181,7 @@ fun ReminderScreen(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.TextPrimary, contentColor = AppColors.Bg),
                 shape = RoundedCornerShape(14.dp),
+                enabled = snap != null,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
             ) { Text("保存设置", fontWeight = FontWeight.SemiBold) }
 

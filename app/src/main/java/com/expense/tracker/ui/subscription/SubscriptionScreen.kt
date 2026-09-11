@@ -27,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,6 +57,13 @@ fun SubscriptionScreen(
     val state by vm.uiState.collectAsState()
     val active = state.status == SubscriptionStatus.ACTIVE
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    // 健康轮询只在页面可见时运行；离开页面立即停止，避免后台 30s 网络/电量消耗
+    DisposableEffect(Unit) {
+        vm.startHealthPolling()
+        onDispose { vm.stopHealthPolling() }
+    }
+
     LaunchedEffect(Unit) {
         while (true) {
             nowMillis = System.currentTimeMillis()

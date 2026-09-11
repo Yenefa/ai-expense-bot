@@ -60,9 +60,9 @@ class RecurringViewModel(
             createdAt = now,
         )
         viewModelScope.launch {
-            // 首次到期点 = 今天之后的第一个周期点
+            // 首次到期点 = 从规则字段推导的、今天之后的第一个周期点（基准为今天零点，不再拿“昨天”当基准）
             val today = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
-            val firstDue = RecurringGenerator.nextDueAfter(baseRule, today - 86_400_000L, today, zone)
+            val firstDue = RecurringGenerator.nextDueAfter(baseRule, today, today, zone)
             dao.insert(baseRule.copy(nextDueAt = firstDue))
             internal.update { it.copy(saved = true, savedMessage = "周期账单已添加") }
         }

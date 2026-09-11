@@ -16,7 +16,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 data class DailyGroup(
-    val dateLabel: String,    // "6月15日"
+    val dateIso: String,      // "2026-06-15"，含年份，跨年唯一：仅用于 key，不用于展示
+    val dateLabel: String,    // "6月15日"，仅用于展示
     val total: Double,
     val items: List<DisplayExpense>,
 )
@@ -84,6 +85,7 @@ class HistoryViewModel(private val repo: ExpenseRepository) : ViewModel() {
             .sortedByDescending { it.key }
             .map { (date, items) ->
                 DailyGroup(
+                    dateIso = date.toString(),
                     dateLabel = date.format(fmt),
                     total = Money.centsToYuan(items.sumOf { it.amountCents }),
                     items = items.sortedByDescending { it.occurredAt }.map { e ->

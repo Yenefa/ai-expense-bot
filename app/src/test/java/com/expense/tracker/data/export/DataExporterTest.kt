@@ -2,6 +2,8 @@ package com.expense.tracker.data.export
 
 import com.expense.tracker.data.db.ChatMessageEntity
 import com.expense.tracker.data.db.ExpenseEntity
+import com.expense.tracker.data.db.RecurringPeriodType
+import com.expense.tracker.data.db.RecurringRuleEntity
 import com.expense.tracker.data.prefs.ThemeMode
 import com.expense.tracker.memory.MemoryFact
 import com.expense.tracker.memory.MemoryType
@@ -217,4 +219,86 @@ class DataExporterTest {
         assertThat(csv.lines()[1].split(',')[1]).isEqualTo("9.00")
         assertThat(csv.lines()[2].split(',')[1]).isEqualTo("8.00")
     }
+
+    @Test fun recurringRuleRoundTripsInBackup() {
+        val rule = recurringRule()
+
+        val json = DataExporter.toBackupJson(
+            expenses = emptyList(),
+            chatMessages = emptyList(),
+            preferences = BackupPreferences(false, "", "", ThemeMode.SYSTEM),
+            sourceAppVersion = "3.11",
+            exportedAtIso = "2026-09-12T10:00:00Z",
+            recurringRules = listOf(rule),
+        )
+        val decoded = DataExporter.parseBackup(json)
+
+        assertThat(decoded.recurringRules).containsExactly(rule)
+    }
+
+    @Test fun invalidRecurringRulesRejectRestoreAndLeaveExistingRulesUnchanged() {
+        val existing = recurringRule(id = 1L)
+        val invalidRules = listOf(
+            ruleJson(amountCents = 0L) to "周期账单金额必须大于零",
+            ruleJson(categoryId = "nope") to "未知周期账单分类",
+            ruleJson(periodType = "weird") to "周期账单周期类型无效",
+            ruleJson(dayOfMonth = 0) to "周期账单日期无效",
+            ruleJson(dayOfWeek = 0) to "周期账单星期无效",
+            ruleJson(monthOfYear = 13) to "周期账单月份无效",
+            ruleJson(nextDueAt = 0L) to "周期账单下次到期时间无效",
+            ruleJson(createdAt = -1L) to "周期账单创建时间无效",
+        )
+
+        invalidRules.forEach { (rule, expectedMessage) ->
+            val db = mutableListOf(existing)
+
+            // 模拟 restore：解析失败时抛异常，后续清空/写入不会执行，db 保持不变
+            val error = assertThrows(BackupFormatException::class.java) {
+                val parsed = DataExporter.parseBackup(backupWithRules(rule))
+                db.clear()
+                db.addAll(parsed.recurringRules)
+            }
+
+            assertThat(error).hasMessageThat().contains(expectedMessage)
+            assertThat(db).containsExactly(existing)
+        }
+    }
+
+    private fun recurringRule(
+        amountCents: Long = 350_000L,
+        categoryId: String = "housing",
+        periodType: String = RecurringPeriodType.MONTHLY.name,
+        dayOfMonth: Int = 15,
+        dayOfWeek: Int = 1,
+        monthOfYear: Int = 1,
+        nextDueAt: Long = 1_780_000_000_000L,
+        createdAt: Long = 1_770_000_000_000L,
+        id: Long = 7L,
+    ) = RecurringRuleEntity(
+        amountCents = amountCents,
+        categoryId = categoryId,
+        note = "房租",
+        periodType = periodType,
+        dayOfMonth = dayOfMonth,
+        dayOfWeek = dayOfWeek,
+        monthOfYear = monthOfYear,
+        nextDueAt = nextDueAt,
+        createdAt = createdAt,
+        id = id,
+    )
+
+    private fun ruleJson(
+        amountCents: Long = 350_000L,
+        categoryId: String = "housing",
+        periodType: String = "MONTHLY",
+        dayOfMonth: Int = 15,
+        dayOfWeek: Int = 1,
+        monthOfYear: Int = 1,
+        nextDueAt: Long = 1_780_000_000_000L,
+        createdAt: Long = 1_770_000_000_000L,
+    ): String =
+        """{"id":7,"amountCents":$amountCents,"categoryId":"$categoryId","note":"房租","periodType":"$periodType","dayOfMonth":$dayOfMonth,"dayOfWeek":$dayOfWeek,"monthOfYear":$monthOfYear,"nextDueAt":$nextDueAt,"enabled":true,"createdAt":$createdAt}"""
+
+    private fun backupWithRules(vararg rulesJson: String): String =
+        """{"formatVersion":3,"sourceAppVersion":"3.11","exportedAt":"2026-09-12T10:00:00Z","expenses":[],"chatMessages":[],"preferences":{"llmEnabled":false,"baseUrl":"","model":"","themeMode":"SYSTEM"},"recurringRules":[${rulesJson.joinToString(",")}]}"""
 }

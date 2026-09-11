@@ -351,3 +351,27 @@
 
 ## 验收（本地）
 - JVM 356 → **359，0 failed**（分类异常规则 2 + 引擎端到端 1）；`lintDebug` / `assembleDebug` / `assembleRelease` 通过
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.14.1 深度审计修复 + 工程加固（opencode，多 subagent 并行）
+
+## 背景
+- owner 指令："一直往下推进，可以派 subagent 加速"
+- 只读审计 subagent 产出 11 条高置信缺陷报告（含 4 条 High）；本文记录修复与验证
+
+## 并行分工（文件集互不重叠）
+- 修复 A：历史页跨年 key 崩溃（`dateIso`）+ LLM JSON 多候选解析
+- 修复 B：周期账单排期（跳月/31 号漂移）+ 进程级互斥 + 单条失败不中断
+- 修复 C：提醒页快照回填 + 未来日期窗口（预算总览/桌面组件/每日提醒/预算预警）
+- 修复 D：备份 recurringRules 校验 + 记忆编辑无效金额反馈
+- 主线程：Locale 固定（18 处，含 LLM prompt）+ 会员页轮询生命周期 + 集成/发布
+- 工程 subagent：CI 加固（release 编译检查/失败报告/最小权限）、正式签名基础设施（env/properties + `docs/release-signing.md`）
+
+## 二审修复（CI 首跑暴露）
+- `gradlew` 补可执行位；CSV 导入器补 `zone` 参数、3 条提示词断言改为按运行环境动态计算（Linux/UTC 可复现）
+
+## 验收（本地 + CI）
+- JVM 359 → **372，0 failed**（+13：解析器 2 / 历史 1 / 周期 6 / 备份 2 / Locale 2）
+- GitHub Actions：timezone 修复后 run 34622309914 **success**；本版推送后跑新工作流（含 release 编译检查）
+- 未修/待 owner 决定：云备份是否排除 `expense.db`（与"仅本地存储"文案相关，属产品决策）

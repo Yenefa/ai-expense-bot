@@ -32,10 +32,13 @@ class BudgetOverviewViewModel(
 
     init {
         viewModelScope.launch {
-            val monthStart = monthStartMillis()
+            val monthStartDate = LocalDate.now(zone).withDayOfMonth(1)
+            val monthStart = monthStartDate.atStartOfDay(zone).toInstant().toEpochMilli()
+            // 不含下月月初的上界，避免未来日期记录被计入本月
+            val monthEnd = monthStartDate.plusMonths(1).atStartOfDay(zone).toInstant().toEpochMilli()
             combine(
                 budgetPrefs.snapshot,
-                repo.observeInRange(monthStart, Long.MAX_VALUE),
+                repo.observeInRange(monthStart, monthEnd),
             ) { budget, list ->
                 val spentByCategory = list
                     .filter { it.deletedAt == null }
@@ -54,7 +57,4 @@ class BudgetOverviewViewModel(
             }
         }
     }
-
-    private fun monthStartMillis(): Long =
-        LocalDate.now(zone).withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli()
 }

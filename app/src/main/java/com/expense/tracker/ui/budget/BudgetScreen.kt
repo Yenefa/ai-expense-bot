@@ -169,4 +169,4 @@ fun BudgetScreen(
 }
 
 private fun formatCents(cents: Long): String =
-    if (cents <= 0L) "" else "%.2f".format(cents / 100.0).trimEnd('0').trimEnd('.')
+    if (cents <= 0L) "" else "%.2f".format(java.util.Locale.US, cents / 100.0).trimEnd('0').trimEnd('.')
