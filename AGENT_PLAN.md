@@ -33,7 +33,7 @@
 - **真实模型复测已完成（2026-09-11，owner 指令）**：qwen3.7-flash ×3 轮，
   **False Mutation Rate 0.0%（0/54）**；Router 100% / Query Recall 100% / Tool 100%；Date Binding 98.9%；E2E 90.9–91.8%；
   详见 `docs/expensebench-v2-verification-post-hardening.md`
-- LLM Bench 继续按需（不再自动跑）；剩余：分类灰区 gold 复核、多轮重复记录、更新未产出
+- LLM Bench 继续按需（不再自动跑）；剩余：多轮重复记录、更新未产出（分类灰区已按 owner 裁定落地，见 docs/gold-review-mtp-classification.md）
 - 后续候选：分类灰区 gold 复核
 
 ## Memory Governance（v3.10 写 / v3.11 读+管理，已完成，2026-09-11）

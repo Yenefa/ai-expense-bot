@@ -29,9 +29,12 @@ class LlmPromptContractTest {
         val chatPrompt = LlmPrompt.systemPrompt()
         val billPrompt = LlmPrompt.billImportSystemPrompt()
 
-        assertThat(chatPrompt).contains("书籍、课程、电子元器件、API、模型调用、云算力")
+        assertThat(chatPrompt).contains("书籍、课程、文具、笔、电子元器件、API、模型调用、云算力")
         assertThat(chatPrompt).contains("category=education")
+        assertThat(chatPrompt).contains("理发/剪发")
+        assertThat(chatPrompt).contains("酒店/住宿")
         assertThat(billPrompt).contains("category=education")
+        assertThat(billPrompt).contains("酒店住宿归 housing")
     }
 
     @Test fun chatPromptDefinesBatchAndExecutionSafetyContract() {

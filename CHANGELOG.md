@@ -5,6 +5,16 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.12.1 (versionCode 39) — 2026-09-11
+
+**分类口径修正（gold review 落地）**
+
+- 记账提示词明确三类映射：文具/笔 → education；日用品/超市、理发/剪发 → shopping；水电/物业/燃气/宽带、酒店/住宿 → housing（账单导入提示词同步）
+- 查询分类别名补充：文具（education）、理发/剪发（shopping）、酒店/住宿（housing）
+- 测试数据集按 owner 裁定修正：mtp-29 理发 → shopping、mtp-30 酒店 → housing（裁定记录 `docs/gold-review-mtp-classification.md`）
+- 按 owner 指示**未重跑 LLM Bench**；新数据集 sha 下的复测待下次运行验证（预期分类不一致 5 → 0–1）
+- JVM 全量测试通过
+
 ## 3.12.0 (versionCode 38) — 2026-09-11
 
 **Proactive Insight v1：规则决定该不该提醒，LLM 只负责怎么说（纯本地验收）**

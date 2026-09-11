@@ -4,7 +4,7 @@
 - 被测对象：Memory 提案管线（确定性检测 + 类型校验 + 确认门）+ 生产 Agent 路由（本地 stub LLM）
 - 数据来源：本地确定性管线 + 生产 Agent（stub LLM，零网络）
 - dataset_sha256 = 9e4d099130ef311104d0db5f904ce8f2405a51e6fd5cbbb1082d349fdce345c7
-- ran_at = 2026-09-11T20:09:35.754686800+08:00
+- ran_at = 2026-09-11T21:12:13.900361300+08:00
 - 记忆写入口：只有 MemoryGovernor.confirm（人类确认）
 
 ## 首要指标：Silent Memory Write Rate

@@ -209,3 +209,13 @@
 ## 决定
 - 安全验收线（FMR 0% 连续 3 轮）达成；剩余问题与写安全无关
 - 后续候选（优先级）：分类灰区 gold 复核 → 多轮历史去重/最近批次约束 → 更新动作可靠性 → 系统通知投递
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.12.1 分类口径修正（owner 裁定）
+
+- Owner 裁定：笔=学习、酒店=住宿、理发=生活开支（映射到现有分类 shopping）
+- 落地：提示词补 3 组映射（主链路 + 账单导入同步）；AgentCategories 别名补文具/理发/酒店住宿；数据集 mtp-29 → shopping、mtp-30 → housing
+- 记录：`docs/gold-review-mtp-classification.md`；未改评分器
+- 按 owner 指示未重跑 LLM Bench；新数据集 sha 下复测待下次运行（预期分类不一致 5 → 0-1）
+- 测试：JVM 334/334（含更新后的 prompt contract）
