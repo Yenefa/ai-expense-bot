@@ -1,0 +1,38 @@
+{"id":"pi-01","bucket":"should_alert","rule":"budget_threshold","limit_cents":200000,"spent_cents":185000,"expect_type":"budget_threshold","expect_severity":"warn"}
+{"id":"pi-02","bucket":"should_alert","rule":"budget_threshold","limit_cents":200000,"spent_cents":210000,"expect_type":"budget_threshold","expect_severity":"over"}
+{"id":"pi-03","bucket":"should_alert","rule":"budget_threshold","limit_cents":200000,"spent_cents":180000,"expect_type":"budget_threshold","expect_severity":"warn"}
+{"id":"pi-04","bucket":"should_alert","rule":"budget_threshold","limit_cents":200000,"spent_cents":200001,"expect_type":"budget_threshold","expect_severity":"over"}
+{"id":"pi-05","bucket":"should_alert","rule":"budget_threshold","limit_cents":200000,"spent_cents":185000,"record_count":4,"expect_type":"budget_threshold","expect_severity":"warn","note":"恰好 4 个样本可用"}
+{"id":"pi-06","bucket":"should_alert","rule":"anomalous_spending","weeks_cents":[50000,60000,40000,50000],"current_week_cents":90000,"expect_type":"anomalous_spending","expect_severity":"warn"}
+{"id":"pi-07","bucket":"should_alert","rule":"anomalous_spending","weeks_cents":[50000,60000,40000,50000],"current_week_cents":75000,"expect_type":"anomalous_spending","expect_severity":"warn","note":"恰好 1.5x 边界"}
+{"id":"pi-08","bucket":"should_alert","rule":"anomalous_spending","weeks_cents":[100000,100000,100000,100000],"current_week_cents":160000,"expect_type":"anomalous_spending","expect_severity":"warn"}
+{"id":"pi-09","bucket":"should_alert","rule":"savings_goal_deviation","spent_cents":300000,"income":800000,"savings":500000,"expect_type":"savings_goal_deviation","expect_severity":"warn"}
+{"id":"pi-10","bucket":"should_alert","rule":"savings_goal_deviation","spent_cents":650000,"income":800000,"savings":200000,"expect_type":"savings_goal_deviation","expect_severity":"over"}
+{"id":"pi-11","bucket":"should_alert","rule":"savings_goal_deviation","spent_cents":400000,"income":800000,"savings":200000,"expect_type":"savings_goal_deviation","expect_severity":"over","note":"预计结余恰为 0"}
+{"id":"pi-12","bucket":"should_alert","rule":"budget_threshold","limit_cents":200000,"spent_cents":210000,"state_last_at_type":"budget_threshold","state_last_at_offset_ms":3600000,"state_last_severity":"warn","expect_type":"budget_threshold","expect_severity":"over","note":"WARN→OVER 升级突破冷却"}
+{"id":"pi-13","bucket":"should_alert","rule":"budget_threshold","limit_cents":200000,"spent_cents":185000,"state_last_at_type":"budget_threshold","state_last_at_offset_ms":90000000,"state_last_severity":"warn","expect_type":"budget_threshold","expect_severity":"warn","note":"25 小时后冷却已过"}
+{"id":"pi-14","bucket":"should_alert","rule":"anomalous_spending","weeks_cents":[50000,60000,40000,50000],"current_week_cents":90000,"state_last_at_type":"anomalous_spending","state_last_at_offset_ms":691200000,"expect_type":"anomalous_spending","expect_severity":"warn","note":"8 天后可再次提醒"}
+{"id":"pi-15","bucket":"suppressed_cold_start","rule":"anomalous_spending","weeks_cents":[50000,60000,40000,0],"current_week_cents":200000}
+{"id":"pi-16","bucket":"suppressed_cold_start","rule":"savings_goal_deviation","spent_cents":650000,"savings":200000,"note":"缺少月收入记忆"}
+{"id":"pi-17","bucket":"suppressed_cold_start","rule":"budget_threshold","limit_cents":200000,"spent_cents":300000,"record_count":3}
+{"id":"pi-18","bucket":"suppressed_cold_start","rule":"savings_goal_deviation","spent_cents":200000,"record_count":5,"elapsed_days":2,"income":800000,"savings":200000}
+{"id":"pi-19","bucket":"suppressed_cold_start","rule":"anomalous_spending","weeks_cents":[0,0,0,0],"current_week_cents":300000}
+{"id":"pi-20","bucket":"suppressed_cold_start","rule":"budget_threshold","limit_cents":0,"spent_cents":300000,"note":"未设预算"}
+{"id":"pi-21","bucket":"suppressed_cooldown","rule":"budget_threshold","limit_cents":200000,"spent_cents":185000,"state_last_at_type":"budget_threshold","state_last_at_offset_ms":3600000,"state_last_severity":"warn"}
+{"id":"pi-22","bucket":"suppressed_cooldown","rule":"anomalous_spending","weeks_cents":[50000,60000,40000,50000],"current_week_cents":200000,"state_last_at_type":"anomalous_spending","state_last_at_offset_ms":86400000}
+{"id":"pi-23","bucket":"suppressed_cooldown","rule":"savings_goal_deviation","spent_cents":650000,"income":800000,"savings":200000,"state_last_at_type":"savings_goal_deviation","state_last_at_offset_ms":86400000}
+{"id":"pi-24","bucket":"suppressed_cooldown","rule":"budget_threshold","limit_cents":200000,"spent_cents":210000,"state_last_at_type":"budget_threshold","state_last_at_offset_ms":3600000,"state_last_severity":"over","note":"OVER→OVER 不升级"}
+{"id":"pi-25","bucket":"suppressed_cooldown","rule":"anomalous_spending","weeks_cents":[50000,60000,40000,50000],"current_week_cents":90000,"state_last_at_type":"anomalous_spending","state_last_at_offset_ms":518400000,"note":"6 天仍在 7 天冷却内"}
+{"id":"pi-26","bucket":"suppressed_daily_budget","rule":"budget_threshold","limit_cents":200000,"spent_cents":185000,"state_day_key":"2026-09-16","state_count_today":1}
+{"id":"pi-27","bucket":"suppressed_daily_budget","rule":"anomalous_spending","weeks_cents":[50000,60000,40000,50000],"current_week_cents":200000,"state_day_key":"2026-09-16","state_count_today":1}
+{"id":"pi-28","bucket":"suppressed_daily_budget","rule":"savings_goal_deviation","spent_cents":650000,"income":800000,"savings":200000,"state_day_key":"2026-09-16","state_count_today":1}
+{"id":"pi-29","bucket":"suppressed_daily_budget","rule":"budget_threshold","limit_cents":200000,"spent_cents":210000,"state_day_key":"2026-09-16","state_count_today":1,"note":"升级也不能突破每日额度"}
+{"id":"pi-30","bucket":"suppressed_daily_budget","rule":"budget_threshold","limit_cents":200000,"spent_cents":185000,"state_day_key":"2026-09-16","state_count_today":2}
+{"id":"pi-31","bucket":"suppressed_disabled","rule":"budget_threshold","limit_cents":200000,"spent_cents":185000,"enabled":["anomalous_spending","savings_goal_deviation"]}
+{"id":"pi-32","bucket":"suppressed_disabled","rule":"anomalous_spending","weeks_cents":[50000,60000,40000,50000],"current_week_cents":200000,"enabled":[]}
+{"id":"pi-33","bucket":"suppressed_disabled","rule":"savings_goal_deviation","spent_cents":650000,"income":800000,"savings":200000,"enabled":["budget_threshold","anomalous_spending"]}
+{"id":"pi-34","bucket":"no_trigger","rule":null,"limit_cents":200000,"spent_cents":100000}
+{"id":"pi-35","bucket":"no_trigger","rule":null,"limit_cents":200000,"spent_cents":100000,"weeks_cents":[50000,50000,50000,50000],"current_week_cents":50000,"income":800000,"savings":200000}
+{"id":"pi-36","bucket":"no_trigger","rule":null,"weeks_cents":[50000,60000,40000,50000],"current_week_cents":60000}
+{"id":"pi-37","bucket":"no_trigger","rule":null,"spent_cents":240000,"income":800000,"savings":200000,"note":"预计结余 32 万 ≥ 目标"}
+{"id":"pi-38","bucket":"no_trigger","rule":null,"limit_cents":200000,"spent_cents":178000}

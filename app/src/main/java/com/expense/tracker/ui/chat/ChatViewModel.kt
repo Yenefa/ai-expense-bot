@@ -56,6 +56,8 @@ class ChatViewModel(
     private val memoryConfirmationHandler: LlmConfirmationHandler = { LlmResult.Error("确认已失效") },
     private val memoryCancellationHandler: LlmCancellationHandler = {},
     private val budgetWarningProvider: suspend () -> String? = { null },
+    /** 主动洞察：规则判定 + 硬约束在 provider 内部完成；这里只负责展示文案。 */
+    private val proactiveInsightProvider: suspend () -> com.expense.tracker.proactive.ProactiveAlert? = { null },
 ) : ViewModel() {
 
     private val internal = MutableStateFlow(ChatUiState())
@@ -109,6 +111,7 @@ class ChatViewModel(
             runCatching { budgetWarningProvider() }.getOrNull()?.let { warning ->
                 chatRepo.appendAssistant(text = warning)
             }
+            maybeEmitProactive()
             internal.update { it.copy(sending = false) }
         }
     }
@@ -215,6 +218,7 @@ class ChatViewModel(
         if (result.assistantPersisted) {
             // 正式消息已与账目事务一起写入，避免再写一次或显示重复的流式气泡。
             internal.update { it.copy(streamingText = null) }
+            if (result.expenseIds.isNotEmpty()) maybeEmitProactive()
             return
         }
         streamReply(result.replyText)
@@ -224,6 +228,13 @@ class ChatViewModel(
             text = result.replyText,
             relatedExpenseIds = result.expenseIds,
         )
+        if (result.expenseIds.isNotEmpty()) maybeEmitProactive()
+    }
+
+    /** 主动提醒只以规则结果为输入；此处不调用 LLM、不判断异常。 */
+    private suspend fun maybeEmitProactive() {
+        val alert = runCatching { proactiveInsightProvider() }.getOrNull() ?: return
+        chatRepo.appendAssistant("🔔 ${alert.copy}")
     }
 
     private suspend fun appendError(result: LlmResult.Error) {

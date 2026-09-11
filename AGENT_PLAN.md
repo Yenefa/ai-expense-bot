@@ -5,7 +5,7 @@
 
 ## 执行线（owner 定义）
 
-**v3.9.1 Reliability Hardening ✅ → ExpenseBench v2 / AgentBehaviorBench（当前）→ Memory Governance → Proactive Insight**
+**v3.9.1 ✅ → ExpenseBench v2 ✅ → v3.9.2/v3.9.3 ✅ → Memory Governance v1 ✅ → Memory Consumption & User Control ✅ → Proactive Insight v1 ✅（完整链路成型）**
 
 ## 项目现状
 
@@ -41,6 +41,14 @@
 - Bench：写侧 Silent Write = 0%（36 条）；读侧 Unauthorized Read = 0% / Deleted Reuse = 0% / Application 100%（38 条）
 - 下一步：**Proactive Insight**（才允许开始）；候选：分析/建议消费画像、预算等扩展类型
 
+## Proactive Insight（v3.12.0 v1 已完成，2026-09-11）
+
+- 规则决定是否提醒（预算临界 / 异常消费 / 储蓄偏离），LLM 只改文案
+- 硬约束：≥4 可比样本 / 冷启动不提醒 / 每日 1 条 / 同类冷却 / 可逐类关闭
+- Bench 38 条：False/Missed/Duplicate/Cold-start/Budget 五项指标全 0%
+- 完整链路：Deterministic Routing → Short-term Context → Governed Memory → Scoped Memory Read → Deterministic Finance Tools → Controlled Mutation → Rule-governed Proactive Insight
+- 下一步候选：系统通知投递与提醒中心、分类级异常基线、LLM 文案真实复测
+
 ## 历史里程碑（简）
 
 v3.6 AI 安全（日期/确认/解析提速）→ v3.7 预算/提醒/周期账单/桌面组件 → v3.8 Agent v1 + ExpenseBench v1 →
@@ -48,4 +56,5 @@ v3.9 Intent Escalation + analyze_expenses → v3.9.1 Reliability Hardening（thi
 v3.9.2 本地安全加固（CHAT write firewall / Router 收敛 / 纯日期容错 / partial hints）→
 v3.9.3 会话上下文路由（条件更正 / 条件续记 / Query 回承）→
 v3.10.0 Memory Governance v1（四类提案 / 确认门 / Silent Memory Write Rate = 0）→
-v3.11.0 Memory Consumption & Control（读权限 / 别名应用 / 我的记忆 / 备份 v3 / Unauthorized & Deleted 双 0）
+v3.11.0 Memory Consumption & Control（读权限 / 别名应用 / 我的记忆 / 备份 v3 / Unauthorized & Deleted 双 0）→
+v3.12.0 Proactive Insight v1（规则决策 / LLM 文案 / 五指标全 0）

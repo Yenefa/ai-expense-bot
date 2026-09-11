@@ -4,7 +4,7 @@
 - 被测对象：真实 Agent + MemoryReadScope 授权注入 + 商户别名确定性应用（stub LLM，零网络）
 - 数据来源：本地确定性管线 + 生产 Agent（stub LLM，零网络）
 - dataset_sha256 = be55d982274a5705b0059376470c093ba7d07712c827d5a85ca2c2cec6665ffe
-- ran_at = 2026-09-11T19:03:25.413216300+08:00
+- ran_at = 2026-09-11T20:09:35.708500700+08:00
 - 授权范围：MUTATION→商户别名；QUERY→月收入/储蓄目标/常用分类；CHAT→无
 
 ## 核心指标

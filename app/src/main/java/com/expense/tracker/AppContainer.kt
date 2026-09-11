@@ -24,9 +24,13 @@ import com.expense.tracker.llm.LlmThinkingPolicy
 import com.expense.tracker.llm.ChatLlmCoordinator
 import com.expense.tracker.llm.AnalyticsInsightsParser
 import com.expense.tracker.llm.BillImportResult
+import com.expense.tracker.data.model.Category
 import com.expense.tracker.llm.importFromBillText
 import com.expense.tracker.llm.AiAccessResolver
 import com.expense.tracker.memory.MemoryGovernor
+import com.expense.tracker.memory.MemoryReadPolicy
+import com.expense.tracker.memory.MemoryReadScope
+import com.expense.tracker.memory.MemoryType
 import com.expense.tracker.memory.UserProfilePrefs
 import com.expense.tracker.ocr.MlKitOcrRecognizer
 import com.expense.tracker.ocr.OcrRecognizer
@@ -43,6 +47,34 @@ class AppContainer(context: Context) {
     /** 长期记忆（UserProfile）：独立 DataStore；写入口只有 MemoryGovernor.confirm/用户管理操作。 */
     val userProfileStore: UserProfilePrefs by lazy { UserProfilePrefs.create(appCtx) }
     val memoryGovernor: MemoryGovernor by lazy { MemoryGovernor(userProfileStore) }
+
+    /** 主动提醒：规则决策 + 硬约束；LLM 只允许改文案。 */
+    val proactivePrefs: com.expense.tracker.data.prefs.ProactivePrefs by lazy {
+        com.expense.tracker.data.prefs.ProactivePrefs.create(appCtx)
+    }
+    private val proactiveGovernor: com.expense.tracker.proactive.ProactiveGovernor by lazy {
+        com.expense.tracker.proactive.ProactiveGovernor(
+            stateStore = proactivePrefs,
+            enabledProvider = { proactivePrefs.enabledNow() },
+            copywriter = { alert ->
+                runCatching {
+                    val snapshot = userPrefs.snapshot.first()
+                    if (!snapshot.llmEnabled) return@runCatching null
+                    val config = aiAccessResolver.resolve(snapshot)
+                    llmClient.chatJson(
+                        baseUrl = config.baseUrl,
+                        apiKey = config.apiKey,
+                        model = config.model,
+                        userText = com.expense.tracker.proactive.ProactiveCopyPrompt.userText(alert),
+                        systemPrompt = com.expense.tracker.proactive.ProactiveCopyPrompt.systemPrompt(),
+                        installationId = config.installationId,
+                        temperature = 0.0,
+                        enableThinking = LlmThinkingPolicy.enableThinkingFor(true, config.model),
+                    ).trim()
+                }.getOrNull()
+            },
+        )
+    }
     val subscriptionPrefs: SubscriptionPrefs by lazy { SubscriptionPrefs.fromContext(appCtx) }
     val budgetPrefs: BudgetPrefs by lazy { BudgetPrefs.fromContext(appCtx) }
     val reminderPrefs: ReminderPrefs by lazy { ReminderPrefs.fromContext(appCtx) }
@@ -134,6 +166,56 @@ class AppContainer(context: Context) {
         } ?: LlmResult.Error("这条记忆确认已失效，请重新说一次。")
     }
     val llmMemoryCancellationHandler: (String) -> Unit = { memoryGovernor.cancel(it) }
+
+    /**
+     * 主动洞察：确定性规则决定是否提醒（预算/异常/储蓄），每日最多 1 条；
+     * LLM 仅可能改写文案，失败自动回退确定性文案。
+     */
+    val proactiveInsightProvider: suspend () -> com.expense.tracker.proactive.ProactiveAlert? = {
+        runCatching {
+            val now = System.currentTimeMillis()
+            val zone = java.time.ZoneId.systemDefault()
+            val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+            val monthStart = today.withDayOfMonth(1)
+            val monthRecords = activeConsumption(
+                monthStart.atStartOfDay(zone).toInstant().toEpochMilli(),
+                Long.MAX_VALUE,
+            )
+            val weekStart = today.with(
+                java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY),
+            )
+            val currentWeekSpent = activeConsumption(
+                weekStart.atStartOfDay(zone).toInstant().toEpochMilli(),
+                today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli(),
+            ).sumOf { it.amountCents }
+            val completedWeeks = (4 downTo 1).map { back ->
+                val start = weekStart.minusWeeks(back.toLong())
+                activeConsumption(
+                    start.atStartOfDay(zone).toInstant().toEpochMilli(),
+                    start.plusWeeks(1).atStartOfDay(zone).toInstant().toEpochMilli(),
+                ).sumOf { it.amountCents }
+            }
+            val facts = MemoryReadPolicy.filter(MemoryReadScope.FINANCIAL_ANALYSIS, memoryGovernor.snapshot())
+            val inputs = com.expense.tracker.proactive.ProactiveInputs(
+                nowMillis = now,
+                zone = zone,
+                monthlyLimitCents = budgetPrefs.snapshot.first().monthlyLimitCents,
+                monthSpentCents = monthRecords.sumOf { it.amountCents },
+                monthRecordCount = monthRecords.size,
+                elapsedMonthDays = today.dayOfMonth,
+                daysInMonth = today.lengthOfMonth(),
+                currentWeekSpentCents = currentWeekSpent,
+                completedWeekSpendsCents = completedWeeks,
+                monthlyIncomeCents = facts.firstOrNull { it.type == MemoryType.MONTHLY_INCOME }?.amountCents,
+                savingsGoalCents = facts.firstOrNull { it.type == MemoryType.SAVINGS_GOAL }?.amountCents,
+            )
+            proactiveGovernor.evaluate(inputs)
+        }.getOrNull()
+    }
+
+    private suspend fun activeConsumption(fromMillis: Long, toMillis: Long) =
+        expenseRepo.observeInRange(fromMillis, toMillis).first()
+            .filter { it.deletedAt == null && !Category.byIdOrOther(it.categoryId).isInvestment }
 
     /** 记账后的预算预警文案（达到 90% 或超支时非空）。 */
     val budgetWarningProvider: suspend () -> String? = suspend {

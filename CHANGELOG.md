@@ -5,6 +5,22 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.12.0 (versionCode 38) — 2026-09-11
+
+**Proactive Insight v1：规则决定该不该提醒，LLM 只负责怎么说（纯本地验收）**
+
+新增：
+
+- **三类主动提醒**：预算临界（90% / 超支）、异常消费（本周明显高于近 4 周个人基线）、储蓄目标偏离（月收入 + 储蓄目标 + 本月 pace 外推）
+- **硬约束（治理层，LLM 无权参与）**：至少 4 个可比样本 / 冷启动不提醒 / 每日最多 1 条 / 同类冷却（预算 24h、异常与储蓄 7d）/ 预算 WARN→OVER 可升级突破冷却（hysteresis）/ 用户可逐类关闭
+- **LLM 只允许改文案**：规则先产出结构化事实与确定性文案，copywriter 仅在规则触发后调用；失败/超长自动回退，不参与"是否提醒"
+- **设置 → 🔮 主动提醒**：三类开关（默认开启）
+- **ProactiveInsightBench**：38 条六桶；**False Alert / Missed Alert / Duplicate / Cold-start Violation / Notification Budget Violation 五项指标全部 0%**，文案覆盖率 100%
+
+测试：322 → **334 个 JVM 单测全部通过**（新增 12：规则 5 / 治理 5 / Bench 2）。
+
+> 真实 LLM Bench 仍暂停（owner 决定，纯本地验收）。
+
 ## 3.11.0 (versionCode 37) — 2026-09-11
 
 **Memory Consumption & User Control：读有授权边界，用户可完整管理（纯本地验收）**

@@ -58,6 +58,21 @@
 - **Bench 双保险**：写侧 Silent Memory Write Rate = 0%（36 条）；读侧 Unauthorized Read = 0% / Deleted Reuse = 0% / Correct Application = 100%（38 条，[docs/memory-consumption.md](docs/memory-consumption.md)）
 - v1 边界：分析类记忆只作上下文不参与计算；无冲突合并
 
+## 🔮 Proactive Insight（v3.12）
+
+**规则决定"该不该提醒"，LLM 只负责"怎么说"** —— 模型无权判断异常、无权直接发通知。
+
+三类（v1）：
+
+- **预算临界**：本月预算 ≥90% / 超支
+- **异常消费**：本周明显高于近 4 周个人基线（≥1.5x 且至少高出 ¥100）
+- **储蓄目标偏离**：结合月收入 + 储蓄目标，按本月 pace 外推预计结余
+
+硬约束（治理层，模型不可见）：至少 4 个可比样本 / 冷启动不提醒 / **每日最多 1 条** / 同类冷却（预算 24h、异常与储蓄 7d）/ 预算 WARN→OVER 可升级突破冷却 / 设置内可逐类关闭。
+
+- **ProactiveInsightBench**：38 条六桶，五项指标 **False Alert / Missed Alert / Duplicate / Cold-start Violation / Notification Budget Violation 全部 0%**（`docs/proactive-insight-local-report.md`，协议见 [docs/proactive-insight.md](docs/proactive-insight.md)）
+- 完整链路：**Deterministic Routing → Short-term Context → Governed Memory → Scoped Memory Read → Deterministic Finance Tools → Controlled Mutation → Rule-governed Proactive Insight**
+
 ## 📊 ExpenseBench
 
 内置提取质量基准（协议见 [docs/expensebench.md](docs/expensebench.md)）：**120 条标注语录 × 6 个桶**（基础 / 相对日期 / 多笔 / 商户 / 口语 / 明确时间），评测金额、分类、日期、商户四个维度的准确率。
@@ -305,6 +320,7 @@ Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有�
 | **v3.9.3** | **会话上下文路由** - ConversationActionContext：条件更正（记错了/说错了/不对）、条件续记（也是35）、Query 回承（那X呢）；修复查询工具失败回退可写；离线路由 80/80、Query 召回 16/16 |
 | **v3.10.0** | **Memory Governance v1** - 四类长期记忆（月收入/储蓄目标/商户别名/常用分类）；提案→类型校验→预览→确认→UserProfile；LLM 无写接口；Silent Memory Write Rate = 0%（Bench 36 条） |
 | **v3.11.0** | **Memory Consumption & Control** - MemoryReadScope 读权限 + 别名确定性应用；我的记忆（查看/修改/删除/清空）；JSON 备份 v3 含记忆；Unauthorized Read 0% / Deleted Reuse 0% / Application 100%（Bench 38 条） |
+| **v3.12.0** | **Proactive Insight v1** - 预算临界/异常消费/储蓄偏离三类；规则决策 + 硬约束（4 样本/冷启动/每日 1 条/冷却/可关闭）；LLM 仅文案；五项 Bench 指标全 0% |
 
 > 版本管理规范（2026-08-08 起）：每次交付 versionCode +1、versionName 语义化递增，变更记录维护在 `CHANGELOG.md`。
 

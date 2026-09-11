@@ -169,3 +169,25 @@
 ## 决定
 - 安全写 + 安全读 + 可管理 三项闭环完成，**下一步才允许进入 Proactive Insight**
 - 边界：分析类记忆只作上下文不参与计算；无冲突合并
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.12.0 Proactive Insight v1（opencode）
+
+## 范围（owner：规则决定"该不该提醒"，LLM 只负责"怎么说"）
+- 三类：预算临界（90%/超支）、异常消费（本周 ≥ 近 4 周基线 ×1.5 且高出 ≥¥100）、储蓄目标偏离（收入+储蓄+pace 外推）
+- 硬约束：≥4 可比样本 / 冷启动不提醒 / 每日最多 1 条 / 同类冷却（预算 24h、异常/储蓄 7d）/ WARN→OVER 升级可突破冷却 / 用户可逐类关闭
+- LLM 边界：copywriter 只在规则触发后调用；超长/换行/失败回退确定性文案；不参与决策
+- 开关 UI：设置 → 🔮 主动提醒（3 类，默认开）
+- 投递：记录成功后聊天内追加 "🔔 …"（系统通知栏为后续版本）
+
+## Bench（ProactiveInsightBench v1，38 条六桶）
+- 报告 `docs/proactive-insight-local-report.md`
+- **False Alert 0%（0/24）/ Missed 0%（0/14）/ Duplicate 0%（0/5）/ Cold-start 0%（0/6）/ Budget Violation 0%（0/5）**；文案覆盖率 100%
+
+## 验收（本地）
+- JVM 单测 322 → **334，0 failed**（新增 12：规则 5 / 治理 5 / Bench 2）
+
+## 结果
+- 完整链路成型：Deterministic Routing → Short-term Context → Governed Memory → Scoped Memory Read → Deterministic Finance Tools → Controlled Mutation → Rule-governed Proactive Insight
+- 后续候选：系统通知投递与提醒中心、分类级异常基线、LLM 文案真实复测
