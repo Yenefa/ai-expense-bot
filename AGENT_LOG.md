@@ -99,4 +99,25 @@
 
 ## 决定
 - 真实 LLM Bench 暂停，不再自动三轮全量；待免费额度/替代模型/明确指令先跑 smoke
-- 未做（后续候选）：上下文触发词、续记路由「今天也是35」、分类灰区 gold 复核；Memory Governance 继续后压
+- 未做（后续候选）：分类灰区 gold 复核；Memory Governance 继续后压
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.9.3 会话上下文路由（opencode）
+
+## 范围（owner：纯本地，不新增裸关键词 MUTATION 规则）
+- **ConversationActionContext**（轻量会话状态，非长期画像）：previousRoute / recentExpenseIds / previousMutationBatch / previousQueryPeriod / previousCategories，每轮结束推进
+- **条件更正**：上一轮记账 + 最近账目非空 + 更正词（记错了/说错了/不对/补充一下）→ MUTATION；"你这个分析不对"（查询语境）保持非记账
+- **条件续记**：「今天也是35」仅在上一轮 MUTATION 语境后记账
+- **Query 回承**：「那上个月呢 / 那这周呢 / 再看下饮品」仅当上一轮 QUERY 时生效，继承 intent，当前句 period/category 覆盖
+- 修复：查询工具失败回退到可写上下文的问题（现在回退也保持只读）
+
+## 验收（本地）
+- JVM 单测 288 → **295，0 failed**（新增路由正反例 4 组 + Agent 级会话用例 3 个）
+- 离线行为基线：前置路由 74/80 → **80/80**；Query 前置召回 14/16 → **16/16**；工具选择 16/16
+- 正反例：查询后「不对」不触发改账；无最近账目「记错了」不升 MUTATION；无上一轮 QUERY「那上个月呢」不继承
+- 数据集：multi_turn 用例新增 `previous_route` gold 用于上下文模拟
+
+## 决定
+- 真实 LLM Bench 仍暂停；待免费额度/替代模型/明确指令
+- 未做（后续候选）：分类灰区 gold 复核；Memory Governance 继续后压

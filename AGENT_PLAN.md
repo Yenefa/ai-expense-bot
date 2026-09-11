@@ -27,8 +27,11 @@
 - **v3.9.2 本地加固已完成**（2026-09-11，纯本地验收）：
   - CHAT write firewall（非 MUTATION 路径代码层禁写）、Router 收敛（裸金额→MUTATION / 非支出护栏→CHAT / 查询追问）、纯日期 `occurred_at` 容错、partial hints
   - 离线基线：前置路由 58/80 → **74/80**；Query 前置召回 9/16 → **14/16**；工具 14/14；JVM **288/288**
+- **v3.9.3 会话上下文路由已完成**（2026-09-11，纯本地验收）：
+  - `ConversationActionContext`：条件更正（上一轮记账 + 最近账目 + 更正词）、条件续记（也是35）、Query 回承（那X呢/再看下X）
+  - 离线基线：前置路由 74/80 → **80/80**；Query 前置召回 14/16 → **16/16**；工具 16/16；JVM **295/295**
 - **LLM Bench 暂停**：不再自动三轮全量；待免费额度/替代模型/明确指令先跑 smoke
-- 后续候选：上下文触发词（记错了/不对/说错了）、「今天也是35」续记路由、分类灰区 gold 复核；Memory Governance 继续后压
+- 后续候选：分类灰区 gold 复核；Memory Governance 继续后压
 
 ## Memory Governance（下一阶段，未开工）
 
@@ -39,4 +42,5 @@ v2 的 negative_false_positive 桶保证它不会被识别成 ¥8000 支出。
 
 v3.6 AI 安全（日期/确认/解析提速）→ v3.7 预算/提醒/周期账单/桌面组件 → v3.8 Agent v1 + ExpenseBench v1 →
 v3.9 Intent Escalation + analyze_expenses → v3.9.1 Reliability Hardening（thinking 门控 / QUERY 只读 / analyze 修复 / Escalation 参数 / 文案对齐）→
-v3.9.2 本地安全加固（CHAT write firewall / Router 收敛 / 纯日期容错 / partial hints）
+v3.9.2 本地安全加固（CHAT write firewall / Router 收敛 / 纯日期容错 / partial hints）→
+v3.9.3 会话上下文路由（条件更正 / 条件续记 / Query 回承）

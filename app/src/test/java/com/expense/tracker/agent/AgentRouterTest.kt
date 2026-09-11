@@ -115,8 +115,75 @@ class AgentRouterTest {
     fun `查询召回覆盖花哪与追问`() {
         assertThat(AgentRouter.route("我的钱都花哪了", now, zone).route).isEqualTo(AgentRoute.QUERY)
         assertThat(AgentRouter.route("上个月和这个月比，哪个花得多", now, zone).route).isEqualTo(AgentRoute.QUERY)
-        assertThat(AgentRouter.route("那上个月呢", now, zone).route).isEqualTo(AgentRoute.QUERY)
-        assertThat(AgentRouter.route("那这周呢", now, zone).route).isEqualTo(AgentRoute.QUERY)
-        assertThat(AgentRouter.route("再看下饮品", now, zone).route).isEqualTo(AgentRoute.QUERY)
+        val queryContext = ConversationActionContext(previousRoute = AgentRoute.QUERY)
+        assertThat(AgentRouter.route("那上个月呢", now, zone, queryContext).route).isEqualTo(AgentRoute.QUERY)
+        assertThat(AgentRouter.route("那这周呢", now, zone, queryContext).route).isEqualTo(AgentRoute.QUERY)
+        assertThat(AgentRouter.route("再看下饮品", now, zone, queryContext).route).isEqualTo(AgentRoute.QUERY)
+        // 回承是条件规则：没有上一轮 QUERY 时不是查询
+        assertThat(AgentRouter.route("那上个月呢", now, zone).route).isEqualTo(AgentRoute.CHAT)
+    }
+
+    @Test
+    fun `花钱分析问句直接走查询`() {
+        assertThat(AgentRouter.route("我最近吃饭是不是花多了", now, zone).route).isEqualTo(AgentRoute.QUERY)
+        assertThat(AgentRouter.route("我是不是乱花钱了", now, zone).route).isEqualTo(AgentRoute.QUERY)
+    }
+
+    @Test
+    fun `条件更正上一轮记账且有最近账目才升为改账`() {
+        val recordContext = ConversationActionContext(
+            previousRoute = AgentRoute.MUTATION,
+            recentExpenseIds = listOf(7L),
+            previousMutationBatch = listOf(7L),
+        )
+        listOf(
+            "记错了，是53",
+            "上一条说错了，那杯瑞幸是16不是18",
+            "不对，是32",
+            "补充一下，其实是40",
+        ).forEach { text ->
+            assertThat(AgentRouter.route(text, now, zone, recordContext).route).isEqualTo(AgentRoute.MUTATION)
+        }
+
+        // 反例 1：上一轮记账但没有最近账目
+        val noIds = recordContext.copy(recentExpenseIds = emptyList())
+        assertThat(AgentRouter.route("记错了，是53", now, zone, noIds).route).isEqualTo(AgentRoute.CHAT)
+        // 反例 2：上一轮是查询 —— "你这个分析不对" 不是改账
+        val queryContext = ConversationActionContext(
+            previousRoute = AgentRoute.QUERY,
+            recentExpenseIds = listOf(7L),
+        )
+        assertThat(AgentRouter.route("你这个分析不对", now, zone, queryContext).route).isEqualTo(AgentRoute.CHAT)
+        // 反例 3：无任何会话上下文
+        assertThat(AgentRouter.route("不对，是32", now, zone).route).isEqualTo(AgentRoute.CHAT)
+        assertThat(AgentRouter.route("补充一下，其实是40", now, zone).route).isEqualTo(AgentRoute.CHAT)
+    }
+
+    @Test
+    fun `条件续记也是35仅在上一轮记账语境后生效`() {
+        val recordContext = ConversationActionContext(previousRoute = AgentRoute.MUTATION)
+        assertThat(AgentRouter.route("今天也是35", now, zone, recordContext).route).isEqualTo(AgentRoute.MUTATION)
+        assertThat(AgentRouter.route("今天也是35", now, zone).route).isEqualTo(AgentRoute.CHAT)
+        val queryContext = ConversationActionContext(previousRoute = AgentRoute.QUERY)
+        assertThat(AgentRouter.route("今天也是35", now, zone, queryContext).route).isEqualTo(AgentRoute.CHAT)
+    }
+
+    @Test
+    fun `Query回承只覆盖时段与分类`() {
+        val queryContext = ConversationActionContext(
+            previousRoute = AgentRoute.QUERY,
+            previousQueryPeriod = AgentPeriodResolver.defaultMonth(now, zone),
+            previousCategories = setOf("food"),
+        )
+
+        val periodOverride = AgentRouter.route("那上个月呢", now, zone, queryContext)
+        assertThat(periodOverride.route).isEqualTo(AgentRoute.QUERY)
+        assertThat(periodOverride.period?.label).contains("2026-08")
+
+        val categoryOverride = AgentRouter.route("再看下饮品", now, zone, queryContext)
+        assertThat(categoryOverride.route).isEqualTo(AgentRoute.QUERY)
+        assertThat(categoryOverride.categories).containsExactly("drink")
+        // period 继承上一轮（本月）
+        assertThat(categoryOverride.period?.label).contains("2026-09")
     }
 }

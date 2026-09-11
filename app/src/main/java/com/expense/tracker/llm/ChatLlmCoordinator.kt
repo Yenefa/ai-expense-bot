@@ -215,7 +215,9 @@ class ChatLlmCoordinator(
         private const val PENDING_TTL_MS = 10 * 60_000L
         private val EXISTING_RECORD_INTENT = Regex(
             "删除|删掉|取消|不要了|改成|改为|修改|更改|调整|移到|挪到|改到|" +
-                "这笔|那笔|它们|他们|这些|那些|刚才|上一批|全部|全都|都改|都删",
+                "这笔|那笔|它们|他们|这些|那些|刚才|上一批|全部|全都|都改|都删|" +
+                // v3.9.3：更正语义只有在路由已放行（上一轮记账 + 最近账目）时才会走到这里。
+                "记错了|说错了|搞错了|不对|补充",
         )
         private val FALSE_MUTATION_CLAIM = Regex(
             "(?:已|成功).{0,20}(?:记录|记账|修改|删除|移动|改到|改好)|已记\\s*\\d*\\s*笔",

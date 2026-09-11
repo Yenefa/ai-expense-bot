@@ -5,6 +5,24 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.9.3 (versionCode 35) — 2026-09-11
+
+**会话上下文路由：条件更正 / 续记 / Query 回承（纯本地验收）**
+
+新增：
+
+- **ConversationActionContext（轻量会话状态，非长期用户画像）**：记录 previousRoute / recentExpenseIds / previousMutationBatch / previousQueryPeriod / previousCategories，每轮结束后推进；ExpenseAgent 持有并驱动路由
+- **条件更正语义**：只有「上一轮是记账 + 最近账目非空 + 更正词（记错了/说错了/不对/补充一下）」才升为 MUTATION；查询语境下「你这个分析不对」保持非记账
+- **条件续记**：「今天也是35」只在上一轮明确消费语境（MUTATION）后记账，裸数字不再无条件写账
+- **Query 回承**：「那上个月呢 / 那这周呢 / 再看下饮品」仅当上一轮是 QUERY 时继承 intent，当前句出现的 period/category 覆盖继承值
+- 修复查询工具执行失败时回退到可写上下文的问题（现在回退也保持只读）
+
+测试：288 → **295 个 JVM 单测全部通过**（新增路由正反例与 Agent 级会话用例 7 个）。
+
+离线行为基线：前置路由 74/80 → **80/80**；Query 前置召回 14/16 → **16/16**；工具选择 16/16。
+
+> 真实 LLM Bench 仍暂停（owner 决定，纯本地验收）。
+
 ## 3.9.2 (versionCode 34) — 2026-09-11
 
 **本地安全加固（不依赖 LLM Bench）：CHAT 写防火墙 + Router 收敛 + 解析容错**

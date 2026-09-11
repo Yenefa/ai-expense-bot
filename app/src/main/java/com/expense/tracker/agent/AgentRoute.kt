@@ -24,26 +24,45 @@ data class AgentDecision(
 )
 
 /**
- * 意图路由（v3.8 Agent 层，v3.9.2 加固）：本地确定性规则，零成本、零延迟，
- * 决定消息走记账管线还是查询/闲聊。
+ * 意图路由（v3.8 Agent 层，v3.9.3 会话上下文）：本地确定性规则，零成本、零延迟。
  *
- * v3.9.2 写路径收敛：只有 MUTATION 可以写库；QUERY 与 CHAT 在协调器层被代码拒绝任何
- * expenses/actions（CHAT write firewall）。因此路由规则分三层：
+ * 写路径收敛：只有 MUTATION 可以写库；QUERY 与 CHAT 在协调器层被代码拒绝任何
+ * expenses/actions（write firewall）。路由规则：
  * 1. 明确的删改意图 → MUTATION；
- * 2. 查询（含后续询问）→ QUERY；
- * 3. 非支出语义（收入/负债/预算/估值/假设/否定/第三方…）→ CHAT（写防火墙保护）；
+ * 2. 条件更正/续记（依赖上一轮行为 + 最近账目，非裸关键词）→ MUTATION；
+ * 3. 查询（强规则 / 软规则 / 分析问句 / 上一轮 QUERY 的追问回承）→ QUERY；
+ * 4. 非支出语义（收入/负债/预算/估值/假设/否定/第三方…）→ CHAT（写防火墙保护）；
  *    其余带金额的支出语境 → MUTATION（含无元/块的裸金额）。
  */
 object AgentRouter {
 
-    fun route(text: String, nowMillis: Long, zone: ZoneId = ZoneId.systemDefault()): AgentDecision {
+    fun route(
+        text: String,
+        nowMillis: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+        context: ConversationActionContext = ConversationActionContext(),
+    ): AgentDecision {
         val normalized = text.trim()
         if (MUTATION_INTENT.containsMatchIn(normalized)) {
             return AgentDecision(AgentRoute.MUTATION)
         }
+        // v3.9.3 条件更正：上一轮是记账且存在最近账目时，「记错了/说错了/不对/补充一下」才算改账。
+        if (context.previousRoute == AgentRoute.MUTATION &&
+            context.recentExpenseIds.isNotEmpty() &&
+            CORRECTION_WORD.containsMatchIn(normalized)
+        ) {
+            return AgentDecision(AgentRoute.MUTATION)
+        }
+        // v3.9.3 条件续记：上一轮是明确消费语境（MUTATION）时，「今天也是35」才继续记；
+        // 否则一个裸数字不构成记账意图。
+        if (context.previousRoute == AgentRoute.MUTATION && CONTINUATION_RECORD.containsMatchIn(normalized)) {
+            return AgentDecision(AgentRoute.MUTATION)
+        }
         val softQuery = QUERY_TOPIC.containsMatchIn(normalized) && QUESTION_TONE.containsMatchIn(normalized)
-        if (STRONG_QUERY.containsMatchIn(normalized) || QUERY_FOLLOW_UP.containsMatchIn(normalized) || softQuery) {
-            return queryDecision(normalized, nowMillis, zone)
+        val analysisQuery = QUERY_TOPIC.containsMatchIn(normalized) && ANALYSIS_QUERY_HINT.containsMatchIn(normalized)
+        val followUpInherit = context.previousRoute == AgentRoute.QUERY && FOLLOW_UP_QUERY.containsMatchIn(normalized)
+        if (STRONG_QUERY.containsMatchIn(normalized) || softQuery || analysisQuery || followUpInherit) {
+            return queryDecision(normalized, nowMillis, zone, context)
         }
         // 非支出语义优先于裸金额识别：这些句子里的数字不是本笔消费。
         if (NON_EXPENSE_INTENT.containsMatchIn(normalized)) {
@@ -68,14 +87,25 @@ object AgentRouter {
     /**
      * 从原句重新解析查询参数（时段 / 分类 / 预算）。Intent Escalation 把路由从 CHAT
      * 升级为分析时，必须重新跑这里，不能复用升级前的空 CHAT 决策。
+     *
+     * v3.9.3：当上一轮是 QUERY 且本轮是追问（那X呢 / 再看下X）时继承 intent，
+     * 当前句出现的 period/category 覆盖继承值。
      */
-    fun queryDecision(text: String, nowMillis: Long, zone: ZoneId = ZoneId.systemDefault()): AgentDecision {
+    fun queryDecision(
+        text: String,
+        nowMillis: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+        context: ConversationActionContext = ConversationActionContext(),
+    ): AgentDecision {
         val normalized = text.trim()
+        val inherit = context.previousRoute == AgentRoute.QUERY && FOLLOW_UP_QUERY.containsMatchIn(normalized)
+        val categories = AgentCategories.resolve(normalized)
         return AgentDecision(
             route = AgentRoute.QUERY,
             period = AgentPeriodResolver.resolve(normalized, nowMillis, zone)
+                ?: (if (inherit) context.previousQueryPeriod else null)
                 ?: AgentPeriodResolver.defaultMonth(nowMillis, zone),
-            categories = AgentCategories.resolve(normalized),
+            categories = categories.ifEmpty { if (inherit) context.previousCategories else emptySet() },
             wantBudget = BUDGET_INTENT.containsMatchIn(normalized),
         )
     }
@@ -87,16 +117,26 @@ object AgentRouter {
 
     private val STRONG_QUERY = Regex(
         "多少|几笔|几次|一共|总共|总计|合计|统计|汇总|平均|排行|最常|占比|分布|趋势|" +
-            "明细|清单|流水|花在哪|花在什么|花哪|哪个花|消费记录|还剩|剩多少|超支|超预算|预算|对比|哪个多|哪些|" +
-            "[再又]看下|再看看",
+            "明细|清单|流水|花在哪|花在什么|花哪|哪个花|消费记录|还剩|剩多少|超支|超预算|预算|对比|哪个多|哪些",
     )
 
-    /** 回承上一轮查询的追问：「那上个月呢」「那这周呢」。 */
-    private val QUERY_FOLLOW_UP = Regex("那(?:上|本|这|下)?(?:个)?(?:月|周|星期|年)呢")
+    /** 追问回承模式（v3.9.3）：只在上一轮是 QUERY 时生效，继承 intent、覆盖 period/category。 */
+    private val FOLLOW_UP_QUERY = Regex("那(?:上|本|这|下)?(?:个)?(?:月|周|星期|年)呢|(?:再|又)看下|再看[看下]")
+
+    /** 条件更正语义（v3.9.3）：必须配合上一轮记账 + 最近账目，不是裸关键词路由。 */
+    private val CORRECTION_WORD = Regex("记错了|说错了|搞错了|写错了|不对(?!起)|补充(?:一下)?")
+
+    /** 条件续记（v3.9.3）：上一轮是记账语境时才生效。 */
+    private val CONTINUATION_RECORD = Regex("也是\\s*\\d")
 
     private val QUERY_TOPIC = Regex("花|消费|支出|用掉|开销")
     private val QUESTION_TONE = Regex("吗|呢|？|\\?")
     private val BUDGET_INTENT = Regex("预算|还剩|超支|超预算")
+
+    /** 花钱类分析问句（比"多少"弱）：花+|是不是/要不要等 → 直接 QUERY（只读，零风险）。 */
+    private val ANALYSIS_QUERY_HINT = Regex(
+        "是不是|要不要|该不该|怎么办|该怎么|正常吗|合理吗|严重吗|怎么看|太多|花多|花太快|超了|超标|建议|帮我看看|帮我分析|分析一下",
+    )
 
     /**
      * 非支出语义护栏（v3.9.2）：命中即走 CHAT，由 write firewall 保证不落库。
@@ -132,7 +172,7 @@ object AgentRouter {
     fun needsEscalation(text: String): Boolean {
         val normalized = text.trim()
         if (STRONG_QUERY.containsMatchIn(normalized)) return false
-        if (QUERY_FOLLOW_UP.containsMatchIn(normalized)) return false
+        if (FOLLOW_UP_QUERY.containsMatchIn(normalized)) return false
         if (QUERY_TOPIC.containsMatchIn(normalized) && QUESTION_TONE.containsMatchIn(normalized)) return false
         return ESCALATION_HINTS.containsMatchIn(normalized)
     }

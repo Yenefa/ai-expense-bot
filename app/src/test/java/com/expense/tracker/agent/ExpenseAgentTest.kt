@@ -5,10 +5,13 @@ import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.data.repo.ChatRepository
 import com.expense.tracker.data.repo.ExpenseRepository
+import com.expense.tracker.data.repo.LlmMutationApplier
 import com.expense.tracker.data.repo.MutationApplyResult
+import com.expense.tracker.data.repo.TransactionRunner
 import com.expense.tracker.llm.ChatLlmCoordinator
 import com.expense.tracker.ui.chat.LlmResult
 import com.google.common.truth.Truth.assertThat
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
@@ -25,13 +28,19 @@ class ExpenseAgentTest {
         val structuredRequest: Boolean = false,
     )
 
+    private class InlineRunner : TransactionRunner {
+        override suspend fun <T> run(block: suspend () -> T): T = block()
+    }
+
     private fun agent(
         dao: FakeExpenseDao,
         budget: BudgetSnapshot = BudgetSnapshot(),
         onCapture: (CapturedRequest) -> Unit,
         responseJson: String,
+        respondByText: ((String) -> String)? = null,
         escalateIntent: (suspend (String) -> IntentEscalation?)? = null,
         onApply: () -> Unit = {},
+        initialContext: ConversationActionContext = ConversationActionContext(),
     ): ExpenseAgent {
         val chatDao = FakeChatDao()
         val coordinator = ChatLlmCoordinator(
@@ -39,7 +48,7 @@ class ExpenseAgentTest {
             chatRepository = ChatRepository(chatDao),
             requestJson = { text, _, systemPrompt, _, structuredRequest ->
                 onCapture(CapturedRequest(text, systemPrompt, structuredRequest))
-                responseJson
+                respondByText?.invoke(text) ?: responseJson
             },
             applyPlan = {
                 onApply()
@@ -57,6 +66,28 @@ class ExpenseAgentTest {
             coordinator = coordinator,
             toolContext = toolContext,
             escalateIntent = escalateIntent,
+            nowProvider = { now },
+            zone = zone,
+            initialConversationContext = initialContext,
+        )
+    }
+
+    /** 带真实 applier 的会话 agent：跨轮共享 ConversationActionContext，落库可断言。 */
+    private fun sessionAgent(dao: FakeExpenseDao, respond: (String) -> String): ExpenseAgent {
+        val chatDao = FakeChatDao()
+        val applier = LlmMutationApplier(ExpenseRepository(dao), ChatRepository(chatDao), InlineRunner())
+        val coordinator = ChatLlmCoordinator(
+            expenseRepository = ExpenseRepository(dao),
+            chatRepository = ChatRepository(chatDao),
+            requestJson = { text, _, _, _, _ -> respond(text) },
+            applyPlan = applier::apply,
+            nowProvider = { now },
+            zone = zone,
+        )
+        return ExpenseAgent(
+            coordinator = coordinator,
+            toolContext = AgentToolContext(ExpenseRepository(dao), { BudgetSnapshot() }, zone),
+            escalateIntent = null,
             nowProvider = { now },
             zone = zone,
         )
@@ -330,5 +361,83 @@ class ExpenseAgentTest {
         assertThat(applyCalls).isEqualTo(0)
         assertThat(dao.state.value).hasSize(1)
         assertThat(dao.state.value.single().deletedAt).isNull()
+    }
+
+    @Test
+    fun `两轮更正只更新上一笔`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        val agent = sessionAgent(dao) { text ->
+            if (text.contains("记错了")) {
+                "{\"reply\":\"已更正\",\"expenses\":[],\"actions\":[{\"action\":\"update\",\"expense_id\":1,\"amount\":53}]}"
+            } else {
+                "{\"reply\":\"已记录\",\"expenses\":[{\"amount\":35,\"category\":\"food\",\"note\":\"晚饭\",\"occurred_at\":null}],\"actions\":[]}"
+            }
+        }
+
+        agent.submit("昨天晚饭35", prefs())
+        assertThat(dao.getAllActiveOnce().single().amountCents).isEqualTo(3500L)
+
+        val corrected = agent.submit("记错了，是53", prefs())
+
+        assertThat(corrected).isInstanceOf(LlmResult.Ok::class.java)
+        val rows = dao.getAllActiveOnce()
+        assertThat(rows).hasSize(1)
+        assertThat(rows.single().amountCents).isEqualTo(5300L)
+    }
+
+    @Test
+    fun `查询后的不对不触发改账`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        var applyCalls = 0
+        val chatDao = FakeChatDao()
+        val applier = LlmMutationApplier(ExpenseRepository(dao), ChatRepository(chatDao), InlineRunner())
+        val coordinator = ChatLlmCoordinator(
+            expenseRepository = ExpenseRepository(dao),
+            chatRepository = ChatRepository(chatDao),
+            requestJson = { text, _, _, _, _ ->
+                if (text.contains("不对")) {
+                    "{\"reply\":\"已记录35元\",\"expenses\":[{\"amount\":35,\"category\":\"food\",\"note\":\"午饭\",\"occurred_at\":null}],\"actions\":[]}"
+                } else {
+                    "{\"reply\":\"本月合计 ¥53.00\",\"expenses\":[],\"actions\":[]}"
+                }
+            },
+            applyPlan = { plan ->
+                applyCalls++
+                applier.apply(plan)
+            },
+            nowProvider = { now },
+            zone = zone,
+        )
+        val agent = ExpenseAgent(
+            coordinator = coordinator,
+            toolContext = AgentToolContext(ExpenseRepository(dao), { BudgetSnapshot() }, zone),
+            escalateIntent = null,
+            nowProvider = { now },
+            zone = zone,
+        )
+
+        agent.submit("这个月花了多少？", prefs()) // QUERY → 会话上下文 previousRoute=QUERY
+        val result = agent.submit("你这个分析不对", prefs()) // 含更正词，但上一轮不是记账
+
+        assertThat(result).isInstanceOf(LlmResult.Ok::class.java)
+        assertThat(applyCalls).isEqualTo(0)
+        assertThat(dao.getAllActiveOnce()).isEmpty()
+    }
+
+    @Test
+    fun `续记也是35在上一轮记账后才落库`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        val agent = sessionAgent(dao) {
+            "{\"reply\":\"已记录\",\"expenses\":[{\"amount\":35,\"category\":\"food\",\"note\":\"午饭\",\"occurred_at\":null}],\"actions\":[]}"
+        }
+
+        agent.submit("昨天午饭35", prefs())
+        val second = agent.submit("今天也是35", prefs())
+
+        assertThat(second).isInstanceOf(LlmResult.Ok::class.java)
+        val rows = dao.getAllActiveOnce().sortedBy { it.id }
+        assertThat(rows).hasSize(2)
+        assertThat(Instant.ofEpochMilli(rows[1].occurredAt).atZone(zone).toLocalDate())
+            .isEqualTo(LocalDate.of(2026, 9, 6))
     }
 }

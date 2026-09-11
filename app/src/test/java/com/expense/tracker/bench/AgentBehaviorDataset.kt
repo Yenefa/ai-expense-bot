@@ -47,6 +47,11 @@ data class BehaviorCase(
     val expected_pending: Boolean = false,
     /** 本轮结束后期望的活跃账目总数（含 seed；用于抓"该 update 却 insert"的重复记账）。 */
     val expected_active_count: Int? = null,
+    /**
+     * 上一轮生效路由（v3.9.3 会话上下文模拟）：用于更正/续记门控与 Query 回承。
+     * bench 按此 hydrate ConversationActionContext；null = 无上一轮。
+     */
+    val previous_route: String? = null,
     /** 人工标注理由/已知缺口说明。 */
     val note: String? = null,
 )

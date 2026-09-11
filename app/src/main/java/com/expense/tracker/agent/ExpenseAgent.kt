@@ -14,6 +14,9 @@ import java.time.ZoneId
  * get_budget_status），把可信数据注入 system prompt，LLM 只负责组织语言；
  * 规则快路径不命中但文本带分析特征时，再走一次轻量 Intent Escalation 调用确认。
  * 写路径（记账/删改）：保持既有变更计划管线与确认门，行为不变。
+ *
+ * v3.9.3：持有「当前会话最近一次行为」的轻量上下文（非长期画像），用于条件更正、
+ * 续记与 Query 回承；每轮结束后推进。
  */
 class ExpenseAgent(
     private val coordinator: ChatLlmCoordinator,
@@ -24,16 +27,29 @@ class ExpenseAgent(
     private val zone: ZoneId = ZoneId.systemDefault(),
     /** Bench/监控观测点：每轮最终生效路由（含升级结果），生产默认 no-op。 */
     private val onRouteResolved: (AgentRoute) -> Unit = {},
+    /** 会话起点上下文（测试/未来会话恢复用），默认空。 */
+    initialConversationContext: ConversationActionContext = ConversationActionContext(),
 ) {
+    private var conversationContext: ConversationActionContext = initialConversationContext
+    private var lastTurn: TurnMeta? = null
+
+    private data class TurnMeta(
+        val route: AgentRoute,
+        val period: AgentPeriodSpec?,
+        val categories: Set<String>,
+    )
 
     suspend fun submit(text: String, prefs: UserPrefsSnapshot): LlmResult {
-        val decision = AgentRouter.route(text, nowProvider(), zone)
-        return when {
+        val decision = AgentRouter.route(text, nowProvider(), zone, conversationContext)
+        lastTurn = null
+        val result = when {
             decision.route == AgentRoute.QUERY -> {
+                lastTurn = TurnMeta(AgentRoute.QUERY, decision.period, decision.categories)
                 onRouteResolved(AgentRoute.QUERY)
                 submitQuery(text, prefs, decision)
             }
             decision.route == AgentRoute.MUTATION -> {
+                lastTurn = TurnMeta(AgentRoute.MUTATION, null, emptySet())
                 onRouteResolved(AgentRoute.MUTATION)
                 coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
             }
@@ -41,10 +57,15 @@ class ExpenseAgent(
                 escalateIntent != null &&
                 AgentRouter.needsEscalation(text) -> submitEscalated(text, prefs)
             else -> {
+                lastTurn = TurnMeta(AgentRoute.CHAT, null, emptySet())
                 onRouteResolved(AgentRoute.CHAT)
                 coordinator.submit(text, prefs, CHAT_TURN_CONTEXT)
             }
         }
+        lastTurn?.let { turn ->
+            conversationContext = conversationContext.recordTurn(turn.route, turn.period, turn.categories, result)
+        }
+        return result
     }
 
     suspend fun confirm(token: String): LlmResult = coordinator.confirm(token)
@@ -56,16 +77,20 @@ class ExpenseAgent(
         val escalation = runCatching { escalateIntent?.invoke(text) }.getOrNull()
         return when {
             escalation != null && escalation.isAnalysis && escalation.requiresTools -> {
-                onRouteResolved(AgentRoute.QUERY)
                 // 升级前是 CHAT 决策（时段/分类/预算都是空的），必须用原句重新解析，
                 // 否则"我最近吃饭是不是花多了"会退化成"本月所有消费分析"。
-                submitQuery(text, prefs, AgentRouter.queryDecision(text, nowProvider(), zone))
+                val decision = AgentRouter.queryDecision(text, nowProvider(), zone, conversationContext)
+                lastTurn = TurnMeta(AgentRoute.QUERY, decision.period, decision.categories)
+                onRouteResolved(AgentRoute.QUERY)
+                submitQuery(text, prefs, decision)
             }
             escalation?.intent == "record" -> {
+                lastTurn = TurnMeta(AgentRoute.MUTATION, null, emptySet())
                 onRouteResolved(AgentRoute.MUTATION)
                 coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
             }
             else -> {
+                lastTurn = TurnMeta(AgentRoute.CHAT, null, emptySet())
                 onRouteResolved(AgentRoute.CHAT)
                 coordinator.submit(text, prefs, CHAT_TURN_CONTEXT)
             }
@@ -78,7 +103,8 @@ class ExpenseAgent(
         val query = runCatching { AgentTools.queryExpenses(toolContext, spec, decision.categories, zone) }
             .getOrElse { error ->
                 PrivacySafeLog.llmRequestFailed()
-                return coordinator.submit(text, prefs)
+                // 工具失败也保持只读：路由已判为 QUERY，此处绝不能回退到可写上下文。
+                return coordinator.submit(text, prefs, QUERY_TURN_CONTEXT)
             }
         val analyze = runCatching { AgentTools.analyzeExpenses(toolContext, spec, now, zone) }.getOrNull()
         val budget = if (decision.wantBudget) {
@@ -90,18 +116,20 @@ class ExpenseAgent(
         return coordinator.submit(
             text = text,
             prefs = prefs,
-            turnContext = ChatTurnContext(
-                systemPromptSuffix = suffix,
-                suppressMutationGuard = true,
-                allowMutations = false,
-                structuredRequest = true,
-            ),
+            turnContext = QUERY_TURN_CONTEXT.copy(systemPromptSuffix = suffix),
         )
     }
 
     private companion object {
         /** 记账/删改轮：要求结构化 JSON，Qwen 下显式关闭思考；唯一允许写库的路径。 */
         val MUTATION_TURN_CONTEXT = ChatTurnContext(structuredRequest = true)
+
+        /** 查询轮：只读 + 允许"已记录 X 笔"式查询回复。 */
+        val QUERY_TURN_CONTEXT = ChatTurnContext(
+            suppressMutationGuard = true,
+            allowMutations = false,
+            structuredRequest = true,
+        )
 
         /** 闲聊轮：v3.9.2 CHAT write firewall，代码层拒绝任何写操作。 */
         val CHAT_TURN_CONTEXT = ChatTurnContext(allowMutations = false)

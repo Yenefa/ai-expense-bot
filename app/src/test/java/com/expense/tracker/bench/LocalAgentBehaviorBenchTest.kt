@@ -3,6 +3,7 @@ package com.expense.tracker.bench
 import com.expense.tracker.agent.AgentRoute
 import com.expense.tracker.agent.AgentRouter
 import com.expense.tracker.agent.AgentToolContext
+import com.expense.tracker.agent.ConversationActionContext
 import com.expense.tracker.agent.ExpenseAgent
 import com.expense.tracker.agent.FakeChatDao
 import com.expense.tracker.agent.FakeExpenseDao
@@ -62,8 +63,19 @@ class LocalAgentBehaviorBenchTest {
         append("""],"actions":[]}""")
     }
 
+    /** 按数据集 gold 模拟上一轮会话状态（更正/续记门控、Query 回承）。 */
+    private fun contextOf(case: BehaviorCase): ConversationActionContext {
+        val seedIds = case.seed_expenses.indices.map { (it + 1).toLong() }
+        return ConversationActionContext(
+            previousRoute = case.previous_route?.let(AgentRoute::valueOf),
+            recentExpenseIds = seedIds,
+            previousMutationBatch = seedIds,
+        )
+    }
+
     private fun emptyAgent(
         dao: FakeExpenseDao,
+        context: ConversationActionContext = ConversationActionContext(),
         onTool: (String) -> Unit = {},
         onRoute: (AgentRoute) -> Unit = {},
     ): ExpenseAgent {
@@ -82,6 +94,7 @@ class LocalAgentBehaviorBenchTest {
             nowProvider = { now },
             zone = zone,
             onRouteResolved = onRoute,
+            initialConversationContext = context,
         )
     }
 
@@ -120,6 +133,7 @@ class LocalAgentBehaviorBenchTest {
         val tools = setOf("query_expenses", "analyze_expenses", "get_budget_status")
         cases.forEach { case ->
             case.expected_route?.let { assertThat(routes).contains(it) }
+            case.previous_route?.let { assertThat(routes).contains(it) }
             case.expected_tools?.forEach { assertThat(tools).contains(it) }
             case.expect.forEach { exp ->
                 assertThat(Category.byId(exp.category)).isNotNull()
@@ -152,7 +166,7 @@ class LocalAgentBehaviorBenchTest {
         val scored = cases.filter { it.expected_route != null }
         val routeMisses = mutableListOf<String>()
         scored.forEach { case ->
-            val actual = AgentRouter.route(case.text, now, zone).route.name
+            val actual = AgentRouter.route(case.text, now, zone, contextOf(case)).route.name
             if (actual != case.expected_route) {
                 val suffix = case.note?.let { " — $it" }.orEmpty()
                 routeMisses += "${case.id}: expect=${case.expected_route} actual=$actual$suffix"
@@ -160,18 +174,23 @@ class LocalAgentBehaviorBenchTest {
         }
         val queryExpected = cases.filter { it.expected_route == "QUERY" }
         val queryFrontHit = queryExpected.count {
-            AgentRouter.route(it.text, now, zone).route == AgentRoute.QUERY
+            AgentRouter.route(it.text, now, zone, contextOf(it)).route == AgentRoute.QUERY
         }
 
         val toolChecked = mutableListOf<Pair<String, Boolean>>()
         cases.filter { it.expected_tools != null }.forEach { case ->
-            if (AgentRouter.route(case.text, now, zone).route != AgentRoute.QUERY) return@forEach
+            if (AgentRouter.route(case.text, now, zone, contextOf(case)).route != AgentRoute.QUERY) return@forEach
             val tools = linkedSetOf<String>()
-            emptyAgent(FakeExpenseDao(), onTool = { tools += it }).submit(case.text, prefs())
+            emptyAgent(FakeExpenseDao(), context = contextOf(case), onTool = { tools += it })
+                .submit(case.text, prefs())
             toolChecked += case.id to (tools.toSet() == case.expected_tools!!.toSet())
         }
         val toolMismatches = toolChecked.filterNot { it.second }
         assertThat(toolMismatches).isEmpty()
+
+        // v3.9.3 本地验收门槛：路由 ≥78/80，Query 前置召回 16/16
+        assertThat(scored.size - routeMisses.size).isAtLeast(78)
+        assertThat(queryFrontHit).isEqualTo(queryExpected.size)
 
         val multi = cases.filter { it.bucket == AgentBehaviorDataset.MULTI_TEMPORAL }
         val hintCovered = multi.count { case ->
@@ -184,7 +203,7 @@ class LocalAgentBehaviorBenchTest {
             appendLine("# ExpenseBench v2 — 离线行为基线报告（无 LLM）")
             appendLine()
             appendLine("- 数据集：`app/src/test/resources/expensebench/cases-v2.jsonl`，共 ${cases.size} 条 / 基准时刻 ${ExpenseBenchDataset.BENCH_NOW_ISO}")
-            appendLine("- 覆盖：前置路由（不含 Escalation 的确定性层）、工具选择、多日期端侧提示覆盖率")
+            appendLine("- 覆盖：前置路由（不含 Escalation 的确定性层；多轮用例按 gold `previous_route` 模拟会话上下文）、工具选择、多日期端侧提示覆盖率")
             appendLine("- 多日期端侧提示完整覆盖：$hintCovered/${multi.size}（其余金额无元/块，交由 LLM 端 Date Binding）")
             appendLine()
             appendLine("## 前置路由（expected_route 已标注的 ${scored.size} 条）")

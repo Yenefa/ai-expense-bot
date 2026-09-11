@@ -37,6 +37,7 @@
 
 - 「这个月吃饭花多少」「预算还剩多少」「比上个月多花了吗」直接在对话里回答，不用翻统计页
 - 查询轮与闲聊轮**代码层只读**（v3.9.2 CHAT write firewall）：只有 MUTATION 记账/删改轮可以写库；即使模型被提示词注入诱导或幻觉输出 expenses/actions，也会在进入变更计划器之前被丢弃，数据库零修改
+- **会话上下文路由（v3.9.3）**：轻量 `ConversationActionContext` 只记当前会话最近行为——更正（记错了/说错了/不对）需上一轮记账且有最近账目；「也是35」续记需上一轮消费语境；「那上个月呢」等追问仅继承上一轮 QUERY，只覆盖 period/category
 - `analyze_expenses`：本期 vs 上期环比、分类趋势（含"上月有、本月 0 → 已清零"）、按日均 pace 的月底预测（投资类不计入）—— 环比分母为零时输出"新增支出"而不是 +∞%；样本不足 7 天宁可不给预测；预测必须标注推算依据
 - **治理原则：AI 辅助决策，用户拥有最终控制权** —— 读路径全自动且只读；写路径中**新增/修改按产品规则直接执行，删除必须人工确认**后才落库
 - **Qwen 结构化请求显式关闭思考**：MUTATION / QUERY / Intent Escalation / 智核分析 / 账单导入均发送 `enable_thinking=false`；普通闲聊保持供应商默认。ExpenseBench 实测思考模式会把整笔全对从 89.1% 拉到 74.6%
@@ -284,6 +285,7 @@ Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有�
 | **v3.9.0** | **Intent Escalation + analyze_expenses** - 规则不命中时轻量升级调用；环比/趋势/月底预测工具；查询轮默认注入对比分析 |
 | **v3.9.1** | **Reliability Hardening** - Qwen 结构化请求显式 `enable_thinking=false`；查询轮代码层只读（注入攻击也零修改）；修复预测含投资、趋势漏"已清零"、升级后查询参数丢失；README/说明书与真实行为对齐（新增/修改直接执行、删除确认；API Key = Android Keystore） |
 | **v3.9.2** | **本地安全加固** - CHAT write firewall（非 MUTATION 路径代码层禁写）；Router 裸金额/非支出护栏/查询追问；纯日期 `occurred_at` 容错；partial hints 修复；离线行为基线 58/80 → 74/80 |
+| **v3.9.3** | **会话上下文路由** - ConversationActionContext：条件更正（记错了/说错了/不对）、条件续记（也是35）、Query 回承（那X呢）；修复查询工具失败回退可写；离线路由 80/80、Query 召回 16/16 |
 
 > 版本管理规范（2026-08-08 起）：每次交付 versionCode +1、versionName 语义化递增，变更记录维护在 `CHANGELOG.md`。
 

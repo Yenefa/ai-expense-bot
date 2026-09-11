@@ -2,6 +2,7 @@ package com.expense.tracker.bench
 
 import com.expense.tracker.agent.AgentRoute
 import com.expense.tracker.agent.AgentToolContext
+import com.expense.tracker.agent.ConversationActionContext
 import com.expense.tracker.agent.ExpenseAgent
 import com.expense.tracker.agent.FakeChatDao
 import com.expense.tracker.agent.FakeExpenseDao
@@ -173,6 +174,11 @@ class LlmAgentBehaviorBenchTest {
         var route: AgentRoute? = null
         val tools = mutableListOf<String>()
         var appliedPlan: LlmMutationPlan? = null
+        val initialContext = ConversationActionContext(
+            previousRoute = case.previous_route?.let(AgentRoute::valueOf),
+            recentExpenseIds = seedIds,
+            previousMutationBatch = seedIds,
+        )
         val applier = LlmMutationApplier(ExpenseRepository(expenseDao), ChatRepository(chatDao), InlineRunner())
         val coordinator = ChatLlmCoordinator(
             expenseRepository = ExpenseRepository(expenseDao),
@@ -220,6 +226,7 @@ class LlmAgentBehaviorBenchTest {
             nowProvider = { now },
             zone = zone,
             onRouteResolved = { route = it },
+            initialConversationContext = initialContext,
         )
 
         val result = agent.submit(case.text, prefs)
