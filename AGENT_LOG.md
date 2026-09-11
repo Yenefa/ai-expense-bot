@@ -316,3 +316,18 @@
 
 ## 验收
 - JVM 356/356；`assembleRelease` 成功；新 APK SHA-256 与下载站一致
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.13.2 滚动排查第二轮（opencode，owner 追问"还有可修的吗"）
+
+## 排查
+- 用"内容型页面 × 滚动能力"全量扫描：所有 Screen 已逐个确认（含弹窗内滚动与主内容滚动区分）；本轮唯一遗漏为 `RecurringScreen`
+- `RecurringScreen`：规则列表无滚动，条目多时被截断且底部"添加周期账单"被挤出屏幕
+
+## 修复
+- 列表区改为 `weight(1f) + verticalScroll`，按钮固定可见（不是整页滚动，主操作始终可达）
+- 版本 v3.13.2（versionCode 43）；APK/下载站同步更新
+
+## 验收
+- JVM 356/356；`assembleRelease` 成功；线上 index/APK 与新 APK 哈希一致（`ebab6fdd…`）

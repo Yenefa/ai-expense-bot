@@ -96,30 +96,33 @@ fun RecurringScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-            Text(
-                "房租、会员订阅、工资等固定账单，到期自动记一笔，不会重复生成。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = AppColors.TextSecondary,
-            )
+            // 规则列表可增长：给滚动区域让位，底部"添加"按钮固定可见
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                Text(
+                    "房租、会员订阅、工资等固定账单，到期自动记一笔，不会重复生成。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppColors.TextSecondary,
+                )
 
-            Spacer(Modifier.height(16.dp))
-            if (state.rules.isEmpty()) {
-                Box(Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
-                    Text("还没有周期账单，点下方按钮添加", color = AppColors.TextMuted)
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    state.rules.forEach { rule ->
-                        RuleRow(
-                            rule = rule,
-                            onToggle = { vm.toggle(rule) },
-                            onDelete = { vm.delete(rule) },
-                        )
+                Spacer(Modifier.height(16.dp))
+                if (state.rules.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
+                        Text("还没有周期账单，点下方按钮添加", color = AppColors.TextMuted)
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.rules.forEach { rule ->
+                            RuleRow(
+                                rule = rule,
+                                onToggle = { vm.toggle(rule) },
+                                onDelete = { vm.delete(rule) },
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(12.dp))
             Button(
                 onClick = { showForm = true },
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.TextPrimary, contentColor = AppColors.Bg),
