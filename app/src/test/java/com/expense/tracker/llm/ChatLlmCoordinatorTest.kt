@@ -325,13 +325,14 @@ class ChatLlmCoordinatorTest {
     @Test fun followUpWordsLoadRecordedHistoryAndOnlyTheNewExpenseIsApplied() = runBlocking {
         val zone = ZoneId.of("Asia/Shanghai")
         val now = LocalDateTime.of(2026, 9, 6, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        val seedAt = LocalDateTime.of(2026, 9, 6, 9, 0).atZone(zone).toInstant().toEpochMilli()
         val dao = FakeExpenseDao()
         val seedId = dao.insert(
             ExpenseEntity(
                 amountCents = 5_000L,
                 categoryId = "transport",
                 note = "打车",
-                occurredAt = LocalDateTime.of(2026, 9, 6, 9, 0).atZone(zone).toInstant().toEpochMilli(),
+                occurredAt = seedAt,
                 createdAt = now,
             ),
         )
@@ -359,7 +360,7 @@ class ChatLlmCoordinatorTest {
 
         // 上下文触发词让已有账目进入提示词，模型能看到"历史已记录"的去重依据。
         assertThat(requestedPrompt).contains("不得再次提取")
-        assertThat(requestedPrompt).contains("$seedId|09-06 09:00")
+        assertThat(requestedPrompt).contains("$seedId|${promptTime(seedAt)}")
         assertThat(requestedPrompt).contains("打车")
         assertThat(requestedHistory.map { it.content }).containsExactly("打车50", "已记录 1 笔").inOrder()
         assertThat(result.expenseIds).hasSize(1)
@@ -405,20 +406,21 @@ class ChatLlmCoordinatorTest {
             coordinator.submit(text, prefs())
 
             assertThat(requestedPrompt).contains("不得再次提取")
-            assertThat(requestedPrompt).contains("7|09-06 09:00")
+            assertThat(requestedPrompt).contains("7|${promptTime(existing.occurredAt)}")
         }
     }
 
     @Test fun onlyDateCorrectionOnLastBatchBindsTargetDateDeterministically() = runBlocking {
         val zone = ZoneId.of("Asia/Shanghai")
         val now = LocalDateTime.of(2026, 9, 6, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        val seedAt = LocalDateTime.of(2026, 9, 6, 15, 0).atZone(zone).toInstant().toEpochMilli()
         val dao = FakeExpenseDao()
         val seedId = dao.insert(
             ExpenseEntity(
                 amountCents = 1_800L,
                 categoryId = "drink",
                 note = "咖啡",
-                occurredAt = LocalDateTime.of(2026, 9, 6, 15, 0).atZone(zone).toInstant().toEpochMilli(),
+                occurredAt = seedAt,
                 createdAt = now,
             ),
         )
@@ -444,13 +446,18 @@ class ChatLlmCoordinatorTest {
 
         assertThat(result).isInstanceOf(LlmResult.Ok::class.java)
         assertThat(requestedPrompt).contains("必须输出 update 动作")
-        assertThat(requestedPrompt).contains("$seedId|09-06 15:00")
+        assertThat(requestedPrompt).contains("$seedId|${promptTime(seedAt)}")
         val rows = dao.getAllActiveOnce()
         assertThat(rows).hasSize(1)
         val updated = Instant.ofEpochMilli(rows.single().occurredAt).atZone(zone)
         assertThat(updated.toLocalDate()).isEqualTo(LocalDate.of(2026, 9, 4))
         assertThat(updated.toLocalTime()).isEqualTo(LocalTime.of(15, 0))
     }
+
+    /** LlmPrompt 渲染记录时间使用 JVM 默认时区（CI 为 UTC），断言需按运行环境动态计算。 */
+    private fun promptTime(millis: Long): String =
+        java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")
+            .format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()))
 
     private fun prefs() = UserPrefsSnapshot(
         llmEnabled = true,

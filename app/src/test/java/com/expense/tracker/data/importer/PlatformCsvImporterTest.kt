@@ -25,7 +25,7 @@ class PlatformCsvImporterTest {
 
     @Test
     fun wechatBillOnlyImportsSuccessfulExpenseRows() {
-        val result = PlatformCsvImporter.parse(wechatCsv)
+        val result = PlatformCsvImporter.parse(wechatCsv, zone)
 
         assertThat(result.expenses).hasSize(3)
         assertThat(result.expenses[0].amountCents).isEqualTo(800L)
@@ -52,7 +52,7 @@ class PlatformCsvImporterTest {
 
     @Test
     fun alipayBillImportsExpenseAndSkipsIncome() {
-        val result = PlatformCsvImporter.parse(alipayCsv)
+        val result = PlatformCsvImporter.parse(alipayCsv, zone)
 
         assertThat(result.expenses).hasSize(1)
         assertThat(result.expenses[0].amountCents).isEqualTo(1_560L)
@@ -71,7 +71,7 @@ class PlatformCsvImporterTest {
             2026080622001412345683,2026080610006,2026-08-06 13:00:00,2026-08-06 13:00:01,2026-08-06 13:00:02,手机客户端,即时到账交易,瑞幸咖啡,拿铁,19.90,支出,交易成功,0.00,0.00,
         """.trimIndent()
 
-        val result = PlatformCsvImporter.parse(csv)
+        val result = PlatformCsvImporter.parse(csv, zone)
 
         assertThat(result.expenses).hasSize(1)
         assertThat(result.expenses[0].amountCents).isEqualTo(1_990L)

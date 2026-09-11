@@ -37,7 +37,7 @@ object PlatformCsvImporter {
         return detect(headers) != Platform.UNKNOWN
     }
 
-    fun parse(csv: String): CsvImportResult {
+    fun parse(csv: String, zone: ZoneId = ZoneId.systemDefault()): CsvImportResult {
         val records = CsvExpenseImporter.parseRecords(csv)
         require(records.isNotEmpty()) { "CSV 文件为空" }
         val headers = records.first().fields.mapIndexed { index, value ->
@@ -62,8 +62,8 @@ object PlatformCsvImporter {
             val platformRecord = record.recordNumber
 
             when (platform) {
-                Platform.WECHAT -> parseWechatRow(record, idx, expenses, issues, platformRecord, now)
-                Platform.ALIPAY -> parseAlipayRow(record, idx, expenses, issues, platformRecord, now)
+                Platform.WECHAT -> parseWechatRow(record, idx, expenses, issues, platformRecord, now, zone)
+                Platform.ALIPAY -> parseAlipayRow(record, idx, expenses, issues, platformRecord, now, zone)
                 Platform.UNKNOWN -> Unit
             }
         }
@@ -78,6 +78,7 @@ object PlatformCsvImporter {
         issues: MutableList<CsvImportIssue>,
         line: Int,
         now: Long,
+        zone: ZoneId,
     ) {
         val timeText = field(record, idx, "交易时间")
         val tradeType = field(record, idx, "交易类型")
@@ -100,7 +101,7 @@ object PlatformCsvImporter {
             issues += CsvImportIssue(line, "状态为「$status」，已跳过")
             return
         }
-        val occurredAt = parseDateTime(timeText) ?: now.also { errors.add("交易时间无法解析，按当前时间") }
+        val occurredAt = parseDateTime(timeText, zone) ?: now.also { errors.add("交易时间无法解析，按当前时间") }
         val amountCents = parseAmount(amountText)
         if (amountCents == null || amountCents <= 0L) {
             issues += CsvImportIssue(line, "金额无效「$amountText」，已跳过")
@@ -126,6 +127,7 @@ object PlatformCsvImporter {
         issues: MutableList<CsvImportIssue>,
         line: Int,
         now: Long,
+        zone: ZoneId,
     ) {
         val timeText = listOf("付款时间", "交易创建时间").mapNotNull { name ->
             idx[name]?.let { record.fields.getOrNull(it) }
@@ -154,7 +156,7 @@ object PlatformCsvImporter {
             issues += CsvImportIssue(line, "状态为「$status」，已跳过")
             return
         }
-        val occurredAt = parseDateTime(timeText) ?: now
+        val occurredAt = parseDateTime(timeText, zone) ?: now
         val amountCents = parseAmount(amountText)
         if (amountCents == null || amountCents <= 0L) {
             issues += CsvImportIssue(line, "金额无效「$amountText」，已跳过")
@@ -219,10 +221,9 @@ object PlatformCsvImporter {
         DateTimeFormatter.ofPattern("yyyy/M/d"),
     )
 
-    private fun parseDateTime(text: String): Long? {
+    private fun parseDateTime(text: String, zone: ZoneId): Long? {
         val cleaned = text.trim()
         if (cleaned.isEmpty()) return null
-        val zone = ZoneId.systemDefault()
         for (formatter in dateFormats) {
             val parsed = runCatching {
                 if (formatter.toString().contains("yyyy-MM-dd")) {
