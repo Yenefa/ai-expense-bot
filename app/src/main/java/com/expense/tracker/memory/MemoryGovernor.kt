@@ -2,6 +2,7 @@ package com.expense.tracker.memory
 
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 /**
  * Memory 治理器：**唯一的长期记忆写入口是 `confirm`（人类确认）**。
@@ -59,6 +60,39 @@ class MemoryGovernor(
     fun cancel(token: String): Boolean = synchronized(pending) {
         discardExpiredLocked(nowProvider())
         pending.remove(token) != null
+    }
+
+    /** 当前已确认画像快照（读权限过滤前不做任何筛选）。 */
+    suspend fun snapshot(): List<MemoryFact> = store.facts.first()
+
+    /** 用户管理：修改单条（字段需通过类型校验）。 */
+    suspend fun update(fact: MemoryFact): Boolean {
+        val draft = MemoryDraft(
+            type = fact.type,
+            amountCents = fact.amountCents,
+            merchant = fact.merchant,
+            categoryId = fact.categoryId,
+            rawText = fact.rawText,
+        )
+        if (!MemoryTypeValidator.validate(draft)) return false
+        val current = store.facts.first()
+        if (current.none { it.id == fact.id }) return false
+        store.save(current.map { if (it.id == fact.id) fact else it })
+        return true
+    }
+
+    /** 用户管理：删除单条。 */
+    suspend fun delete(id: String): Boolean {
+        val current = store.facts.first()
+        val next = current.filterNot { it.id == id }
+        if (next.size == current.size) return false
+        store.save(next)
+        return true
+    }
+
+    /** 用户管理：清空全部。 */
+    suspend fun clear() {
+        store.save(emptyList())
     }
 
     fun pendingCount(): Int = synchronized(pending) {

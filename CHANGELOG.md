@@ -5,6 +5,22 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.11.0 (versionCode 37) — 2026-09-11
+
+**Memory Consumption & User Control：读有授权边界，用户可完整管理（纯本地验收）**
+
+新增：
+
+- **MemoryReadScope 读权限**：`NONE`（闲聊）/ `CLASSIFICATION`（记账只读商户别名）/ `FINANCIAL_ANALYSIS`（查询分析读月收入/储蓄目标/常用分类）；按轮次显式授权，整份画像永不无差别注入
+- **别名确定性应用**：记账轮命中已授权别名时覆盖模型分类（「瑞幸15」→ 饮品）；"已知商户 + 裸金额"由此进入记账轮
+- **设置 → 我的记忆**：查看（类型/摘要/来源/创建时间）、修改单条、删除单条、清空全部（二次确认）；删除后所有 Agent 路径不再读取
+- **完整 JSON 备份 v3**：新增长期记忆 `memoryFacts`，v2 旧备份兼容解析；恢复字段校验不通过整包拒绝
+- **MemoryConsumptionBench**：38 条六桶；三项核心指标 **Unauthorized Memory Read Rate = 0% / Deleted Memory Reuse Rate = 0% / Correct Memory Application = 100%**
+
+测试：311 → **322 个 JVM 单测全部通过**（新增 11：读权限 4 / 管理 2 / 备份 3 / 消费 Bench 2）。
+
+> 真实 LLM Bench 仍暂停（owner 决定，纯本地验收）。
+
 ## 3.10.0 (versionCode 36) — 2026-09-11
 
 **Memory Governance v1：长期记忆只能经人类确认写入（纯本地验收）**

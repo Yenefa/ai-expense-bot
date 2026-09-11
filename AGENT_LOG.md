@@ -144,3 +144,28 @@
 ## 决定 / 边界
 - v1 只保存不消费（分析/建议不注入画像）；无画像管理页
 - 后续候选：画像管理页、消费端注入、预算等扩展类型，再进 Proactive Insight
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.11.0 Memory Consumption & User Control（opencode）
+
+## 范围（owner：读也要有权限边界；用户必须能管理记忆）
+- **MemoryReadScope**：NONE / CLASSIFICATION / FINANCIAL_ANALYSIS；按轮次授权注入，整份画像不无差别进 prompt
+  - MUTATION 轮只读商户别名，并确定性应用（note 命中商户 → 覆盖分类；「瑞幸15」→ 饮品）
+  - QUERY 轮才读月收入/储蓄目标/常用分类；CHAT 轮不读
+  - 「已知商户 + 裸金额」进入记账轮（分类读权限的路由联动）
+- **我的记忆**（设置入口）：查看（类型/摘要/来源/创建时间）、修改单条（重新过类型校验）、删除单条、清空全部
+- **JSON 备份 v3**：`memoryFacts` 入包；v2 旧备份兼容（记忆为空）；恢复字段校验
+- 系统备份/设备迁移继续排除 `user_profile_prefs`
+
+## Bench（MemoryConsumptionBench v1，38 条）
+- 六桶：alias_application 8 / analysis_reads 8 / preference_analysis 4 / unauthorized 8 / deleted_reuse 6 / no_memory 4
+- 报告 `docs/memory-consumption-local-report.md`
+- **Unauthorized Memory Read Rate = 0%（0/38）**；**Deleted Memory Reuse Rate = 0%（0/6）**；Correct Memory Application = 100%（25/25）；路由 38/38
+
+## 验收（本地）
+- JVM 单测 311 → **322，0 failed**（新增 11：读权限 4 / 管理 2 / 备份 3 / 消费 Bench 2）
+
+## 决定
+- 安全写 + 安全读 + 可管理 三项闭环完成，**下一步才允许进入 Proactive Insight**
+- 边界：分析类记忆只作上下文不参与计算；无冲突合并

@@ -55,6 +55,7 @@ fun SettingsMenuScreen(
     onOpenBudget: () -> Unit = {},
     onOpenReminder: () -> Unit = {},
     onOpenRecurring: () -> Unit = {},
+    onOpenMemory: () -> Unit = {},
     prefs: UserPrefs,
 ) {
     val snackbarHost = remember { SnackbarHostState() }
@@ -104,6 +105,7 @@ fun SettingsMenuScreen(
                 subtitle = "CSV 导入 · JSON / CSV 本地导出",
                 onClick = onOpenDataExport,
             )
+            MenuRow(emoji = "🧠", title = "我的记忆", subtitle = "查看 / 修改 / 删除已确认的长期信息", onClick = onOpenMemory)
             MenuRow(emoji = "🗑", title = "最近删除", subtitle = "30 天内可恢复的已删除记录", onClick = onOpenDeletedItems)
             MenuRow(emoji = "📖", title = "软件说明书", subtitle = "了解所有功能与交互细节", onClick = onOpenUserManual)
             MenuRow(emoji = "ℹ️", title = "关于 Y.E cost", subtitle = "v$versionName · ChatGPT 风格 · 本地 SQLite", onClick = {

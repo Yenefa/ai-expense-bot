@@ -7,6 +7,9 @@ import com.expense.tracker.data.db.toExpenseIdsCsvOrNull
 import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.model.Money
 import com.expense.tracker.data.prefs.ThemeMode
+import com.expense.tracker.memory.MemoryDraft
+import com.expense.tracker.memory.MemoryFact
+import com.expense.tracker.memory.MemoryTypeValidator
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -34,11 +37,14 @@ data class BackupData(
     val chatMessages: List<ChatMessageEntity>,
     val preferences: BackupPreferences,
     val recurringRules: List<RecurringRuleEntity> = emptyList(),
+    /** v3：长期记忆（UserProfile）；v2 旧备份解析为空列表。 */
+    val memoryFacts: List<MemoryFact> = emptyList(),
 )
 
 /** Versioned JSON backup codec plus the existing spreadsheet-oriented CSV export. */
 object DataExporter {
-    const val CURRENT_FORMAT_VERSION = 2
+    const val CURRENT_FORMAT_VERSION = 3
+    private const val MIN_SUPPORTED_FORMAT_VERSION = 2
 
     private val json = Json {
         prettyPrint = true
@@ -55,6 +61,7 @@ object DataExporter {
         val chatMessages: List<ChatMessageDto>,
         val preferences: PreferencesDto,
         val recurringRules: List<RecurringRuleDto> = emptyList(),
+        val memoryFacts: List<MemoryFact> = emptyList(),
     )
 
     @Serializable
@@ -126,6 +133,7 @@ object DataExporter {
         sourceAppVersion: String,
         exportedAtIso: String,
         recurringRules: List<RecurringRuleEntity> = emptyList(),
+        memoryFacts: List<MemoryFact> = emptyList(),
     ): String {
         val data = BackupData(
             formatVersion = CURRENT_FORMAT_VERSION,
@@ -135,6 +143,7 @@ object DataExporter {
             chatMessages = chatMessages,
             preferences = preferences,
             recurringRules = recurringRules,
+            memoryFacts = memoryFacts,
         )
         validate(data)
         return json.encodeToString(data.toEnvelope())
@@ -146,7 +155,7 @@ object DataExporter {
         val data = if (formatVersion == null) {
             json.decodeFromString<LegacyEnvelope>(content).toBackupData()
         } else {
-            if (formatVersion != CURRENT_FORMAT_VERSION) {
+            if (formatVersion !in MIN_SUPPORTED_FORMAT_VERSION..CURRENT_FORMAT_VERSION) {
                 throw BackupFormatException("不支持的备份格式版本：$formatVersion")
             }
             json.decodeFromString<BackupEnvelope>(content).toBackupData()
@@ -175,7 +184,10 @@ object DataExporter {
     }
 
     private fun validate(data: BackupData) {
-        invalidIf(data.formatVersion != CURRENT_FORMAT_VERSION, "不支持的备份格式版本：${data.formatVersion}")
+        invalidIf(
+            data.formatVersion !in MIN_SUPPORTED_FORMAT_VERSION..CURRENT_FORMAT_VERSION,
+            "不支持的备份格式版本：${data.formatVersion}",
+        )
         invalidIf(data.sourceAppVersion.isBlank(), "备份缺少应用版本")
         invalidIf(runCatching { Instant.parse(data.exportedAt) }.isFailure, "导出时间无效")
         invalidIf(data.expenses.map { it.id }.toSet().size != data.expenses.size, "账目 ID 重复")
@@ -193,6 +205,21 @@ object DataExporter {
             invalidIf(message.createdAt <= 0L, "聊天消息时间无效")
             invalidIf(message.relatedExpenseId != null && message.relatedExpenseId <= 0L, "关联账目 ID 无效")
             invalidIf(message.relatedExpenseIds().any { it <= 0L }, "关联账目批次 ID 无效")
+        }
+        invalidIf(data.memoryFacts.map { it.id }.toSet().size != data.memoryFacts.size, "记忆 ID 重复")
+        data.memoryFacts.forEach { fact ->
+            invalidIf(fact.id.isBlank(), "记忆 ID 无效")
+            invalidIf(fact.createdAt <= 0L, "记忆时间无效")
+            val valid = MemoryTypeValidator.validate(
+                MemoryDraft(
+                    type = fact.type,
+                    amountCents = fact.amountCents,
+                    merchant = fact.merchant,
+                    categoryId = fact.categoryId,
+                    rawText = fact.rawText,
+                ),
+            )
+            invalidIf(!valid, "记忆字段无效：${fact.type.wire}")
         }
     }
 
@@ -238,6 +265,7 @@ object DataExporter {
                 createdAt = it.createdAt,
             )
         },
+        memoryFacts = memoryFacts,
     )
 
     private fun BackupEnvelope.toBackupData() = BackupData(
@@ -284,6 +312,7 @@ object DataExporter {
                 id = it.id,
             )
         },
+        memoryFacts = memoryFacts,
     )
 
     private fun LegacyEnvelope.toBackupData() = BackupData(

@@ -204,7 +204,7 @@ fun DataExportScreen(onClose: () -> Unit) {
             DataOption(
                 emoji = "♻️",
                 title = "恢复完整备份",
-                subtitle = "校验后覆盖当前账目、回收站、聊天和非敏感设置",
+                subtitle = "校验后覆盖当前账目、回收站、聊天、长期记忆和非敏感设置",
                 enabled = !busy,
                 onClick = {
                     backupImportLauncher.launch(
@@ -228,7 +228,7 @@ fun DataExportScreen(onClose: () -> Unit) {
             DataOption(
                 emoji = "🗂",
                 title = "导出 JSON（完整）",
-                subtitle = "包含全部账目（含回收站）、聊天和非敏感设置",
+                subtitle = "包含全部账目（含回收站）、聊天、长期记忆和非敏感设置",
                 enabled = !busy,
                 onClick = {
                     busy = true
@@ -291,7 +291,7 @@ fun DataExportScreen(onClose: () -> Unit) {
 
             Spacer(Modifier.weight(1f))
             Text(
-                "提示：完整备份可恢复全部账目、回收站和聊天；API Key 不会写入明文文件。",
+                "提示：完整备份可恢复全部账目、回收站、聊天和长期记忆；API Key 不会写入明文文件。",
                 style = MaterialTheme.typography.labelSmall,
                 color = AppColors.TextMuted,
                 modifier = Modifier.padding(bottom = 8.dp),
@@ -395,7 +395,7 @@ fun DataExportScreen(onClose: () -> Unit) {
                             color = AppColors.TextSecondary,
                         )
                         Text(
-                            "恢复会覆盖当前全部账目、回收站、聊天和非敏感设置，无法撤销。当前设备上的 API Key 会保留。",
+                            "恢复会覆盖当前全部账目、回收站、聊天、长期记忆和非敏感设置，无法撤销。当前设备上的 API Key 会保留。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                         )

@@ -1,5 +1,6 @@
 package com.expense.tracker.llm
 
+import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.data.repo.ChatRepository
 import com.expense.tracker.data.repo.ExpenseRepository
@@ -35,6 +36,11 @@ data class ChatTurnContext(
      * （见 [LlmThinkingPolicy]），普通 CHAT 保持 null 沿用供应商默认。
      */
     val structuredRequest: Boolean = false,
+    /**
+     * 已授权商户别名（CLASSIFICATION 读权限）：note 命中商户时覆盖模型分类。
+     * 只在该轮明确授权时传入；默认空表示不读取任何记忆。
+     */
+    val classificationAliases: Map<String, String> = emptyMap(),
 )
 
 class ChatLlmCoordinator(
@@ -120,11 +126,13 @@ class ChatLlmCoordinator(
             )
         }
 
+        // Memory 分类读权限的应用：用户确认过的商户别名覆盖模型分类。
+        val parsedWithAliases = applyClassificationAliases(parsed, turnContext.classificationAliases)
         val sourceExpenseHints = interpreted.expenseHints
-            .takeIf { parsed.expenses.isNotEmpty() && interpreted.hasCompleteExpenseHints }
+            .takeIf { parsedWithAliases.expenses.isNotEmpty() && interpreted.hasCompleteExpenseHints }
             .orEmpty()
         val plan = LlmMutationPlanner.create(
-            result = parsed,
+            result = parsedWithAliases,
             nowMillis = now,
             availableRecords = contextRecords,
             lastBatchIds = lastBatchIds,
@@ -191,6 +199,25 @@ class ChatLlmCoordinator(
             expenseIds = affectedIds.distinct(),
             assistantPersisted = true,
         )
+
+    private fun applyClassificationAliases(
+        result: LlmParseResult,
+        aliases: Map<String, String>,
+    ): LlmParseResult {
+        if (aliases.isEmpty() || result.expenses.isEmpty()) return result
+        return result.copy(
+            expenses = result.expenses.map { expense ->
+                val mapped = aliases.entries.firstOrNull { (merchant, _) ->
+                    merchant.isNotBlank() && expense.note.contains(merchant)
+                }?.value
+                if (mapped != null && mapped != expense.categoryId && Category.byId(mapped) != null) {
+                    expense.copy(categoryId = mapped)
+                } else {
+                    expense
+                }
+            },
+        )
+    }
 
     private fun String.withoutFalseMutationClaim(): String =
         if (FALSE_MUTATION_CLAIM.containsMatchIn(this)) {

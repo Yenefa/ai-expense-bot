@@ -3,6 +3,8 @@ package com.expense.tracker.data.export
 import com.expense.tracker.data.db.ChatMessageEntity
 import com.expense.tracker.data.db.ExpenseEntity
 import com.expense.tracker.data.prefs.ThemeMode
+import com.expense.tracker.memory.MemoryFact
+import com.expense.tracker.memory.MemoryType
 import com.google.common.truth.Truth.assertThat
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -41,7 +43,7 @@ class DataExporterTest {
         )
         val decoded = DataExporter.parseBackup(json)
 
-        assertThat(decoded.formatVersion).isEqualTo(2)
+        assertThat(decoded.formatVersion).isEqualTo(DataExporter.CURRENT_FORMAT_VERSION)
         assertThat(decoded.sourceAppVersion).isEqualTo("3.6")
         assertThat(decoded.expenses).containsExactlyElementsIn(expenses).inOrder()
         assertThat(decoded.chatMessages).containsExactlyElementsIn(chats).inOrder()
@@ -145,6 +147,59 @@ class DataExporterTest {
             DataExporter.parseBackup(unsupported)
         }
         assertThat(error).hasMessageThat().contains("99")
+    }
+
+    @Test fun memoryFactsRoundTripInBackup() {
+        val facts = listOf(
+            MemoryFact(
+                type = MemoryType.MONTHLY_INCOME,
+                amountCents = 800_000L,
+                rawText = "我月收入8000",
+                createdAt = 1L,
+                id = "mem-1",
+            ),
+            MemoryFact(
+                type = MemoryType.MERCHANT_ALIAS,
+                merchant = "瑞幸",
+                categoryId = "drink",
+                rawText = "以后瑞幸都算饮品",
+                createdAt = 2L,
+                id = "mem-2",
+            ),
+        )
+
+        val json = DataExporter.toBackupJson(
+            expenses = emptyList(),
+            chatMessages = emptyList(),
+            preferences = BackupPreferences(false, "", "", ThemeMode.SYSTEM),
+            sourceAppVersion = "3.10",
+            exportedAtIso = "2026-09-11T10:00:00Z",
+            memoryFacts = facts,
+        )
+
+        assertThat(DataExporter.parseBackup(json).memoryFacts)
+            .containsExactlyElementsIn(facts).inOrder()
+    }
+
+    @Test fun v2BackupWithoutMemoryStillParses() {
+        val v2 = """
+            {"formatVersion":2,"sourceAppVersion":"3.9","exportedAt":"2026-09-10T10:00:00Z","expenses":[],"chatMessages":[],"preferences":{"llmEnabled":false,"baseUrl":"","model":"","themeMode":"SYSTEM"}}
+        """.trimIndent()
+
+        val decoded = DataExporter.parseBackup(v2)
+
+        assertThat(decoded.formatVersion).isEqualTo(2)
+        assertThat(decoded.memoryFacts).isEmpty()
+    }
+
+    @Test fun invalidMemoryFactRejectsBackup() {
+        val invalid = """
+            {"formatVersion":3,"sourceAppVersion":"3.10","exportedAt":"2026-09-11T10:00:00Z","expenses":[],"chatMessages":[],"preferences":{"llmEnabled":false,"baseUrl":"","model":"","themeMode":"SYSTEM"},"memoryFacts":[{"type":"monthly_income","amount_cents":null,"raw_text":"我月收入","created_at":1,"id":"mem-x"}]}
+        """.trimIndent()
+
+        assertThrows(BackupFormatException::class.java) {
+            DataExporter.parseBackup(invalid)
+        }
     }
 
     @Test fun csvHeaderAndEscapingStayCompatible() {

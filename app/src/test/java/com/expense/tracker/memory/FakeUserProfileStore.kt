@@ -14,5 +14,9 @@ class FakeUserProfileStore : UserProfileStore {
         state.value = state.value + fact
     }
 
+    override suspend fun save(facts: List<MemoryFact>) {
+        state.value = facts
+    }
+
     fun snapshot(): List<MemoryFact> = state.value
 }

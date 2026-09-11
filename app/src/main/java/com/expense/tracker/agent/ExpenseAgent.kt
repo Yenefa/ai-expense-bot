@@ -3,7 +3,11 @@ package com.expense.tracker.agent
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.llm.ChatLlmCoordinator
 import com.expense.tracker.llm.ChatTurnContext
+import com.expense.tracker.memory.MemoryFact
 import com.expense.tracker.memory.MemoryGovernor
+import com.expense.tracker.memory.MemoryReadPolicy
+import com.expense.tracker.memory.MemoryReadScope
+import com.expense.tracker.memory.MemoryType
 import com.expense.tracker.ui.chat.LlmResult
 import com.expense.tracker.util.PrivacySafeLog
 import java.time.ZoneId
@@ -49,7 +53,14 @@ class ExpenseAgent(
             lastTurn = null
             return LlmResult.MemoryProposalRequired(proposal.token, proposal.summary, proposal.typeLabel)
         }
-        val decision = AgentRouter.route(text, nowProvider(), zone, conversationContext)
+        val profile = scopedProfile()
+        val decision = AgentRouter.route(
+            text = text,
+            nowMillis = nowProvider(),
+            zone = zone,
+            context = conversationContext,
+            knownMerchants = knownMerchants(profile),
+        )
         lastTurn = null
         val result = when {
             decision.route == AgentRoute.QUERY -> {
@@ -60,7 +71,7 @@ class ExpenseAgent(
             decision.route == AgentRoute.MUTATION -> {
                 lastTurn = TurnMeta(AgentRoute.MUTATION, null, emptySet())
                 onRouteResolved(AgentRoute.MUTATION)
-                coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
+                coordinator.submit(text, prefs, classificationContext(profile))
             }
             decision.route == AgentRoute.CHAT &&
                 escalateIntent != null &&
@@ -96,7 +107,7 @@ class ExpenseAgent(
             escalation?.intent == "record" -> {
                 lastTurn = TurnMeta(AgentRoute.MUTATION, null, emptySet())
                 onRouteResolved(AgentRoute.MUTATION)
-                coordinator.submit(text, prefs, MUTATION_TURN_CONTEXT)
+                coordinator.submit(text, prefs, classificationContext(scopedProfile()))
             }
             else -> {
                 lastTurn = TurnMeta(AgentRoute.CHAT, null, emptySet())
@@ -121,11 +132,36 @@ class ExpenseAgent(
         } else {
             null
         }
-        val suffix = AgentPrompts.toolResultBlock(query, budget, analyze) + AgentPrompts.queryDirective()
+        // 财务分析读权限：仅 QUERY 轮注入 income/savings/preference；其他轮次不读。
+        val memoryBlock = MemoryReadPolicy.promptBlock(MemoryReadScope.FINANCIAL_ANALYSIS, scopedProfile()).orEmpty()
+        val suffix = AgentPrompts.toolResultBlock(query, budget, analyze) + memoryBlock + AgentPrompts.queryDirective()
         return coordinator.submit(
             text = text,
             prefs = prefs,
             turnContext = QUERY_TURN_CONTEXT.copy(systemPromptSuffix = suffix),
+        )
+    }
+
+    private suspend fun scopedProfile(): List<MemoryFact> =
+        runCatching { memoryGovernor?.snapshot() }.getOrNull().orEmpty()
+
+    private fun knownMerchants(profile: List<MemoryFact>): Set<String> =
+        profile.asSequence()
+            .filter { it.type == MemoryType.MERCHANT_ALIAS }
+            .mapNotNull { it.merchant?.takeIf { name -> name.isNotBlank() } }
+            .toSet()
+
+    /** 记账轮：CLASSIFICATION 读权限（只注入商户别名）。 */
+    private fun classificationContext(profile: List<MemoryFact>): ChatTurnContext {
+        val aliases = profile.asSequence()
+            .filter { it.type == MemoryType.MERCHANT_ALIAS }
+            .mapNotNull { fact ->
+                fact.merchant?.takeIf { it.isNotBlank() }?.let { it to fact.categoryId.orEmpty() }
+            }
+            .toMap()
+        return MUTATION_TURN_CONTEXT.copy(
+            systemPromptSuffix = MemoryReadPolicy.promptBlock(MemoryReadScope.CLASSIFICATION, profile).orEmpty(),
+            classificationAliases = aliases,
         )
     }
 

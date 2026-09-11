@@ -53,6 +53,14 @@ data class MemoryFact(
         MemoryType.CATEGORY_PREFERENCE ->
             "常用分类：${Category.byIdOrOther(categoryId.orEmpty()).displayName}"
     }
+
+    /** 注入 system prompt 时的单行渲染（与 UI summary 解耦，便于按类型校验渲染结果）。 */
+    fun promptLine(): String = when (type) {
+        MemoryType.MONTHLY_INCOME -> "月收入：¥${Money.formatYuan(amountCents ?: 0L)}"
+        MemoryType.SAVINGS_GOAL -> "储蓄目标：¥${Money.formatYuan(amountCents ?: 0L)}"
+        MemoryType.MERCHANT_ALIAS -> "商户别名：${merchant.orEmpty()}→${categoryId.orEmpty()}"
+        MemoryType.CATEGORY_PREFERENCE -> "常用分类：${categoryId.orEmpty()}"
+    }
 }
 
 /** 待确认提案：token 一次性，确认前不写任何持久化存储。 */

@@ -47,6 +47,8 @@ import com.expense.tracker.ui.history.HistoryScreen
 import com.expense.tracker.ui.history.HistoryViewModel
 import com.expense.tracker.ui.history.DeletedItemsScreen
 import com.expense.tracker.ui.settings.DataExportScreen
+import com.expense.tracker.ui.settings.MemoryScreen
+import com.expense.tracker.ui.settings.MemoryViewModel
 import com.expense.tracker.ui.settings.SettingsMenuScreen
 import com.expense.tracker.ui.settings.SettingsScreen
 import com.expense.tracker.ui.settings.UserManualScreen
@@ -76,6 +78,14 @@ class MainActivity : ComponentActivity() {
                 memoryCancellationHandler = container.llmMemoryCancellationHandler,
                 budgetWarningProvider = container.budgetWarningProvider,
             ) as T
+        }
+    }
+
+    private val memoryVm: MemoryViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                MemoryViewModel(container.memoryGovernor) as T
         }
     }
 
@@ -264,6 +274,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenDataExport = { subScreen = SubScreen.DataExport },
                                 onOpenDeletedItems = { subScreen = SubScreen.DeletedItems },
                                 onOpenUserManual = { subScreen = SubScreen.UserManual },
+                                onOpenMemory = { subScreen = SubScreen.Memory },
                                 prefs = container.userPrefs,
                             )
                         }
@@ -406,6 +417,21 @@ class MainActivity : ComponentActivity() {
                         UserManualScreen(onClose = { subScreen = null })
                     }
 
+                    // 我的记忆 sub-screen 从右侧滑入
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.Memory,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        MemoryScreen(vm = memoryVm, onClose = { subScreen = null })
+                    }
+
                     // 智核分析 sub-screen 从右侧滑入
                     AnimatedVisibility(
                         visible = subScreen == SubScreen.Insights,
@@ -468,6 +494,7 @@ class MainActivity : ComponentActivity() {
         DataExport,
         DeletedItems,
         UserManual,
+        Memory,
         Insights,
         BillImport,
     }

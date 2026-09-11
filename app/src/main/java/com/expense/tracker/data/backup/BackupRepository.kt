@@ -6,14 +6,17 @@ import com.expense.tracker.data.export.BackupData
 import com.expense.tracker.data.export.BackupPreferences
 import com.expense.tracker.data.export.DataExporter
 import com.expense.tracker.data.prefs.UserPrefs
+import com.expense.tracker.memory.UserProfileStore
 import kotlinx.coroutines.flow.first
 
 class BackupRepository(
     private val database: AppDatabase,
     private val userPrefs: UserPrefs,
+    private val userProfileStore: UserProfileStore,
 ) {
     suspend fun createBackup(sourceAppVersion: String, exportedAtIso: String): String {
         val preferences = userPrefs.snapshot.first()
+        val memoryFacts = userProfileStore.facts.first()
         val (expenses, chatMessages, recurringRules) = database.withTransaction {
             Triple(
                 database.expenseDao().getAllOnce(),
@@ -33,6 +36,7 @@ class BackupRepository(
             sourceAppVersion = sourceAppVersion,
             exportedAtIso = exportedAtIso,
             recurringRules = recurringRules,
+            memoryFacts = memoryFacts,
         )
     }
 
@@ -55,5 +59,6 @@ class BackupRepository(
             model = backup.preferences.model,
             themeMode = backup.preferences.themeMode,
         )
+        userProfileStore.save(backup.memoryFacts)
     }
 }

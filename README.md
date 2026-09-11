@@ -42,7 +42,7 @@
 - **治理原则：AI 辅助决策，用户拥有最终控制权** —— 读路径全自动且只读；写路径中**新增/修改按产品规则直接执行，删除必须人工确认**后才落库；**长期记忆必须人工确认**后才写入
 - **Qwen 结构化请求显式关闭思考**：MUTATION / QUERY / Intent Escalation / 智核分析 / 账单导入均发送 `enable_thinking=false`；普通闲聊保持供应商默认。ExpenseBench 实测思考模式会把整笔全对从 89.1% 拉到 74.6%
 
-## 🧠 Memory Governance（v3.10）
+## 🧠 Memory Governance（v3.10 写 / v3.11 读 + 管理）
 
 长期记忆与会话状态分离：`ConversationActionContext` 只管当前会话；**UserProfile 只保存四类长期事实**（月收入 / 储蓄目标 / 商户别名 / 常用分类），且必须经过：
 
@@ -52,8 +52,11 @@
 
 - **唯一写入口是用户确认**（`MemoryGovernor.confirm`）；LLM 没有记忆写接口——聊天内容不可能偷偷写长期记忆
 - 提案轮不调用模型、不写账目；取消/过期/重复确认一律零写入
-- **MemoryGovernanceBench**：36 条（四类正例 + 拒绝集），首要指标 **Silent Memory Write Rate = 0%**（`docs/memory-governance-local-report.md`，协议见 [docs/memory-governance.md](docs/memory-governance.md)）
-- v1 边界：只保存不消费；无画像管理页；预算等其余类型后续版本
+- **读有授权边界（`MemoryReadScope`）**：记账轮只读商户别名（并确定性应用：「瑞幸15」→ 饮品）；查询分析轮才读月收入/储蓄目标/常用分类；闲聊不读任何记忆
+- **设置 → 🧠 我的记忆**：查看（含来源/创建时间）、修改、删除、清空；删除后任何 Agent 路径不再读取
+- **完整 JSON 备份 v3** 包含长期记忆，v2 旧备份兼容
+- **Bench 双保险**：写侧 Silent Memory Write Rate = 0%（36 条）；读侧 Unauthorized Read = 0% / Deleted Reuse = 0% / Correct Application = 100%（38 条，[docs/memory-consumption.md](docs/memory-consumption.md)）
+- v1 边界：分析类记忆只作上下文不参与计算；无冲突合并
 
 ## 📊 ExpenseBench
 
@@ -260,6 +263,7 @@ app/src/main/java/com/expense/tracker/
 | 聊天记录 | 同上（`chat_messages` 表） | 同上 |
 | LLM 配置（Base URL、模型名等） | `files/datastore/user_prefs.preferences_pb` | 同上 |
 | API Key / 订阅令牌 | `shared_prefs/secure_api_key.xml`、`shared_prefs/secure_subscription_credential.xml`（Android Keystore AES-GCM 密文） | 同签名升级保留；排除系统备份/迁移，换机、重装需重新填写 |
+| 长期记忆（UserProfile） | `files/datastore/user_profile_prefs.preferences_pb`（排除系统备份/设备迁移） | 同签名升级保留；可用完整 JSON 备份（v3）恢复；设置内可随时删除 |
 | 导出的 schema | `app/schemas/com.expense.tracker.data.db.AppDatabase/N.json`（git 跟踪） | - |
 
 Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有版本升级显式注册 `Migration`。缺少迁移时应用会拒绝打开数据库，绝不会通过清空用户数据来兜底。
@@ -300,6 +304,7 @@ Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有�
 | **v3.9.2** | **本地安全加固** - CHAT write firewall（非 MUTATION 路径代码层禁写）；Router 裸金额/非支出护栏/查询追问；纯日期 `occurred_at` 容错；partial hints 修复；离线行为基线 58/80 → 74/80 |
 | **v3.9.3** | **会话上下文路由** - ConversationActionContext：条件更正（记错了/说错了/不对）、条件续记（也是35）、Query 回承（那X呢）；修复查询工具失败回退可写；离线路由 80/80、Query 召回 16/16 |
 | **v3.10.0** | **Memory Governance v1** - 四类长期记忆（月收入/储蓄目标/商户别名/常用分类）；提案→类型校验→预览→确认→UserProfile；LLM 无写接口；Silent Memory Write Rate = 0%（Bench 36 条） |
+| **v3.11.0** | **Memory Consumption & Control** - MemoryReadScope 读权限 + 别名确定性应用；我的记忆（查看/修改/删除/清空）；JSON 备份 v3 含记忆；Unauthorized Read 0% / Deleted Reuse 0% / Application 100%（Bench 38 条） |
 
 > 版本管理规范（2026-08-08 起）：每次交付 versionCode +1、versionName 语义化递增，变更记录维护在 `CHANGELOG.md`。
 

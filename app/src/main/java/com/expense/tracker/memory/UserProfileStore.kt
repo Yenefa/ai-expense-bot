@@ -15,10 +15,12 @@ import kotlinx.serialization.json.Json
 
 private val Context.userProfileDataStore: DataStore<Preferences> by preferencesDataStore(name = "user_profile_prefs")
 
-/** 长期记忆（UserProfile）持久化接口；只有 MemoryGovernor 在用户确认后调用 append。 */
+/** 长期记忆（UserProfile）持久化接口；只有 MemoryGovernor 在用户确认/管理操作时写入。 */
 interface UserProfileStore {
     val facts: Flow<List<MemoryFact>>
     suspend fun append(fact: MemoryFact)
+    /** 整体覆盖：用户管理（修改/删除/清空）与备份恢复使用。 */
+    suspend fun save(facts: List<MemoryFact>)
 }
 
 /** DataStore 实现：独立文件，排除系统备份（与现有隐私策略一致）。 */
@@ -36,6 +38,12 @@ class UserProfilePrefs(
         store.edit { prefs ->
             val current = prefs[FACTS_KEY]?.let(::decode).orEmpty()
             prefs[FACTS_KEY] = json.encodeToString(FACTS_SERIALIZER, current + fact)
+        }
+    }
+
+    override suspend fun save(facts: List<MemoryFact>) {
+        store.edit { prefs ->
+            prefs[FACTS_KEY] = json.encodeToString(FACTS_SERIALIZER, facts)
         }
     }
 

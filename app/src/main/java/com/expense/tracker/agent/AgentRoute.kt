@@ -41,6 +41,8 @@ object AgentRouter {
         nowMillis: Long,
         zone: ZoneId = ZoneId.systemDefault(),
         context: ConversationActionContext = ConversationActionContext(),
+        /** 已授权读取的商户别名（CLASSIFICATION scope）：让"瑞幸15"这类裸商户表达进入记账。 */
+        knownMerchants: Set<String> = emptySet(),
     ): AgentDecision {
         val normalized = text.trim()
         if (MUTATION_INTENT.containsMatchIn(normalized)) {
@@ -67,6 +69,10 @@ object AgentRouter {
         // 非支出语义优先于裸金额识别：这些句子里的数字不是本笔消费。
         if (NON_EXPENSE_INTENT.containsMatchIn(normalized)) {
             return AgentDecision(AgentRoute.CHAT)
+        }
+        // Memory 分类读权限的应用：已知商户 + 裸金额 → 记账（如"瑞幸15"）。
+        if (knownMerchants.any { it.isNotBlank() && normalized.contains(it) } && BARE_NUMBER.containsMatchIn(normalized)) {
+            return AgentDecision(AgentRoute.MUTATION)
         }
         if (looksLikeBareExpense(normalized)) {
             return AgentDecision(AgentRoute.MUTATION)

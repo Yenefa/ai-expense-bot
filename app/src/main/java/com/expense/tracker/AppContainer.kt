@@ -40,15 +40,16 @@ class AppContainer(context: Context) {
 
     val db: AppDatabase by lazy { AppDatabase.get(appCtx) }
     val userPrefs: UserPrefs by lazy { UserPrefs.fromContext(appCtx) }
-    /** 长期记忆（UserProfile）：独立 DataStore；写入口只有 MemoryGovernor.confirm。 */
-    val memoryGovernor: MemoryGovernor by lazy { MemoryGovernor(UserProfilePrefs.create(appCtx)) }
+    /** 长期记忆（UserProfile）：独立 DataStore；写入口只有 MemoryGovernor.confirm/用户管理操作。 */
+    val userProfileStore: UserProfilePrefs by lazy { UserProfilePrefs.create(appCtx) }
+    val memoryGovernor: MemoryGovernor by lazy { MemoryGovernor(userProfileStore) }
     val subscriptionPrefs: SubscriptionPrefs by lazy { SubscriptionPrefs.fromContext(appCtx) }
     val budgetPrefs: BudgetPrefs by lazy { BudgetPrefs.fromContext(appCtx) }
     val reminderPrefs: ReminderPrefs by lazy { ReminderPrefs.fromContext(appCtx) }
     val recurringDao: RecurringRuleDao by lazy { db.recurringRuleDao() }
     val expenseRepo: ExpenseRepository by lazy { ExpenseRepository(db.expenseDao()) }
     val chatRepo: ChatRepository by lazy { ChatRepository(db.chatDao()) }
-    val backupRepo: BackupRepository by lazy { BackupRepository(db, userPrefs) }
+    val backupRepo: BackupRepository by lazy { BackupRepository(db, userPrefs, userProfileStore) }
     val llmClient: LlmClient by lazy {
         LlmClient(onSubscriptionUnauthorized = { subscriptionPrefs.clearSubscription() })
     }
