@@ -17,7 +17,16 @@ class ProactiveCenterViewModel(
     val history: StateFlow<List<ProactiveAlertRecord>> = prefs.historyFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** 未读数：设置页角标与提醒中心共用。 */
+    val unreadCount: StateFlow<Int> = prefs.unreadCount
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
     fun clear() {
         viewModelScope.launch { prefs.clearHistory() }
+    }
+
+    /** 进入提醒中心时调用：写入已读水位，未读数归零。 */
+    fun markRead() {
+        viewModelScope.launch { prefs.markHistoryRead() }
     }
 }

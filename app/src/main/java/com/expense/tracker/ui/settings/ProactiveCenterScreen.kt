@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -43,6 +44,9 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun ProactiveCenterScreen(vm: ProactiveCenterViewModel, onClose: () -> Unit) {
     val history by vm.history.collectAsState()
+
+    // 进入页面即视为已读：写入已读水位，设置页角标随之清零。
+    LaunchedEffect(Unit) { vm.markRead() }
 
     Box(Modifier.fillMaxSize().background(AppColors.Bg)) {
         Column(

@@ -21,6 +21,7 @@ class SavingsPaceCalculatorTest {
         assertThat(pace.goalGapCents).isEqualTo(-300_000L)
         assertThat(pace.remainingDays).isEqualTo(15)
         assertThat(pace.remainingSpendableCents).isEqualTo(0L) // 800000 - 500000 - 300000
+        assertThat(pace.remainingDailyBudgetCents).isEqualTo(0L)
         assertThat(pace.onTrack).isFalse()
     }
 
@@ -75,10 +76,16 @@ class SavingsPaceCalculatorTest {
     }
 
     @Test
-    fun `达标日均上限目标高于收入时为0`() {
-        assertThat(SavingsPaceCalculator.requiredDailySpendCents(800_000L, 200_000L, 30))
-            .isEqualTo(20_000L)
-        assertThat(SavingsPaceCalculator.requiredDailySpendCents(100_000L, 200_000L, 30))
-            .isEqualTo(0L)
+    fun `剩余日均额度按剩余天数计算且不为负`() {
+        // 收入 8000，目标 5000，已过 10 天花 2000 → 剩余 20 天、剩余可支配 1000 → 日均 50
+        val pace = SavingsPaceCalculator.compute(800_000L, 500_000L, 200_000L, 10, 30)!!
+        assertThat(pace.remainingDays).isEqualTo(20)
+        assertThat(pace.remainingSpendableCents).isEqualTo(100_000L)
+        assertThat(pace.remainingDailyBudgetCents).isEqualTo(5_000L)
+
+        // 剩余可支配为负 → 日均下限 0，不出现负数
+        val over = SavingsPaceCalculator.compute(800_000L, 500_000L, 400_000L, 10, 30)!!
+        assertThat(over.remainingSpendableCents).isEqualTo(-100_000L)
+        assertThat(over.remainingDailyBudgetCents).isEqualTo(0L)
     }
 }

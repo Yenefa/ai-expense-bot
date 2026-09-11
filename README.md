@@ -65,12 +65,12 @@
 三类（v1）：
 
 - **预算临界**：本月预算 ≥90% / 超支
-- **异常消费**：本周明显高于近 4 周个人基线（≥1.5x 且至少高出 ¥100）
+- **异常消费**：本周明显高于近 4 周个人基线（≥1.5x 且至少高出 ¥100）；总消费被其他分类抵消时，**单一分类异常**也会提醒（v3.14）
 - **储蓄目标偏离**：结合月收入 + 储蓄目标，按本月 pace 外推预计结余
 
 硬约束（治理层，模型不可见）：至少 4 个可比样本 / 冷启动不提醒 / **每日最多 1 条** / 同类冷却（预算 24h、异常与储蓄 7d）/ 预算 WARN→OVER 可升级突破冷却 / 设置内可逐类关闭。
 
-- **投递（v3.13）**：规则放行 → 聊天内 🔔 + **系统通知**（独立渠道 `proactive_insight`，点击直达提醒中心）+ **提醒中心历史**（最近 50 条，可清空）；后台每日 20:00 由 WorkManager 检查（重启自恢复，后台只用确定性文案、无网络）
+- **投递（v3.13/v3.14）**：规则放行 → 聊天内 🔔 + **系统通知**（独立渠道 `proactive_insight`，点击直达提醒中心）+ **提醒中心历史**（最近 50 条，可清空，入口显示未读数）；App 启动检查一次 + 后台每日 20:00 WorkManager 检查（重启自恢复，后台只用确定性文案、无网络）
 - **ProactiveInsightBench**：38 条六桶，五项指标 **False Alert / Missed Alert / Duplicate / Cold-start Violation / Notification Budget Violation 全部 0%**（`docs/proactive-insight-local-report.md`，协议见 [docs/proactive-insight.md](docs/proactive-insight.md)）
 - 完整链路：**Deterministic Routing → Short-term Context → Governed Memory → Scoped Memory Read → Deterministic Finance Tools → Controlled Mutation → Rule-governed Proactive Insight**
 
@@ -326,6 +326,8 @@ Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有�
 | **v3.12.1** | **分类口径修正** - 文具/笔→education、日用品/超市/理发→shopping、水电/酒店→housing（主链路 + 账单导入同步）；数据集 mtp-29/30 按 owner 裁定更新 |
 | **v3.12.2** | **多轮防重记 + 更新动作可靠性** - 历史已确认记录的账目禁止重复提取（还有/也买/又买/再记 追加语义 + 已有账目上下文加载）；改日期必须输出 update（occurred_at + 客户端确定性日期绑定）；新增 5 条攻击/回归用例 |
 | **v3.13.0** | **主动提醒通知投递 + 提醒中心 + 储蓄节奏入计算** - 独立通知渠道与点击直达提醒中心；后台每日 20:00 WorkManager 检查（确定性文案、零网络）；提醒历史 50 条可清空；月收入+储蓄目标进入确定性 `SavingsPaceCalculator`（查询【储蓄进度】可信块 + 主动储蓄规则共用） |
+| **v3.13.1 / v3.13.2** | **滚动显示修复** - 预算管理 / 设置 / 数据导出 / 周期账单页内容超出屏幕时可滚动，不再截断（真机反馈） |
+| **v3.14.0** | **分类级异常基线 + 提醒中心未读 + 启动检查** - 总量正常时单分类异常也能提醒；储蓄 pace 细化"剩余 N 天最多还能花"；提醒中心未读角标、进页已读；App 启动评估一次；Android 13 主题图标 monochrome；CI（单测 + lint） |
 
 > 版本管理规范（2026-08-08 起）：每次交付 versionCode +1、versionName 语义化递增，变更记录维护在 `CHANGELOG.md`。
 

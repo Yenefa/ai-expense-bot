@@ -331,3 +331,23 @@
 
 ## 验收
 - JVM 356/356；`assembleRelease` 成功；线上 index/APK 与新 APK 哈希一致（`ebab6fdd…`）
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.14.0 主动提醒增强 + 代码内收尾（opencode，owner：一次性做完，可用 subagent）
+
+## 并行分工（遵循 dispatching-parallel-agents，文件集互不重叠）
+- Subagent A（CI）：新增 `.github/workflows/ci.yml`（test + lint，push dev/main + PR + 手动）
+- Subagent B（资源）：`ic_launcher_monochrome.xml` 主题图标层 + 小组件文案入 `strings.xml`
+- Subagent C（UI）：提醒中心未读水位（`ProactivePrefs.unreadCount/markHistoryRead`）+ 设置页角标 + 进页已读
+- 主线程（高风险共享模型）：启动检查、分类级异常基线、储蓄 pace 细化、集成/验证/发布
+
+## 交付（v3.14.0 / versionCode 44）
+- 分类级异常：`CategoryWeeklySpending` 输入 + 规则（总量优先，其次选中偏离最大分类，文案带分类名）
+- 储蓄 pace：`SavingsPace.remainingDailyBudgetCents`（剩余可支配/剩余天数，不为负），提醒与查询块同步
+- 启动检查：`AppContainer.proactiveStartupCheck` + `ExpenseApp` 启动协程（聊天 🔔 + 通知 + 历史；额度/冷却兜底）
+- 未读角标：进入提醒中心写已读水位；清空历史重置水位
+- 主题图标 monochrome + 小组件文案资源化 + CI
+
+## 验收（本地）
+- JVM 356 → **359，0 failed**（分类异常规则 2 + 引擎端到端 1）；`lintDebug` / `assembleDebug` / `assembleRelease` 通过

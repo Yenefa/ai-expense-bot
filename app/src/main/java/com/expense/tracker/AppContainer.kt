@@ -187,6 +187,20 @@ class AppContainer(context: Context) {
         Unit
     }
 
+    /**
+     * App 启动检查一次主动提醒：规则放行则写聊天 🔔 + 投递通知（历史由治理器记录）。
+     * 每日额度 / 同类冷却由治理器兜底，重复启动不会重复提醒。
+     */
+    val proactiveStartupCheck: suspend () -> Unit = {
+        runCatching {
+            proactiveEngine.evaluate()?.let { alert ->
+                chatRepo.appendAssistant("🔔 ${alert.copy}")
+                proactiveAlertNotifier(alert)
+            }
+        }
+        Unit
+    }
+
     /** 记账后的预算预警文案（达到 90% 或超支时非空）。 */
     val budgetWarningProvider: suspend () -> String? = suspend {
         val budget = budgetPrefs.snapshot.first()

@@ -1,6 +1,7 @@
 package com.expense.tracker.proactive
 
 import com.expense.tracker.data.finance.SavingsPaceCalculator
+import com.expense.tracker.data.model.Category
 
 /** 主动提醒类型（v1 只做三类）。 */
 enum class ProactiveAlertType(val wire: String, val typeLabel: String) {
@@ -24,6 +25,15 @@ enum class ProactiveSeverity(val wire: String) {
     }
 }
 
+/** 分类级周消费（旧→新 4 个完整周 + 本周），用于分类级异常基线。 */
+data class CategoryWeeklySpending(
+    val categoryId: String,
+    /** 本周（进行中）该分类消费合计。 */
+    val currentWeekCents: Long,
+    /** 最近 4 个完整周该分类消费合计（旧→新）；0 = 该周无数据。 */
+    val completedWeeksCents: List<Long>,
+)
+
 /** 规则输入（全部为端侧确定性事实；memory 字段由调用方按 FINANCIAL_ANALYSIS 授权读取后传入）。 */
 data class ProactiveInputs(
     val nowMillis: Long,
@@ -40,6 +50,8 @@ data class ProactiveInputs(
     val currentWeekSpentCents: Long = 0L,
     /** 最近 4 个完整周的非投资消费合计（旧→新）；0 = 该周无数据。 */
     val completedWeekSpendsCents: List<Long> = emptyList(),
+    /** 分类级周消费（可选）：总消费被其他分类抵消时，仍能发现单一分类异常。 */
+    val categoryWeekSpends: List<CategoryWeeklySpending> = emptyList(),
     /** 已授权读取的财务记忆。 */
     val monthlyIncomeCents: Long? = null,
     val savingsGoalCents: Long? = null,
@@ -133,12 +145,12 @@ object ProactiveRules {
         ) ?: return null
         if (pace.onTrack) return null
         val over = pace.projectedLeftoverCents <= 0L
-        val requiredDaily = SavingsPaceCalculator.requiredDailySpendCents(income, goal, inputs.daysInMonth)
         val copy = if (over) {
             "按当前节奏，本月预计入不敷出 ¥${fmt(-pace.projectedLeftoverCents)}（储蓄目标 ¥${fmt(goal)} 可能落空）；剩余 ${pace.remainingDays} 天，建议压降支出。"
         } else {
             "按当前节奏，本月预计可存 ¥${fmt(pace.projectedLeftoverCents)}，低于储蓄目标 ¥${fmt(goal)}（还差 ¥${fmt(-pace.goalGapCents)}）；" +
-                "剩余 ${pace.remainingDays} 天，日均支出需控制在 ¥${fmt(requiredDaily)} 内。"
+                "剩余 ${pace.remainingDays} 天，最多还能花 ¥${fmt(pace.remainingSpendableCents.coerceAtLeast(0L))}" +
+                "（日均 ¥${fmt(pace.remainingDailyBudgetCents)}）。"
         }
         return ProactiveAlert(
             type = ProactiveAlertType.SAVINGS_GOAL_DEVIATION,
@@ -151,13 +163,44 @@ object ProactiveRules {
                 "goal_gap_cents" to pace.goalGapCents,
                 "remaining_days" to pace.remainingDays.toLong(),
                 "remaining_spendable_cents" to pace.remainingSpendableCents,
-                "required_daily_cents" to requiredDaily,
+                "remaining_daily_cents" to pace.remainingDailyBudgetCents,
             ),
             deterministicCopy = copy,
         )
     }
 
     private fun anomalyAlert(inputs: ProactiveInputs): ProactiveAlert? {
+        totalAnomaly(inputs)?.let { return it }
+        // 分类级基线：总消费被其他分类"抵消"时（总量正常但某个分类暴涨）仍能发现异常；
+        // 多个分类同时异常时只报偏离金额最大的一个。
+        val worst = inputs.categoryWeekSpends.mapNotNull { spending ->
+            val weeks = spending.completedWeeksCents
+            if (weeks.isEmpty()) return@mapNotNull null
+            val samples = weeks.count { it > 0L }
+            if (samples < MIN_COMPARABLE_SAMPLES) return@mapNotNull null
+            val baseline = weeks.sum().toDouble() / weeks.size
+            if (baseline <= 0.0) return@mapNotNull null
+            val current = spending.currentWeekCents
+            val delta = current - baseline.toLong()
+            if (current < baseline * ANOMALY_RATIO || delta < ANOMALY_MIN_DELTA_CENTS) return@mapNotNull null
+            Triple(spending, baseline.toLong(), delta)
+        }.maxByOrNull { it.third } ?: return null
+
+        val (spending, baseline, delta) = worst
+        val name = Category.byIdOrOther(spending.categoryId).displayName
+        return ProactiveAlert(
+            type = ProactiveAlertType.ANOMALOUS_SPENDING,
+            severity = ProactiveSeverity.WARN,
+            facts = mapOf(
+                "current_week_cents" to spending.currentWeekCents,
+                "baseline_cents" to baseline,
+                "delta_cents" to delta,
+            ),
+            deterministicCopy = "本周「$name」消费 ¥${fmt(spending.currentWeekCents)}，明显高于近 4 周平均 ¥${fmt(baseline)}，建议看看是哪几笔。",
+        )
+    }
+
+    private fun totalAnomaly(inputs: ProactiveInputs): ProactiveAlert? {
         val weeks = inputs.completedWeekSpendsCents
         val samples = weeks.count { it > 0L }
         if (samples < MIN_COMPARABLE_SAMPLES) return null

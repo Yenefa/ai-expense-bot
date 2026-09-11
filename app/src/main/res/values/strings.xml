@@ -3,5 +3,14 @@
     <string name="app_name">Y.E cost</string>
     <string name="brand_slogan">记下日常，看见生活</string>
     <string name="widget_description">本月支出与预算进度</string>
+
+    <!-- 桌面组件文案：静态标签与格式串，动态金额仍由 Kotlin 格式化后填入 -->
+    <string name="widget_title">Y.E cost</string>
+    <string name="widget_amount_placeholder">本月支出 ¥0.00</string>
+    <string name="widget_amount_format">本月支出 ¥%1$s</string>
+    <string name="widget_budget_unset">未设置预算</string>
+    <string name="widget_budget_over_format">⚠️ 已超支 ¥%1$s</string>
+    <string name="widget_budget_used_format">预算已用 %1$d%% · ¥%2$s / ¥%3$s</string>
+    <string name="widget_open_app">打开记账</string>
 </resources>
 

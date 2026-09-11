@@ -21,6 +21,8 @@ data class SavingsPace(
     val remainingDays: Int,
     /** 静态口径：在仍要达成目标的前提下，本月还可支配的金额（可为负 = 已超）。 */
     val remainingSpendableCents: Long,
+    /** 剩余天数内的日均可花上限 = max(0, 剩余可支配) / 剩余天数（比整月均值更贴近实际节奏）。 */
+    val remainingDailyBudgetCents: Long,
     /** 是否达标：预计结余 >= 目标。 */
     val onTrack: Boolean,
 )
@@ -43,6 +45,8 @@ object SavingsPaceCalculator {
         if (spentCents < 0L) return null
         val projectedSpend = spentCents.toDouble() / elapsedDays * daysInMonth
         val projectedLeftover = incomeCents - projectedSpend
+        val remainingDays = daysInMonth - elapsedDays
+        val remainingSpendable = incomeCents - goalCents - spentCents
         return SavingsPace(
             incomeCents = incomeCents,
             goalCents = goalCents,
@@ -52,15 +56,14 @@ object SavingsPaceCalculator {
             projectedSpendCents = projectedSpend.toLong(),
             projectedLeftoverCents = projectedLeftover.toLong(),
             goalGapCents = (projectedLeftover - goalCents).toLong(),
-            remainingDays = daysInMonth - elapsedDays,
-            remainingSpendableCents = incomeCents - goalCents - spentCents,
+            remainingDays = remainingDays,
+            remainingSpendableCents = remainingSpendable,
+            remainingDailyBudgetCents = if (remainingDays <= 0) {
+                0L
+            } else {
+                remainingSpendable.coerceAtLeast(0L) / remainingDays
+            },
             onTrack = projectedLeftover >= goalCents,
         )
-    }
-
-    /** 达标所需日均支出上限 = (收入 - 目标) / 当月天数；目标高于收入时为 0。 */
-    fun requiredDailySpendCents(incomeCents: Long, goalCents: Long, daysInMonth: Int): Long {
-        if (daysInMonth <= 0) return 0L
-        return ((incomeCents - goalCents).coerceAtLeast(0L)) / daysInMonth
     }
 }

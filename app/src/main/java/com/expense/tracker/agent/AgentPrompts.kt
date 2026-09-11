@@ -3,7 +3,6 @@ package com.expense.tracker.agent
 import com.expense.tracker.data.budget.BudgetEntry
 import com.expense.tracker.data.budget.BudgetStatus
 import com.expense.tracker.data.finance.SavingsPace
-import com.expense.tracker.data.finance.SavingsPaceCalculator
 import com.expense.tracker.data.model.Money
 
 /** 查询轮的 system prompt 片段：工具结果 + 回答规则。 */
@@ -101,11 +100,10 @@ object AgentPrompts {
                 "结余 ¥${Money.formatYuan(pace.projectedLeftoverCents)}（$leftoverLabel）",
         )
         if (!pace.onTrack) {
-            val requiredDaily = SavingsPaceCalculator
-                .requiredDailySpendCents(pace.incomeCents, pace.goalCents, pace.daysInMonth)
             appendLine(
                 "还差 ¥${Money.formatYuan(-pace.goalGapCents)}；剩余 ${pace.remainingDays} 天，" +
-                    "日均支出需控制在 ¥${Money.formatYuan(requiredDaily)} 内",
+                    "最多还能花 ¥${Money.formatYuan(pace.remainingSpendableCents.coerceAtLeast(0L))}" +
+                    "（日均 ¥${Money.formatYuan(pace.remainingDailyBudgetCents)}）",
             )
         }
         append("（该计算结果来自用户已确认的长期信息，仅限本轮授权范围使用）")

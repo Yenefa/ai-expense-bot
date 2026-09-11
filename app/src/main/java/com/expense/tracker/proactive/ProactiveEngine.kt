@@ -43,17 +43,33 @@ class ProactiveEngine(
             monthEnd.atStartOfDay(zone).toInstant().toEpochMilli(),
         )
         val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-        val currentWeekSpent = activeConsumption(
+        val currentWeekRows = activeConsumption(
             weekStart.atStartOfDay(zone).toInstant().toEpochMilli(),
             today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli(),
-        ).sumOf { it.amountCents }
-        val completedWeeks = (4 downTo 1).map { back ->
+        )
+        val completedWeekRows = (4 downTo 1).map { back ->
             val start = weekStart.minusWeeks(back.toLong())
             activeConsumption(
                 start.atStartOfDay(zone).toInstant().toEpochMilli(),
                 start.plusWeeks(1).atStartOfDay(zone).toInstant().toEpochMilli(),
-            ).sumOf { it.amountCents }
+            )
         }
+        val currentByCategory = currentWeekRows.groupBy { it.categoryId }
+            .mapValues { (_, rows) -> rows.sumOf { it.amountCents } }
+        val completedByCategory = completedWeekRows.map { rows ->
+            rows.groupBy { it.categoryId }.mapValues { (_, items) -> items.sumOf { it.amountCents } }
+        }
+        // 分类级基线：总消费被其他分类抵消时仍能发现单一分类异常。
+        val categoryWeekSpends = (currentByCategory.keys + completedByCategory.flatMap { it.keys })
+            .map { id ->
+                CategoryWeeklySpending(
+                    categoryId = id,
+                    currentWeekCents = currentByCategory[id] ?: 0L,
+                    completedWeeksCents = completedByCategory.map { it[id] ?: 0L },
+                )
+            }
+        val currentWeekSpent = currentWeekRows.sumOf { it.amountCents }
+        val completedWeeks = completedWeekRows.map { rows -> rows.sumOf { it.amountCents } }
         val facts = MemoryReadPolicy.filter(MemoryReadScope.FINANCIAL_ANALYSIS, memoryFacts())
         val inputs = ProactiveInputs(
             nowMillis = now,
@@ -65,6 +81,7 @@ class ProactiveEngine(
             daysInMonth = today.lengthOfMonth(),
             currentWeekSpentCents = currentWeekSpent,
             completedWeekSpendsCents = completedWeeks,
+            categoryWeekSpends = categoryWeekSpends,
             monthlyIncomeCents = facts.firstOrNull { it.type == MemoryType.MONTHLY_INCOME }?.amountCents,
             savingsGoalCents = facts.firstOrNull { it.type == MemoryType.SAVINGS_GOAL }?.amountCents,
         )

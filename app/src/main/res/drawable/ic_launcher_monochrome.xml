@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 13 主题图标 monochrome 层：笔记本 + 小花剪影。
+  仅使用纯黑 #000000（由系统统一着色），内容居中于 108dp 视口的 ~66dp 安全区；
+  花朵与花茎通过 evenOdd 镂空，不使用渐变或第二种颜色。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 封面圆角矩形 + 五瓣花 + 花茎：evenOdd 使花与茎在封面上镂空 -->
+    <path
+        android:fillColor="#000000"
+        android:fillType="evenOdd"
+        android:pathData="M39,28h32a5,5 0 0 1 5,5v42a5,5 0 0 1 -5,5h-32a5,5 0 0 1 -5,-5v-42a5,5 0 0 1 5,-5z
+            M63,57.5a3.4,3.4 0 0 1 5.23,3.8a3.4,3.4 0 0 1 -2,6.15a3.4,3.4 0 0 1 -6.46,0a3.4,3.4 0 0 1 -2,-6.15a3.4,3.4 0 0 1 5.23,-3.8z
+            M62.15,69.98l0.9,0.64l-4.6,6.3l-0.9,-0.64z" />
+
+    <!-- 书脊 -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M33,28h4a5,5 0 0 1 5,5v42a5,5 0 0 1 -5,5h-4a5,5 0 0 1 -5,-5v-42a5,5 0 0 1 5,-5z" />
+
+    <!-- 左侧 3 个装订环 -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M25.6,39.4h6.4a1.6,1.6 0 0 1 0,3.2h-6.4a1.6,1.6 0 0 1 0,-3.2z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M25.6,52.4h6.4a1.6,1.6 0 0 1 0,3.2h-6.4a1.6,1.6 0 0 1 0,-3.2z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M25.6,65.4h6.4a1.6,1.6 0 0 1 0,3.2h-6.4a1.6,1.6 0 0 1 0,-3.2z" />
+</vector>

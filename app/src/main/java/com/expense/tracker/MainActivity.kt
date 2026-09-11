@@ -223,6 +223,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
             val prefs by container.userPrefs.snapshot.collectAsState(initial = null)
+            // 提醒中心未读数：驱动设置页「提醒中心」入口的未读提示（Eagerly 收集，页面未打开也即时更新）。
+            val reminderUnreadCount by proactiveCenterVm.unreadCount.collectAsState()
             val isDark = when (prefs?.themeMode ?: ThemeMode.SYSTEM) {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
@@ -323,6 +325,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenMemory = { subScreen = SubScreen.Memory },
                                 onOpenProactive = { subScreen = SubScreen.Proactive },
                                 onOpenReminderCenter = { subScreen = SubScreen.ProactiveCenter },
+                                reminderUnreadCount = reminderUnreadCount,
                                 prefs = container.userPrefs,
                             )
                         }

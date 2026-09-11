@@ -67,6 +67,30 @@ class ProactiveEngineTest {
     }
 
     @Test
+    fun `总量正常时按分类基线发现单一分类异常`() = runBlocking<Unit> {
+        // 近 4 周：餐饮 50k + 住房 200k；本周餐饮 90k + 住房 200k
+        // 总量 250k → 290k 不达 1.5x，但餐饮 50k → 90k（1.8x 且 +40k）命中分类级基线
+        listOf(
+            LocalDate.of(2026, 8, 19),
+            LocalDate.of(2026, 8, 26),
+            LocalDate.of(2026, 9, 2),
+            LocalDate.of(2026, 9, 9),
+        ).forEach { day ->
+            insert(50_000L, "food", day)
+            insert(200_000L, "housing", day)
+        }
+        insert(90_000L, "food", LocalDate.of(2026, 9, 15))
+        insert(200_000L, "housing", LocalDate.of(2026, 9, 15))
+
+        val alert = engine(LocalDate.of(2026, 9, 16)).evaluate()!!
+
+        assertThat(alert.type).isEqualTo(ProactiveAlertType.ANOMALOUS_SPENDING)
+        assertThat(alert.deterministicCopy).contains("餐饮")
+        assertThat(alert.facts["delta_cents"]).isEqualTo(40_000L)
+        assertThat(alert.facts["baseline_cents"]).isEqualTo(50_000L)
+    }
+
+    @Test
     fun `预算口径排除投资类且要求4个样本`() = runBlocking<Unit> {
         insert(30_000L, "food", LocalDate.of(2026, 9, 2))
         insert(30_000L, "drink", LocalDate.of(2026, 9, 5))

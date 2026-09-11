@@ -92,13 +92,21 @@ class ExpenseWidgetProvider : AppWidgetProvider() {
             categoryLimitsCents = budget.categoryLimitsCents,
             monthlySpentByCategory = spentByCategory,
         )
-        val amountText = "本月支出 ¥${Money.formatYuan(spent)}"
+        val amountText = context.getString(R.string.widget_amount_format, Money.formatYuan(spent))
         val monthly = overview.monthly
         val budgetText = when {
-            monthly == null -> "未设置预算"
+            monthly == null -> context.getString(R.string.widget_budget_unset)
             monthly.status == com.expense.tracker.data.budget.BudgetStatus.OVER ->
-                "⚠️ 已超支 ¥${Money.formatYuan(monthly.amountCents - monthly.limitCents)}"
-            else -> "预算已用 ${(monthly.percent * 100).toInt()}% · ¥${Money.formatYuan(monthly.amountCents)} / ¥${Money.formatYuan(monthly.limitCents)}"
+                context.getString(
+                    R.string.widget_budget_over_format,
+                    Money.formatYuan(monthly.amountCents - monthly.limitCents),
+                )
+            else -> context.getString(
+                R.string.widget_budget_used_format,
+                (monthly.percent * 100).toInt(),
+                Money.formatYuan(monthly.amountCents),
+                Money.formatYuan(monthly.limitCents),
+            )
         }
         val progress = ((monthly?.percent ?: 0.0) * 100).toInt().coerceIn(0, 100)
         return Triple(amountText, budgetText, progress)

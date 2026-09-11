@@ -19,6 +19,10 @@ class ExpenseApp : Application() {
         appScope.launch {
             runCatching { container.recurringRunner() }
         }
+        // 主动提醒：启动检查一次（治理器每日额度/冷却保证不重复）
+        appScope.launch {
+            runCatching { container.proactiveStartupCheck() }
+        }
         // 主动提醒：每日 20:00 后台检查（周期任务持久化，重启后自动恢复；KEEP 不重置周期）
         appScope.launch {
             runCatching { com.expense.tracker.proactive.ProactiveScheduler.ensureScheduled(this@ExpenseApp) }

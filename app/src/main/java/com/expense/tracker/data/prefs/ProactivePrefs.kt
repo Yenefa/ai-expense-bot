@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.expense.tracker.proactive.ProactiveAlertRecord
@@ -81,6 +82,14 @@ class ProactivePrefs(
         .map { prefs -> parseHistory(prefs[HISTORY_KEY]).entries.reversed().mapNotNull { it.toRecord() } }
         .flowOn(Dispatchers.IO)
 
+    /** 未读数：历史中 createdAt 晚于已读水位的条数（同一条 flow 内解析历史与水位）。 */
+    val unreadCount: Flow<Int> = store.data
+        .map { prefs ->
+            val readWatermark = prefs[LAST_READ_AT_KEY] ?: 0L
+            parseHistory(prefs[HISTORY_KEY]).entries.count { it.createdAt > readWatermark }
+        }
+        .flowOn(Dispatchers.IO)
+
     override suspend fun record(
         typeWire: String,
         severityWire: String,
@@ -115,8 +124,17 @@ class ProactivePrefs(
 
     override suspend fun history(): List<ProactiveAlertRecord> = historyFlow.first()
 
+    /** 提醒中心已读：写入当前时刻作为已读水位，未读数随之归零。 */
+    suspend fun markHistoryRead(atMillis: Long = System.currentTimeMillis()) {
+        store.edit { prefs -> prefs[LAST_READ_AT_KEY] = atMillis }
+    }
+
     override suspend fun clearHistory() {
-        store.edit { prefs -> prefs.remove(HISTORY_KEY) }
+        // 清空历史的同时重置已读水位：空历史没有未读。
+        store.edit { prefs ->
+            prefs.remove(HISTORY_KEY)
+            prefs[LAST_READ_AT_KEY] = 0L
+        }
     }
 
     private fun parseHistory(raw: String?): ProactiveHistoryJson =
@@ -135,6 +153,7 @@ class ProactivePrefs(
     companion object {
         private val STATE_KEY = stringPreferencesKey("alert_state_json")
         private val HISTORY_KEY = stringPreferencesKey("alert_history_json")
+        private val LAST_READ_AT_KEY = longPreferencesKey("alert_last_read_at")
         const val MAX_HISTORY = 50
 
         fun create(context: Context): ProactivePrefs =

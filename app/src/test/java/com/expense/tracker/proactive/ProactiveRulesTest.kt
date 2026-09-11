@@ -16,6 +16,7 @@ class ProactiveRulesTest {
         daysInMonth: Int = 30,
         currentWeek: Long = 0L,
         weeks: List<Long> = listOf(0L, 0L, 0L, 0L),
+        categoryWeeks: List<CategoryWeeklySpending> = emptyList(),
         income: Long? = null,
         savings: Long? = null,
     ) = ProactiveInputs(
@@ -28,6 +29,7 @@ class ProactiveRulesTest {
         daysInMonth = daysInMonth,
         currentWeekSpentCents = currentWeek,
         completedWeekSpendsCents = weeks,
+        categoryWeekSpends = categoryWeeks,
         monthlyIncomeCents = income,
         savingsGoalCents = savings,
     )
@@ -87,7 +89,60 @@ class ProactiveRulesTest {
         assertThat(alert.facts["projected_leftover_cents"]).isEqualTo(-500_000L)
         assertThat(alert.facts["goal_gap_cents"]).isEqualTo(-700_000L)
         assertThat(alert.facts["remaining_days"]).isEqualTo(15L)
-        assertThat(alert.facts["required_daily_cents"]).isEqualTo(20_000L)
+        // 已花 6500 > 收入 8000 - 目标 2000 → 剩余可支配为负，日均下限 0
+        assertThat(alert.facts["remaining_spendable_cents"]).isEqualTo(-50_000L)
+        assertThat(alert.facts["remaining_daily_cents"]).isEqualTo(0L)
+    }
+
+    @Test
+    fun `总消费正常但单分类异常时按分类提醒`() {
+        // 近 4 周：餐饮 50k/周 + 住房 200k/周；本周餐饮 90k、住房 200k
+        // 总消费 250k → 290k（1.16x，不达 1.5x）；餐饮 50k → 90k（1.8x 且 +40）→ 分类级命中
+        val alert = ProactiveRules.evaluate(
+            inputs(
+                limit = 0L,
+                currentWeek = 290_000L,
+                weeks = listOf(250_000L, 250_000L, 250_000L, 250_000L),
+                categoryWeeks = listOf(
+                    CategoryWeeklySpending("food", 90_000L, listOf(50_000L, 50_000L, 50_000L, 50_000L)),
+                    CategoryWeeklySpending("housing", 200_000L, listOf(200_000L, 200_000L, 200_000L, 200_000L)),
+                ),
+            ),
+        )!!
+        assertThat(alert.type).isEqualTo(ProactiveAlertType.ANOMALOUS_SPENDING)
+        assertThat(alert.deterministicCopy).contains("餐饮")
+        assertThat(alert.facts["delta_cents"]).isEqualTo(40_000L)
+        assertThat(alert.facts["baseline_cents"]).isEqualTo(50_000L)
+    }
+
+    @Test
+    fun `分类异常同样受样本与阈值约束`() {
+        // 只有 1 个非零样本 → 冷启动
+        assertThat(
+            ProactiveRules.evaluate(
+                inputs(
+                    limit = 0L,
+                    currentWeek = 90_000L,
+                    weeks = listOf(0L, 0L, 0L, 0L),
+                    categoryWeeks = listOf(
+                        CategoryWeeklySpending("food", 90_000L, listOf(50_000L, 0L, 0L, 0L)),
+                    ),
+                ),
+            ),
+        ).isNull()
+        // 分类幅度不足 1.5x（70k vs 50k）
+        assertThat(
+            ProactiveRules.evaluate(
+                inputs(
+                    limit = 0L,
+                    currentWeek = 70_000L,
+                    weeks = listOf(0L, 0L, 0L, 0L),
+                    categoryWeeks = listOf(
+                        CategoryWeeklySpending("food", 70_000L, listOf(50_000L, 50_000L, 50_000L, 50_000L)),
+                    ),
+                ),
+            ),
+        ).isNull()
     }
 
     @Test
@@ -98,7 +153,8 @@ class ProactiveRulesTest {
         assertThat(alert.severity).isEqualTo(ProactiveSeverity.WARN)
         assertThat(alert.deterministicCopy).contains("还差 ¥3000.00")
         assertThat(alert.deterministicCopy).contains("剩余 15 天")
-        assertThat(alert.deterministicCopy).contains("日均支出需控制在 ¥100.00 内")
+        // 已花 3000 > 收入 8000 - 目标 5000 → 静态剩余额度为 0，提示"最多还能花 ¥0.00"
+        assertThat(alert.deterministicCopy).contains("最多还能花 ¥0.00（日均 ¥0.00）")
     }
 
     @Test

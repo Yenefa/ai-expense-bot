@@ -10,7 +10,7 @@
         android:id="@+id/widget_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Y.E cost"
+        android:text="@string/widget_title"
         android:textColor="#222222"
         android:textSize="14sp"
         android:textStyle="bold" />
@@ -20,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="本月支出 ¥0.00"
+        android:text="@string/widget_amount_placeholder"
         android:textColor="#333333"
         android:textSize="16sp"
         android:textStyle="bold" />
@@ -54,7 +54,7 @@
         android:gravity="center"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
-        android:text="打开记账"
+        android:text="@string/widget_open_app"
         android:textColor="#FFFFFF"
         android:textSize="13sp"
         android:textStyle="bold" />
