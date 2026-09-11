@@ -75,4 +75,48 @@ class AgentRouterTest {
         // 口述记账优先于软查询信号（花+吗）
         assertThat(AgentRouter.route("记一下今天午饭35块对吗", now, zone).route).isEqualTo(AgentRoute.MUTATION)
     }
+
+    @Test
+    fun `裸金额支出走记账管线`() {
+        listOf(
+            "午饭35",
+            "今天咖啡18",
+            "刚买了杯奶茶16",
+            "再记一笔：打车23",
+            "补记昨天的午饭35",
+            "记账：晚饭45",
+            "花了23",
+        ).forEach { text ->
+            assertThat(AgentRouter.route(text, now, zone).route).isEqualTo(AgentRoute.MUTATION)
+        }
+    }
+
+    @Test
+    fun `非支出语句走闲聊由写防火墙兜底`() {
+        listOf(
+            "我月薪8000",
+            "年终奖3万到账了",
+            "房租还是2500，没变",
+            "信用卡还欠着12000",
+            "昨天看到一双鞋，标价899",
+            "想买那个3000的包，但太贵了",
+            "同事说他花了2万买电脑",
+            "我没有花35啊",
+            "不是18，别记",
+            "目标：每天控制在50以内",
+            "计划下个月买台5000的电脑",
+            "我还没买呢，先看看",
+        ).forEach { text ->
+            assertThat(AgentRouter.route(text, now, zone).route).isEqualTo(AgentRoute.CHAT)
+        }
+    }
+
+    @Test
+    fun `查询召回覆盖花哪与追问`() {
+        assertThat(AgentRouter.route("我的钱都花哪了", now, zone).route).isEqualTo(AgentRoute.QUERY)
+        assertThat(AgentRouter.route("上个月和这个月比，哪个花得多", now, zone).route).isEqualTo(AgentRoute.QUERY)
+        assertThat(AgentRouter.route("那上个月呢", now, zone).route).isEqualTo(AgentRoute.QUERY)
+        assertThat(AgentRouter.route("那这周呢", now, zone).route).isEqualTo(AgentRoute.QUERY)
+        assertThat(AgentRouter.route("再看下饮品", now, zone).route).isEqualTo(AgentRoute.QUERY)
+    }
 }

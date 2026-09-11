@@ -65,19 +65,35 @@ object LlmMutationPlanner {
         if (result.expenses.size > MAX_MUTATIONS || result.actions.size > MAX_MUTATIONS) {
             throw MutationSafetyException("单次操作超过 $MAX_MUTATIONS 笔，本次未执行。")
         }
-        if (sourceExpenseHints.isNotEmpty()) {
-            if (result.expenses.size != sourceExpenseHints.size) {
-                throw MutationSafetyException("AI 返回笔数与原文金额数不一致，本次未记录。")
+        val partialHintByAmount: Map<Long, SourceExpenseHint> = if (
+            sourceExpenseHints.isNotEmpty() && sourceExpenseHints.size != result.expenses.size
+        ) {
+            // v3.9.2 partial hints：原文只有部分金额带「元/块」时，模型多提取的未标注项允许通过，
+            // 但已标注金额必须精确出现（防漏记/防重复），且只对唯一的已标注金额做日期强绑定。
+            if (sourceExpenseHints.size > result.expenses.size) {
+                throw MutationSafetyException("AI 返回笔数少于原文金额数，本次未记录。")
             }
-            if (result.expenses.map { it.amountCents } != sourceExpenseHints.map { it.amountCents }) {
-                throw MutationSafetyException("AI 返回金额或顺序与原文不一致，本次未记录。")
+            val hintCounts = sourceExpenseHints.groupingBy { it.amountCents }.eachCount()
+            val expenseCounts = result.expenses.groupingBy { it.amountCents }.eachCount()
+            if (hintCounts.any { (amount, count) -> (expenseCounts[amount] ?: 0) != count }) {
+                throw MutationSafetyException("AI 返回金额与原文金额不一致，本次未记录。")
             }
-            val ambiguousEqualAmounts = sourceExpenseHints.groupBy { it.amountCents }.values.any { sameAmount ->
-                sameAmount.size > 1 && sameAmount.map { it.date to it.time }.distinct().size > 1
+            sourceExpenseHints.groupBy { it.amountCents }
+                .mapNotNull { (amount, hints) -> hints.singleOrNull()?.let { amount to it } }
+                .toMap()
+        } else {
+            if (sourceExpenseHints.isNotEmpty()) {
+                if (result.expenses.map { it.amountCents } != sourceExpenseHints.map { it.amountCents }) {
+                    throw MutationSafetyException("AI 返回金额或顺序与原文不一致，本次未记录。")
+                }
+                val ambiguousEqualAmounts = sourceExpenseHints.groupBy { it.amountCents }.values.any { sameAmount ->
+                    sameAmount.size > 1 && sameAmount.map { it.date to it.time }.distinct().size > 1
+                }
+                if (ambiguousEqualAmounts) {
+                    throw MutationSafetyException("原文包含跨日期或时间的相同金额，无法安全绑定账目，请拆分后重试。")
+                }
             }
-            if (ambiguousEqualAmounts) {
-                throw MutationSafetyException("原文包含跨日期或时间的相同金额，无法安全绑定账目，请拆分后重试。")
-            }
+            emptyMap()
         }
 
         val activeRecords = availableRecords.filter { it.deletedAt == null }
@@ -111,7 +127,11 @@ object LlmMutationPlanner {
 
         val normalizedExpenses = result.expenses.mapIndexed { index, item ->
             val originalMillis = item.occurredAtMillis ?: nowMillis
-            val sourceHint = sourceExpenseHints.getOrNull(index)
+            val sourceHint = if (sourceExpenseHints.size == result.expenses.size) {
+                sourceExpenseHints.getOrNull(index)
+            } else {
+                partialHintByAmount[item.amountCents]
+            }
             val perExpenseDate = sourceHint?.date ?: targetDate
             val occurredAtMillis = when {
                 sourceHint?.time != null -> sourceHint.date.atTime(sourceHint.time)

@@ -346,6 +346,78 @@ class LlmMutationPlannerTest {
         }
     }
 
+    @Test fun partialSourceHintsAllowExtraModelExpensesAndBindUniqueMarkedAmount() {
+        val plan = LlmMutationPlanner.create(
+            result = LlmParseResult(
+                reply = "候选3笔",
+                expenses = listOf(
+                    ParsedExpense(1_800L, "drink", "咖啡", millis(2026, 9, 5, 12, 0)),
+                    ParsedExpense(1_600L, "drink", "奶茶", millis(2026, 9, 6, 12, 0)),
+                    ParsedExpense(300L, "drink", "水", millis(2026, 9, 6, 12, 0)),
+                ),
+            ),
+            nowMillis = now,
+            availableRecords = emptyList(),
+            lastBatchIds = emptyList(),
+            currentText = "昨天买咖啡18，今天买奶茶16，前天买水3块",
+            targetDate = null,
+            sourceExpenseHints = listOf(SourceExpenseHint(300L, LocalDate.of(2026, 9, 4))),
+            zone = zone,
+        )
+
+        assertThat(plan.preview.count).isEqualTo(3)
+        assertThat(localDateTime(plan.result.expenses[0].occurredAtMillis!!).toLocalDate())
+            .isEqualTo(LocalDate.of(2026, 9, 5))
+        assertThat(localDateTime(plan.result.expenses[1].occurredAtMillis!!).toLocalDate())
+            .isEqualTo(LocalDate.of(2026, 9, 6))
+        // 唯一被端侧标注的金额仍按原文日期强绑定
+        assertThat(localDateTime(plan.result.expenses[2].occurredAtMillis!!).toLocalDate())
+            .isEqualTo(LocalDate.of(2026, 9, 4))
+    }
+
+    @Test fun partialSourceHintsRejectMissingMarkedAmount() {
+        assertThrows(MutationSafetyException::class.java) {
+            LlmMutationPlanner.create(
+                result = LlmParseResult(
+                    reply = "候选2笔",
+                    expenses = listOf(
+                        ParsedExpense(1_800L, "drink", "咖啡", null),
+                        ParsedExpense(1_600L, "drink", "奶茶", null),
+                    ),
+                ),
+                nowMillis = now,
+                availableRecords = emptyList(),
+                lastBatchIds = emptyList(),
+                currentText = "昨天买咖啡18，今天买奶茶16，前天买水3块",
+                targetDate = null,
+                sourceExpenseHints = listOf(SourceExpenseHint(300L, LocalDate.of(2026, 9, 4))),
+                zone = zone,
+            )
+        }
+    }
+
+    @Test fun partialSourceHintsRejectDuplicatedMarkedAmount() {
+        assertThrows(MutationSafetyException::class.java) {
+            LlmMutationPlanner.create(
+                result = LlmParseResult(
+                    reply = "候选3笔",
+                    expenses = listOf(
+                        ParsedExpense(1_800L, "drink", "咖啡", null),
+                        ParsedExpense(300L, "drink", "水", null),
+                        ParsedExpense(300L, "drink", "水", null),
+                    ),
+                ),
+                nowMillis = now,
+                availableRecords = emptyList(),
+                lastBatchIds = emptyList(),
+                currentText = "昨天买咖啡18，前天买水3块",
+                targetDate = null,
+                sourceExpenseHints = listOf(SourceExpenseHint(300L, LocalDate.of(2026, 9, 4))),
+                zone = zone,
+            )
+        }
+    }
+
     private fun updates(vararg ids: Long) = LlmParseResult(
         reply = "候选修改",
         expenses = emptyList(),

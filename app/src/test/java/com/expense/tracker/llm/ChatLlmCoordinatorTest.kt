@@ -291,6 +291,32 @@ class ChatLlmCoordinatorTest {
         assertThat(applyCalls).isEqualTo(0)
     }
 
+    @Test fun chatTurnDropsModelMutationsAtCodeLevel() = runBlocking {
+        var applyCalls = 0
+        val coordinator = ChatLlmCoordinator(
+            expenseRepository = ExpenseRepository(CoordinatorExpenseDao()),
+            chatRepository = ChatRepository(CoordinatorChatDao()),
+            requestJson = { _, _, _, _, _ ->
+                """{"reply":"已记录35元","expenses":[
+                    {"amount":35,"category":"food","note":"午饭","occurred_at":null}
+                ],"actions":[]}""".trimIndent()
+            },
+            applyPlan = {
+                applyCalls++
+                MutationApplyResult(listOf(1L), listOf(1L), assistantMessageId = 1L)
+            },
+            nowProvider = { 1_786_000_000_000L },
+        )
+
+        // CHAT write firewall：闲聊轮即使模型幻觉输出账目，也不落库、也不展示"已记录"。
+        val result = coordinator.submit("你好呀", prefs(), ChatTurnContext(allowMutations = false))
+
+        val ok = result as LlmResult.Ok
+        assertThat(ok.expenseIds).isEmpty()
+        assertThat(ok.replyText).contains("未修改")
+        assertThat(applyCalls).isEqualTo(0)
+    }
+
     private fun prefs() = UserPrefsSnapshot(
         llmEnabled = true,
         baseUrl = "https://example.com/v1",

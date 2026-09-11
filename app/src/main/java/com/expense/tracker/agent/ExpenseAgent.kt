@@ -42,7 +42,7 @@ class ExpenseAgent(
                 AgentRouter.needsEscalation(text) -> submitEscalated(text, prefs)
             else -> {
                 onRouteResolved(AgentRoute.CHAT)
-                coordinator.submit(text, prefs)
+                coordinator.submit(text, prefs, CHAT_TURN_CONTEXT)
             }
         }
     }
@@ -67,7 +67,7 @@ class ExpenseAgent(
             }
             else -> {
                 onRouteResolved(AgentRoute.CHAT)
-                coordinator.submit(text, prefs)
+                coordinator.submit(text, prefs, CHAT_TURN_CONTEXT)
             }
         }
     }
@@ -100,7 +100,10 @@ class ExpenseAgent(
     }
 
     private companion object {
-        /** 记账/删改轮：要求结构化 JSON，Qwen 下显式关闭思考。 */
+        /** 记账/删改轮：要求结构化 JSON，Qwen 下显式关闭思考；唯一允许写库的路径。 */
         val MUTATION_TURN_CONTEXT = ChatTurnContext(structuredRequest = true)
+
+        /** 闲聊轮：v3.9.2 CHAT write firewall，代码层拒绝任何写操作。 */
+        val CHAT_TURN_CONTEXT = ChatTurnContext(allowMutations = false)
     }
 }

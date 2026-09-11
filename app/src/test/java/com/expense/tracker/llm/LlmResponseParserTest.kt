@@ -39,6 +39,17 @@ class LlmResponseParserTest {
         assertThat(result.expenses[0].occurredAtMillis).isEqualTo(expected)
     }
 
+    @Test fun parseDateOnlyOccurredAt() {
+        // v3.9.2：模型偶尔只回日期，必须落到当天而不是拒绝整批。
+        val raw = """{"reply":"ok","expenses":[{"amount":10,"category":"food","note":"","occurred_at":"2026-09-05"}]}"""
+
+        val result = LlmResponseParser.parse(raw)
+
+        val date = Instant.ofEpochMilli(result.expenses.single().occurredAtMillis!!)
+            .atZone(ZoneId.systemDefault()).toLocalDate()
+        assertThat(date).isEqualTo(java.time.LocalDate.of(2026, 9, 5))
+    }
+
     @Test fun parseUtcOccurredAt() {
         val raw = """{"reply":"ok","expenses":[{"amount":10,"category":"food","note":"","occurred_at":"2025-06-12T12:00:00Z"}]}"""
 

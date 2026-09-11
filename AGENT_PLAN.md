@@ -24,7 +24,11 @@
 - 首轮真实评测已完成（qwen3.7-flash，2026-09-11，3 轮）：
   - 报告 `docs/expensebench-v2-llm-report-qwen3.7-flash.md`；归因 `docs/expensebench-v2-triage-2026-09-11.md`
   - **FMR 1.9% / 5.6% / 5.6%（目标 0%，未达标）**；E2E ~73%；Query Recall 68.8%；Date Binding ~87%
-- 下一步（等 owner 定 v3.9.2 范围；候选见归因记录）：假变更治理（P0）→ 纯日期 `occurred_at` 容错 → hints 误杀 → 上下文触发词 → 查询回承；每条修完重跑 3 轮对比
+- **v3.9.2 本地加固已完成**（2026-09-11，纯本地验收）：
+  - CHAT write firewall（非 MUTATION 路径代码层禁写）、Router 收敛（裸金额→MUTATION / 非支出护栏→CHAT / 查询追问）、纯日期 `occurred_at` 容错、partial hints
+  - 离线基线：前置路由 58/80 → **74/80**；Query 前置召回 9/16 → **14/16**；工具 14/14；JVM **288/288**
+- **LLM Bench 暂停**：不再自动三轮全量；待免费额度/替代模型/明确指令先跑 smoke
+- 后续候选：上下文触发词（记错了/不对/说错了）、「今天也是35」续记路由、分类灰区 gold 复核；Memory Governance 继续后压
 
 ## Memory Governance（下一阶段，未开工）
 
@@ -34,4 +38,5 @@ v2 的 negative_false_positive 桶保证它不会被识别成 ¥8000 支出。
 ## 历史里程碑（简）
 
 v3.6 AI 安全（日期/确认/解析提速）→ v3.7 预算/提醒/周期账单/桌面组件 → v3.8 Agent v1 + ExpenseBench v1 →
-v3.9 Intent Escalation + analyze_expenses → v3.9.1 Reliability Hardening（thinking 门控 / QUERY 只读 / analyze 修复 / Escalation 参数 / 文案对齐）
+v3.9 Intent Escalation + analyze_expenses → v3.9.1 Reliability Hardening（thinking 门控 / QUERY 只读 / analyze 修复 / Escalation 参数 / 文案对齐）→
+v3.9.2 本地安全加固（CHAT write firewall / Router 收敛 / 纯日期容错 / partial hints）

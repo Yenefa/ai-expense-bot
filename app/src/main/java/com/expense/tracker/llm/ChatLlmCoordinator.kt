@@ -104,13 +104,18 @@ class ChatLlmCoordinator(
         val parsed = LlmResponseParser.parse(raw)
         PrivacySafeLog.llmResponseParsed(parsed.expenses.size, parsed.actions.size)
 
-        // 查询轮只读：即使模型被提示词注入诱导返回 expenses/actions，也在进入变更计划器之前丢弃。
+        // 非 MUTATION 路径只读（查询轮 + v3.9.2 CHAT write firewall）：
+        // 即使模型被诱导/幻觉返回 expenses/actions，也在进入变更计划器之前丢弃。
         if (!turnContext.allowMutations) {
             if (parsed.expenses.isNotEmpty() || parsed.actions.isNotEmpty()) {
                 PrivacySafeLog.llmMutationsBlocked(parsed.expenses.size, parsed.actions.size)
             }
             return@runCatching LlmResult.Ok(
-                replyText = parsed.reply,
+                replyText = if (turnContext.suppressMutationGuard) {
+                    parsed.reply
+                } else {
+                    parsed.reply.withoutFalseMutationClaim()
+                },
                 expenseIds = emptyList(),
             )
         }

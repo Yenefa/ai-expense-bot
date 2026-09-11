@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -198,5 +199,9 @@ object LlmResponseParser {
             ?: runCatching {
                 LocalDateTime.parse(iso)
                     .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }.getOrNull()
+            ?: runCatching {
+                // v3.9.2：模型可能只回日期（"2026-09-05"），按本地 00:00 落到当天，而不是整批拒绝。
+                LocalDate.parse(iso).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
             }.getOrNull()
 }

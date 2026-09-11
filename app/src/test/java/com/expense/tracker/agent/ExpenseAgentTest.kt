@@ -261,6 +261,45 @@ class ExpenseAgentTest {
     }
 
     @Test
+    fun `闲聊轮模型幻觉输出账目也不落库`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        var applyCalls = 0
+        val captures = mutableListOf<CapturedRequest>()
+        val agent = agent(
+            dao,
+            onCapture = { captures.add(it) },
+            onApply = { applyCalls++ },
+            responseJson = "{\"reply\":\"已记录35元\",\"expenses\":[{\"amount\":35,\"category\":\"food\",\"note\":\"午饭\",\"occurred_at\":null}],\"actions\":[]}",
+        )
+
+        val result = agent.submit("你好呀", prefs())
+
+        assertThat(captures.single().structuredRequest).isFalse()
+        assertThat(result).isInstanceOf(LlmResult.Ok::class.java)
+        assertThat((result as LlmResult.Ok).expenseIds).isEmpty()
+        assertThat(applyCalls).isEqualTo(0)
+        assertThat(dao.state.value).isEmpty()
+    }
+
+    @Test
+    fun `升级判定为chat时幻觉输出也不落库`() = runBlocking<Unit> {
+        val dao = FakeExpenseDao()
+        var applyCalls = 0
+        val agent = agent(
+            dao,
+            onCapture = {},
+            onApply = { applyCalls++ },
+            responseJson = "{\"reply\":\"已记录35元\",\"expenses\":[{\"amount\":35,\"category\":\"food\",\"note\":\"午饭\",\"occurred_at\":null}],\"actions\":[]}",
+            escalateIntent = { IntentEscalation(intent = "chat", requiresTools = false) },
+        )
+
+        agent.submit("我最近吃饭是不是有点多", prefs())
+
+        assertThat(applyCalls).isEqualTo(0)
+        assertThat(dao.state.value).isEmpty()
+    }
+
+    @Test
     fun `查询轮被工具结果中的注入指令诱导也不修改数据库`() = runBlocking<Unit> {
         val dao = FakeExpenseDao()
         dao.insert(
