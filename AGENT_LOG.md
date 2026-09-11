@@ -280,3 +280,24 @@
 
 ## 验收（本地）
 - JVM **356，0 failed**（354 + M2/M3 回归 2）；`lintDebug` / `assembleDebug` 通过
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.13.0 下载站重建与部署（opencode，owner 指令）
+
+## 背景
+- 旧下载站源码不在本仓库/本机（线上 `/ye-cost` 停留在 v3.7.2 / 2026-08-13）
+- owner 指令：重建单页下载站，沿用品牌样式，部署到同一 CloudBase
+
+## 交付
+- `website/`（纯静态单页，无构建链、无外链依赖）：沿用品牌图标与深紫 `#2B1A3B`、白底；
+  更新 v3.13.0 发布说明、APK 规格与 SHA-256 复制、隐私边界；`website/downloads/*.apk` 不入库
+- 部署：CloudBase env `ilove-d5g0gzrpp375112b9` → 路径 `/ye-cost/`
+- APK：`Y.E-cost-v3.13.0-2026-09-11.apk`（55,353,801 bytes，SHA-256 `ecf7c1d0…`，与本地签名包一致）
+
+## 线上验证
+- `https://ilove-d5g0gzrpp375112b9-1413557923.tcloudbaseapp.com/ye-cost/`：index / icon / apk 均 200；APK Content-Length 与哈希一致
+- 旧版 APK 保留在 `/ye-cost/downloads/`（不破坏旧链接）；误传到 `A:/Git/Git/ye-cost` 的副本已删除
+
+## 坑
+- Git Bash（MSYS）会把 `/ye-cost` 转成 `A:/Git/Git/ye-cost`；`tcb hosting deploy/delete/list` 必须加 `MSYS_NO_PATHCONV=1`（已写入本记录）

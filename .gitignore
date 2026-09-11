@@ -7,3 +7,5 @@ app/build/
 .idea/
 *.iml
 gradle-*.log
+# 下载站：APK 二进制不入库，部署时从构建产物复制
+website/downloads/*.apk

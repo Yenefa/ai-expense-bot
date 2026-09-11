@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Y.E cost · 对话式 AI 记账</title>
+<meta name="description" content="Y.E cost 是一款支持 AI 对话记账、中文 OCR 账单识别、支出统计、预算与主动提醒的 Android App。数据保存在手机本地。" />
+<meta name="application-name" content="Y.E cost" />
+<meta name="keywords" content="Y.E cost,Android 记账,AI 记账,OCR 账单,支出统计,预算,提醒" />
+<meta name="theme-color" content="#ffffff" />
+<meta name="color-scheme" content="light" />
+<meta property="og:title" content="Y.E cost · 把每一笔开销，聊明白" />
+<meta property="og:description" content="AI 对话记账、OCR 账单识别、周月年支出统计、预算与主动提醒，支持 Android 8.0+。" />
+<meta property="og:site_name" content="Y.E cost" />
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="zh_CN" />
+<link rel="shortcut icon" href="./assets/ye-cost-icon.png" />
+<link rel="icon" href="./assets/ye-cost-icon.png" />
+<link rel="apple-touch-icon" href="./assets/ye-cost-icon.png" />
+<style>
+  :root {
+    --ink: #211D24;
+    --muted: #77717A;
+    --faint: #A9A3AE;
+    --line: #ECEAF0;
+    --bg: #FFFFFF;
+    --soft: #F7F5FA;
+    --purple: #2B1A3B;
+    --purple-2: #6C4E8E;
+    --purple-soft: #F1ECF7;
+    --accent: #0A84FF;
+    --green: #34C759;
+    --radius: 20px;
+    --shadow: 0 18px 50px rgba(43, 26, 59, 0.08);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  .shell { width: min(1080px, calc(100% - 40px)); margin: 0 auto; }
+
+  /* Header */
+  header.site {
+    position: sticky; top: 0; z-index: 20;
+    backdrop-filter: saturate(180%) blur(14px);
+    background: rgba(255, 255, 255, 0.86);
+    border-bottom: 1px solid var(--line);
+  }
+  .header-inner { display: flex; align-items: center; gap: 22px; height: 68px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+  .brand img { width: 38px; height: 38px; border-radius: 10px; box-shadow: 0 6px 16px rgba(43,26,59,.18); }
+  .brand strong { display: block; font-size: 16px; letter-spacing: .2px; }
+  .brand small { display: block; font-size: 11.5px; color: var(--muted); }
+  nav.top { display: flex; gap: 22px; font-size: 14px; color: var(--muted); }
+  nav.top a:hover { color: var(--ink); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border-radius: 999px; padding: 11px 20px; font-size: 14px; font-weight: 600;
+    border: 1px solid transparent; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn-primary { background: var(--purple); color: #fff; box-shadow: 0 10px 24px rgba(43,26,59,.24); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(43,26,59,.3); }
+  .btn-ghost { background: #fff; border-color: var(--line); color: var(--ink); }
+  .btn-ghost:hover { border-color: #D8D2E0; }
+  .btn-lg { padding: 15px 28px; font-size: 15px; }
+  @media (max-width: 760px) { nav.top { display: none; } .header-download { display: none; } }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; padding: 72px 0 64px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: 2px; color: var(--muted); font-weight: 600; }
+  .dots { display: inline-flex; gap: 5px; }
+  .dots i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dots .d1 { background: #5E9CFF; } .dots .d2 { background: #FF6B6B; } .dots .d3 { background: #FFC64B; } .dots .d4 { background: #4CD97B; }
+  h1 { font-size: clamp(34px, 4.6vw, 54px); line-height: 1.14; letter-spacing: -1px; margin: 18px 0 14px; }
+  h1 span { color: var(--purple-2); }
+  .lede { font-size: 16.5px; color: var(--muted); max-width: 520px; margin: 0 0 28px; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 26px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 26px; color: var(--muted); font-size: 13.5px; }
+  .facts b { display: block; font-size: 17px; color: var(--ink); }
+
+  /* Product preview (CSS mock) */
+  .preview { background: var(--soft); border: 1px solid var(--line); border-radius: 28px; padding: 18px; box-shadow: var(--shadow); }
+  .preview-top { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 14px; }
+  .preview-top .who { display: flex; align-items: center; gap: 10px; }
+  .mini-mark { width: 30px; height: 30px; border-radius: 9px; background: var(--purple); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  .preview-top strong { display: block; font-size: 14px; }
+  .preview-top small { display: block; font-size: 11.5px; color: var(--muted); }
+  .pill { font-size: 11.5px; color: var(--green); background: rgba(52,199,89,.1); border-radius: 999px; padding: 5px 10px; display: inline-flex; align-items: center; gap: 6px; }
+  .pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-bottom: 12px; }
+  .total-row { display: flex; align-items: baseline; justify-content: space-between; }
+  .total-row .amt { font-size: 30px; font-weight: 700; letter-spacing: -.5px; }
+  .total-row .delta { color: var(--green); font-size: 13px; font-weight: 600; }
+  .bars { display: flex; align-items: flex-end; gap: 8px; height: 74px; margin-top: 16px; }
+  .bars i { flex: 1; background: var(--purple-soft); border-radius: 7px; position: relative; }
+  .bars i::after { content: ""; position: absolute; inset: auto 0 0 0; height: var(--h); background: var(--purple-2); border-radius: 7px; opacity: .75; }
+  .labels { display: flex; gap: 8px; margin-top: 7px; }
+  .labels span { flex: 1; text-align: center; font-size: 10.5px; color: var(--faint); }
+  .chat-line { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; }
+  .chat-line .av { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 12px; }
+  .chat-line.user .av { background: #EAF2FF; }
+  .chat-line.ai .av { background: var(--purple-soft); }
+  .chat-line .bubble { background: var(--soft); border-radius: 12px; padding: 9px 12px; }
+  .chat-line + .chat-line { margin-top: 10px; }
+  .cat { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 10px; font-size: 13px; margin-top: 12px; }
+  .cat .ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--purple-soft); font-size: 15px; }
+  .cat .track { height: 7px; background: var(--soft); border-radius: 999px; overflow: hidden; }
+  .cat .track i { display: block; height: 100%; border-radius: 999px; background: var(--purple-2); opacity: .7; }
+  .cat .num { color: var(--muted); font-variant-numeric: tabular-nums; }
+  @media (max-width: 940px) { .hero { grid-template-columns: 1fr; padding-top: 52px; gap: 40px; } }
+
+  /* Sections */
+  section.block { padding: 64px 0; border-top: 1px solid var(--line); }
+  .kicker { font-size: 12px; letter-spacing: 2px; color: var(--purple-2); font-weight: 700; margin-bottom: 10px; }
+  h2 { font-size: clamp(24px, 3vw, 34px); letter-spacing: -.6px; margin: 0 0 10px; }
+  .sub { color: var(--muted); max-width: 640px; margin: 0 0 34px; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 940px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
+  .feature { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; transition: transform .18s ease, box-shadow .18s ease; }
+  .feature:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+  .feature .tag { display: inline-grid; place-items: center; min-width: 34px; height: 34px; padding: 0 9px; border-radius: 10px; background: var(--purple-soft); color: var(--purple-2); font-weight: 700; font-size: 13px; margin-bottom: 14px; }
+  .feature h3 { font-size: 16.5px; margin: 0 0 6px; }
+  .feature p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .feature .meta { display: block; margin-top: 12px; font-size: 11.5px; color: var(--faint); }
+
+  .privacy-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 940px) { .privacy-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .privacy-grid { grid-template-columns: 1fr; } }
+  .pcard { background: var(--soft); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+  .pcard .cap { font-size: 11px; letter-spacing: 1.6px; color: var(--faint); font-weight: 700; }
+  .pcard strong { display: block; margin: 8px 0 4px; font-size: 15px; }
+  .pcard span { font-size: 12.5px; color: var(--muted); }
+
+  /* Version / download */
+  .version-wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: start; }
+  @media (max-width: 940px) { .version-wrap { grid-template-columns: 1fr; } }
+  .latest { display: inline-flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); font-weight: 600; letter-spacing: 1.4px; }
+  .spec { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .spec-row { display: flex; justify-content: space-between; gap: 18px; padding: 13px 18px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .spec-row:last-child { border-bottom: 0; }
+  .spec-row span { color: var(--muted); }
+  .spec-row b { font-weight: 600; text-align: right; word-break: break-all; }
+  .sha { display: flex; gap: 10px; align-items: center; }
+  .sha code { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; color: var(--ink); }
+  .copy { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 7px 12px; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+  .copy:hover { border-color: #D8D2E0; }
+  .notes { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13.5px; }
+  .notes li + li { margin-top: 8px; }
+  .notice { margin-top: 18px; padding: 13px 16px; border-radius: 14px; background: var(--purple-soft); color: var(--purple); font-size: 12.5px; }
+
+  footer.site { border-top: 1px solid var(--line); padding: 34px 0 46px; color: var(--muted); font-size: 13px; }
+  .foot-row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between; }
+  .foot-links { display: flex; gap: 18px; }
+  .foot-links a:hover { color: var(--ink); }
+  .foot-small { margin-top: 14px; font-size: 11.5px; color: var(--faint); }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="shell header-inner">
+    <a class="brand" href="#top" aria-label="Y.E cost 首页">
+      <img src="./assets/ye-cost-icon.png" alt="Y.E cost 图标" width="38" height="38" />
+      <span><strong>Y.E cost</strong><small>AI expense companion</small></span>
+    </a>
+    <nav class="top" aria-label="页面导航">
+      <a href="#features">功能</a>
+      <a href="#privacy">隐私</a>
+      <a href="#version">版本</a>
+    </nav>
+    <a class="btn btn-primary header-download" href="./downloads/Y.E-cost-v3.13.0-2026-09-11.apk">↓ 下载 APK</a>
+  </div>
+</header>
+
+<main id="top">
+  <div class="shell hero">
+    <div>
+      <div class="eyebrow"><span class="dots"><i class="d1"></i><i class="d2"></i><i class="d3"></i><i class="d4"></i></span>Y.E COST · ANDROID 8.0+</div>
+      <h1>把每一笔开销，<span>聊明白</span></h1>
+      <p class="lede">用对话记账，用 OCR 读账单，再用周、月、年统计、预算与主动提醒看清每一笔支出。数据保存在你自己的手机里。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-lg" href="./downloads/Y.E-cost-v3.13.0-2026-09-11.apk">↓ 下载 Y.E cost v3.13.0</a>
+        <a class="btn btn-ghost btn-lg" href="#version">查看发布说明</a>
+      </div>
+      <div class="facts">
+        <span><b>3.13.0</b>最新版本</span>
+        <span><b>52.8 MB</b>APK 大小</span>
+        <span><b>0</b>广告 · 无追踪</span>
+      </div>
+    </div>
+
+    <div class="preview" aria-label="Y.E cost 界面预览">
+      <div class="preview-top">
+        <div class="who">
+          <span class="mini-mark">Y</span>
+          <span><strong>本周支出</strong><small>7月29日 — 8月4日</small></span>
+        </div>
+        <span class="pill"><i></i>已同步本地</span>
+      </div>
+      <div class="card">
+        <div class="total-row"><span class="amt">¥642.80</span><span class="delta">较上周 −8.4%</span></div>
+        <div class="bars">
+          <i style="--h:34%"></i><i style="--h:52%"></i><i style="--h:88%"></i><i style="--h:46%"></i><i style="--h:70%"></i><i style="--h:30%"></i><i style="--h:58%"></i>
+        </div>
+        <div class="labels"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+      </div>
+      <div class="card">
+        <div class="chat-line user"><span class="av">🧠</span><span class="bubble">买了一本书 68，电子元件 104.8</span></div>
+        <div class="chat-line ai"><span class="av">Y</span><span class="bubble">已记录 2 笔 · 学习与创作 合计 ¥172.80</span></div>
+        <div class="cat">
+          <span class="ico">🍜</span><span class="track"><i style="width:38%"></i></span><span class="num">38% · ¥244.30</span>
+        </div>
+        <div class="cat">
+          <span class="ico">📚</span><span class="track"><i style="width:27%"></i></span><span class="num">27% · ¥172.80</span>
+        </div>
+        <div class="cat">
+          <span class="ico">🚕</span><span class="track"><i style="width:18%"></i></span><span class="num">18% · ¥115.60</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="block" id="features">
+    <div class="shell">
+      <div class="kicker">FEATURES</div>
+      <h2>一个 App，一套清晰账目</h2>
+      <p class="sub">记账不只是输入数字。Y.E cost 把识别、分类、校对、统计、提醒和恢复连成一条完整流程。</p>
+      <div class="grid">
+        <div class="feature">
+          <span class="tag">AI</span>
+          <h3>对话式智能记账</h3>
+          <p>说出「午饭 35，咖啡 18」，自动拆分金额、时间和类别；连续追加不会重复记历史账目，「刚才那杯改到前天」也能改。</p>
+          <span class="meta">自然语言 · 多轮上下文 · 批量事务</span>
+        </div>
+        <div class="feature">
+          <span class="tag">OCR</span>
+          <h3>中文账单识别</h3>
+          <p>选择账单截图，本地 OCR 读取文字，AI 整理为可检查、可批量确认的账目；也支持微信 / 支付宝 CSV 导入。</p>
+          <span class="meta">截图识别 · 平台 CSV · GBK/UTF-8</span>
+        </div>
+        <div class="feature">
+          <span class="tag">统计</span>
+          <h3>周月年支出分析</h3>
+          <p>柱形图、消费次数折线和分类占比一屏对照；环比趋势、月底节奏预测与智核分析给出针对性洞察。</p>
+          <span class="meta">环比 · 趋势 · 月底预测</span>
+        </div>
+        <div class="feature">
+          <span class="tag">提醒</span>
+          <h3>预算与主动提醒</h3>
+          <p>预算 90% / 超支、本周异常消费、储蓄目标偏离三类提醒；规则在本地判定，聊天 + 系统通知 + 提醒中心三处送达，可逐类关闭。</p>
+          <span class="meta">规则决策 · 每日最多 1 条 · 锁屏隐藏金额</span>
+        </div>
+        <div class="feature">
+          <span class="tag">记忆</span>
+          <h3>长期记忆，你说了算</h3>
+          <p>月收入、储蓄目标、商户别名、常用分类只在确认后保存；删除即失效。存钱进度由本地计算，预计结余、缺口、剩余天数一目了然。</p>
+          <span class="meta">确认门 · 读写有边界 · 可管理</span>
+        </div>
+        <div class="feature">
+          <span class="tag">数据</span>
+          <h3>完整备份与恢复</h3>
+          <p>账目、回收站、聊天、长期记忆和非敏感设置可完整导出与恢复；永久删除前会再次确认。</p>
+          <span class="meta">JSON 备份 v3 · 本地导出</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="privacy">
+    <div class="shell">
+      <div class="kicker">PRIVACY</div>
+      <h2>数据边界，说清楚</h2>
+      <p class="sub">本地数据归你；AI 使用不玩文字游戏。</p>
+      <div class="privacy-grid">
+        <div class="pcard"><span class="cap">LEDGER</span><strong>手机本地</strong><span>账目与 OCR 结果存在本机 SQLite（Room），金额整数分精确存储。</span></div>
+        <div class="pcard"><span class="cap">CREDENTIALS</span><strong>Keystore 加密</strong><span>API Key 由 Android Keystore 保管，不写入备份文件。</span></div>
+        <div class="pcard"><span class="cap">AI REQUESTS</span><strong>仅在使用时</strong><span>使用 AI 功能时，必要文本才会发送到你配置或会员的大模型服务；不开启则完全离线。</span></div>
+        <div class="pcard"><span class="cap">REMINDERS</span><strong>提醒数据本地化</strong><span>主动提醒与长期记忆存放本机，并排除系统备份与设备迁移。</span></div>
+      </div>
+      <div class="notice">本网站不收集账目、API Key 或个人数据，无登录、无广告、无追踪。</div>
+    </div>
+  </section>
+
+  <section class="block" id="version">
+    <div class="shell version-wrap">
+      <div>
+        <div class="latest">LATEST · 2026.09.11 &nbsp;·&nbsp; v3.13.0</div>
+        <h2 style="margin-top:12px">下载最新版</h2>
+        <p class="sub">适用 Android 8.0 及以上。安装前建议用右侧 SHA-256 校验下载文件。</p>
+        <div class="hero-actions" style="margin-bottom:30px">
+          <a class="btn btn-primary btn-lg" href="./downloads/Y.E-cost-v3.13.0-2026-09-11.apk">↓ 下载 APK（52.8 MB）</a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/Yenefa/ai-expense-bot/blob/dev/CHANGELOG.md" target="_blank" rel="noreferrer">完整发布说明 ↗</a>
+        </div>
+        <h3 style="font-size:15px;margin:0 0 12px">这一版更新了什么</h3>
+        <ul class="notes">
+          <li><b>对话记账更稳</b>：连续追加（「还有一杯奶茶16」）不会把历史已记录的账再记一遍；「刚才那杯咖啡记到前天」稳定生效。</li>
+          <li><b>主动提醒真正送达</b>：预算临界 / 异常消费 / 储蓄偏离 → 聊天、系统通知与提醒中心；后台每日 20:00 检查，可逐类关闭。</li>
+          <li><b>储蓄进度</b>：确认月收入与储蓄目标后，「存钱进度」由本地确定性计算：预计结余、缺口与剩余天数。</li>
+          <li><b>隐私细节</b>：通知锁屏不显示金额；提醒与记忆数据排除系统备份与设备迁移。</li>
+          <li><b>质量</b>：356 项 JVM 单测 + 4 套本地评测基准全部通过。</li>
+        </ul>
+      </div>
+
+      <div class="spec" aria-label="APK 信息">
+        <div class="spec-row"><span>版本</span><b>v3.13.0（2026-09-11）</b></div>
+        <div class="spec-row"><span>包名</span><b>com.expense.tracker</b></div>
+        <div class="spec-row"><span>内部版本</span><b>versionCode 41</b></div>
+        <div class="spec-row"><span>最低系统</span><b>Android 8.0（minSdk 26）</b></div>
+        <div class="spec-row"><span>目标系统</span><b>targetSdk 34</b></div>
+        <div class="spec-row"><span>文件大小</span><b>55,353,801 bytes</b></div>
+        <div class="spec-row"><span>APK 签名</span><b>v2 / v3 verified · 测试证书（内测）</b></div>
+        <div class="spec-row"><span>文件名</span><b>Y.E-cost-v3.13.0-2026-09-11.apk</b></div>
+        <div class="spec-row" style="display:block">
+          <span style="display:block;margin-bottom:8px">SHA-256</span>
+          <div class="sha">
+            <code id="sha">ECF7C1D0A650AD5A688DE87AA18DF065D94B032CED02F2E25C6FA69F5679F7CA</code>
+            <button class="copy" id="copyBtn" type="button">复制</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="shell">
+    <div class="foot-row">
+      <strong style="color:var(--ink)">把每一笔开销，聊明白。</strong>
+      <div class="foot-links">
+        <a href="https://github.com/Yenefa/ai-expense-bot" target="_blank" rel="noreferrer">GitHub 项目</a>
+        <a href="https://github.com/Yenefa/ai-expense-bot/blob/dev/CHANGELOG.md" target="_blank" rel="noreferrer">版本说明</a>
+        <a href="#top">回到顶部 ↑</a>
+      </div>
+    </div>
+    <p class="foot-small">仅从本网站下载本次测试版，安装前可校验 SHA-256。APK 使用测试证书签名，用于内测分发；请勿用于应用商店转售。除非另有说明，本站内容仅供产品展示。</p>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var btn = document.getElementById('copyBtn');
+    var code = document.getElementById('sha');
+    if (!btn || !code) return;
+    btn.addEventListener('click', function () {
+      var text = code.textContent.trim();
+      function done() { btn.textContent = '已复制'; setTimeout(function () { btn.textContent = '复制'; }, 1500); }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, fallback);
+      } else { fallback(); }
+      function fallback() {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    });
+  })();
+</script>
+</body>
+</html>
