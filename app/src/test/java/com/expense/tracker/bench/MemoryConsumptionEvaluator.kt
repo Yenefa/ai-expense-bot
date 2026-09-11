@@ -128,8 +128,8 @@ object MemoryConsumptionEvaluator {
         val allowed = allowedTypes(case.expectRoute) + case.expectReads.mapNotNull(MemoryTypeWire::from)
 
         val unauthorized = if (effective.isEmpty()) {
-            // 无任何有效记忆时，prompt 里不该出现授权块
-            prompt.contains("已授权记忆")
+            // 无任何有效记忆时，prompt 里不该出现授权块（标记与生产者共用常量，防字面量漂移）
+            prompt.contains(com.expense.tracker.memory.MemoryReadPolicy.BLOCK_MARKER)
         } else {
             effective
                 .filter { MemoryTypeWire.from(it.type) !in allowed }

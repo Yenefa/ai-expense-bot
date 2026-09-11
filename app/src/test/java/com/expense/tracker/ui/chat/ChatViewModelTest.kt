@@ -45,6 +45,8 @@ class ChatViewModelTest {
         llmHandler: LlmHandler = { _, _ -> error("unused in template mode") },
         confirmationHandler: LlmConfirmationHandler = { error("unused confirmation") },
         cancellationHandler: LlmCancellationHandler = {},
+        proactiveInsightProvider: suspend () -> com.expense.tracker.proactive.ProactiveAlert? = { null },
+        proactiveNotifier: (com.expense.tracker.proactive.ProactiveAlert) -> Unit = {},
     ): Triple<ChatViewModel, FakeExpenseDao, FakeChatDao> {
         val ed = FakeExpenseDao()
         val cd = FakeChatDao()
@@ -57,6 +59,8 @@ class ChatViewModelTest {
             llmHandler = llmHandler,
             confirmationHandler = confirmationHandler,
             cancellationHandler = cancellationHandler,
+            proactiveInsightProvider = proactiveInsightProvider,
+            proactiveNotifier = proactiveNotifier,
         )
         return Triple(vm, ed, cd)
     }
@@ -77,6 +81,28 @@ class ChatViewModelTest {
         vm.submitTemplate(amountCents = 0L)
         vm.submitTemplate(amountCents = -1L)
         assertThat(ed.snapshot()).isEmpty()
+    }
+
+    @Test fun proactiveAlertAppendsChatMessageAndCallsNotifier() = runTest(dispatcher) {
+        val delivered = mutableListOf<com.expense.tracker.proactive.ProactiveAlert>()
+        val alert = com.expense.tracker.proactive.ProactiveAlert(
+            type = com.expense.tracker.proactive.ProactiveAlertType.BUDGET_THRESHOLD,
+            severity = com.expense.tracker.proactive.ProactiveSeverity.WARN,
+            facts = emptyMap(),
+            deterministicCopy = "预算快满了",
+        )
+        val (vm, _, cd) = makeVm(
+            proactiveInsightProvider = { alert },
+            proactiveNotifier = { delivered += it },
+        )
+
+        vm.selectCategory("food")
+        vm.submitTemplate(amountCents = 3_500L)
+        cd.flow.first { it.lastOrNull()?.content?.startsWith("🔔") == true }
+
+        // P2：聊天内 🔔 与系统通知投递使用同一次治理结果
+        assertThat(delivered).containsExactly(alert)
+        assertThat(cd.flow.value.last().content).isEqualTo("🔔 预算快满了")
     }
 
     @Test fun toggleLlmFlipsState() = runTest(dispatcher) {

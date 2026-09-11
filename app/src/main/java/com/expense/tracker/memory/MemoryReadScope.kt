@@ -17,6 +17,9 @@ enum class MemoryReadScope(val label: String) {
 
 object MemoryReadPolicy {
 
+    /** 授权块的固定前缀：生产者与评测器共用同一常量，避免字面量漂移（假阳/假阴）。 */
+    const val BLOCK_MARKER = "【已授权记忆"
+
     fun typesFor(scope: MemoryReadScope): Set<MemoryType> = when (scope) {
         MemoryReadScope.NONE -> emptySet()
         MemoryReadScope.CLASSIFICATION -> setOf(MemoryType.MERCHANT_ALIAS)
@@ -37,7 +40,7 @@ object MemoryReadPolicy {
         val scoped = filter(scope, facts)
         if (scoped.isEmpty()) return null
         return buildString {
-            appendLine("【已授权记忆 · ${scope.label}】")
+            appendLine("$BLOCK_MARKER · ${scope.label}】")
             scoped.forEach { appendLine("- ${it.promptLine()}") }
             appendLine("（以上是用户已确认的长期信息，仅限本轮授权范围使用，不要扩展用途）")
         }

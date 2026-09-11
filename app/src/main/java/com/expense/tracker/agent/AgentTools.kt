@@ -2,6 +2,8 @@ package com.expense.tracker.agent
 
 import com.expense.tracker.data.budget.BudgetCalculator
 import com.expense.tracker.data.budget.BudgetSnapshot
+import com.expense.tracker.data.finance.SavingsPace
+import com.expense.tracker.data.finance.SavingsPaceCalculator
 import com.expense.tracker.data.model.Category
 import com.expense.tracker.data.model.Money
 import com.expense.tracker.data.repo.ExpenseRepository
@@ -184,6 +186,35 @@ object AgentTools {
     }
 
     /**
+     * savings_pace(income, goal)：本月至今日的储蓄节奏（P3）。
+     * 输入只能来自已授权画像（FINANCIAL_ANALYSIS），计算与主动提醒储蓄规则共用同一实现；
+     * 样本不足（收入/目标缺失、时间非法）返回 null，由调用方决定是否注入。
+     */
+    suspend fun savingsPace(
+        context: AgentToolContext,
+        incomeCents: Long,
+        goalCents: Long,
+        nowMillis: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): SavingsPace? {
+        context.onToolCall(TOOL_SAVINGS_PACE)
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        val first = today.withDayOfMonth(1)
+        val spentCents = context.activeInRange(
+            first.atStartOfDay(zone).toInstant().toEpochMilli(),
+            first.plusMonths(1).atStartOfDay(zone).toInstant().toEpochMilli(),
+        ).filterNot { Category.byIdOrOther(it.categoryId).isInvestment }
+            .sumOf { it.amountCents }
+        return SavingsPaceCalculator.compute(
+            incomeCents = incomeCents,
+            goalCents = goalCents,
+            spentCents = spentCents,
+            elapsedDays = today.dayOfMonth,
+            daysInMonth = today.lengthOfMonth(),
+        )
+    }
+
+    /**
      * analyze_expenses(spec)：本期 vs 上期 + 分类趋势 + 月底 pace 预测。
      * 预测门槛：本期覆盖"现在"且已过 7 天（样本不足时宁可不预测，见 InsightPolicy 同款约束）。
      */
@@ -263,5 +294,6 @@ object AgentTools {
     const val TOOL_QUERY_EXPENSES = "query_expenses"
     const val TOOL_ANALYZE_EXPENSES = "analyze_expenses"
     const val TOOL_BUDGET_STATUS = "get_budget_status"
+    const val TOOL_SAVINGS_PACE = "savings_pace"
     private const val DAY_MS = 86_400_000L
 }

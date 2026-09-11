@@ -100,6 +100,13 @@ class LocalProactiveInsightBenchTest {
             if (alert != null && alert.copy.isBlank()) {
                 problems += "${case.id}: 提醒文案为空"
             }
+            // P2：放行的提醒必须落入提醒中心历史（且与最终文案一致）；未放行不得有历史
+            val history = store.history()
+            when {
+                alert == null && history.isNotEmpty() -> problems += "${case.id}: 未触发却写入提醒历史"
+                alert != null && history.size != 1 -> problems += "${case.id}: 触发但历史条数为 ${history.size}"
+                alert != null && history.single().copy != alert.copy -> problems += "${case.id}: 历史文案与最终文案不一致"
+            }
         }
 
         val report = ProactiveInsightEvaluator.Report(cases, observations)

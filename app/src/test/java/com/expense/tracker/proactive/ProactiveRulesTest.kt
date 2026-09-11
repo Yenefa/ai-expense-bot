@@ -79,6 +79,29 @@ class ProactiveRulesTest {
     }
 
     @Test
+    fun `储蓄规则复用共享节奏计算并输出缺口事实`() {
+        val alert = ProactiveRules.evaluate(
+            inputs(limit = 0L, spent = 650_000L, income = 800_000L, savings = 200_000L),
+        )!!
+        assertThat(alert.facts["projected_spend_cents"]).isEqualTo(1_300_000L)
+        assertThat(alert.facts["projected_leftover_cents"]).isEqualTo(-500_000L)
+        assertThat(alert.facts["goal_gap_cents"]).isEqualTo(-700_000L)
+        assertThat(alert.facts["remaining_days"]).isEqualTo(15L)
+        assertThat(alert.facts["required_daily_cents"]).isEqualTo(20_000L)
+    }
+
+    @Test
+    fun `储蓄未达标文案包含缺口与剩余天数`() {
+        val alert = ProactiveRules.evaluate(
+            inputs(limit = 0L, spent = 300_000L, income = 800_000L, savings = 500_000L),
+        )!!
+        assertThat(alert.severity).isEqualTo(ProactiveSeverity.WARN)
+        assertThat(alert.deterministicCopy).contains("还差 ¥3000.00")
+        assertThat(alert.deterministicCopy).contains("剩余 15 天")
+        assertThat(alert.deterministicCopy).contains("日均支出需控制在 ¥100.00 内")
+    }
+
+    @Test
     fun `同时触发时按优先级只出一条`() {
         val alert = ProactiveRules.evaluate(
             inputs(spent = 210_000L, currentWeek = 500_000L, weeks = listOf(10_000L, 10_000L, 10_000L, 10_000L), income = 800_000L, savings = 200_000L),

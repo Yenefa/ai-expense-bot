@@ -57,6 +57,7 @@ fun SettingsMenuScreen(
     onOpenRecurring: () -> Unit = {},
     onOpenMemory: () -> Unit = {},
     onOpenProactive: () -> Unit = {},
+    onOpenReminderCenter: () -> Unit = {},
     prefs: UserPrefs,
 ) {
     val snackbarHost = remember { SnackbarHostState() }
@@ -100,6 +101,7 @@ fun SettingsMenuScreen(
             MenuRow(emoji = "📊", title = "预算管理", subtitle = "月度/分类预算 · 90% 预警与超支提醒", onClick = onOpenBudget)
             MenuRow(emoji = "🔔", title = "智能提醒", subtitle = "每日补记提醒 · 通知栏提醒", onClick = onOpenReminder)
             MenuRow(emoji = "🔮", title = "主动提醒", subtitle = "预算临界 / 异常消费 / 储蓄偏离（可逐类关闭）", onClick = onOpenProactive)
+            MenuRow(emoji = "📣", title = "提醒中心", subtitle = "查看规则已放行的提醒记录（含后台通知投递）", onClick = onOpenReminderCenter)
             MenuRow(emoji = "🔁", title = "周期账单", subtitle = "房租 / 订阅 / 工资自动生成", onClick = onOpenRecurring)
             MenuRow(
                 emoji = "📁",

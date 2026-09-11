@@ -24,13 +24,9 @@ import com.expense.tracker.llm.LlmThinkingPolicy
 import com.expense.tracker.llm.ChatLlmCoordinator
 import com.expense.tracker.llm.AnalyticsInsightsParser
 import com.expense.tracker.llm.BillImportResult
-import com.expense.tracker.data.model.Category
 import com.expense.tracker.llm.importFromBillText
 import com.expense.tracker.llm.AiAccessResolver
 import com.expense.tracker.memory.MemoryGovernor
-import com.expense.tracker.memory.MemoryReadPolicy
-import com.expense.tracker.memory.MemoryReadScope
-import com.expense.tracker.memory.MemoryType
 import com.expense.tracker.memory.UserProfilePrefs
 import com.expense.tracker.ocr.MlKitOcrRecognizer
 import com.expense.tracker.ocr.OcrRecognizer
@@ -167,55 +163,29 @@ class AppContainer(context: Context) {
     }
     val llmMemoryCancellationHandler: (String) -> Unit = { memoryGovernor.cancel(it) }
 
-    /**
-     * 主动洞察：确定性规则决定是否提醒（预算/异常/储蓄），每日最多 1 条；
-     * LLM 仅可能改写文案，失败自动回退确定性文案。
-     */
-    val proactiveInsightProvider: suspend () -> com.expense.tracker.proactive.ProactiveAlert? = {
-        runCatching {
-            val now = System.currentTimeMillis()
-            val zone = java.time.ZoneId.systemDefault()
-            val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-            val monthStart = today.withDayOfMonth(1)
-            val monthRecords = activeConsumption(
-                monthStart.atStartOfDay(zone).toInstant().toEpochMilli(),
-                Long.MAX_VALUE,
-            )
-            val weekStart = today.with(
-                java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY),
-            )
-            val currentWeekSpent = activeConsumption(
-                weekStart.atStartOfDay(zone).toInstant().toEpochMilli(),
-                today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli(),
-            ).sumOf { it.amountCents }
-            val completedWeeks = (4 downTo 1).map { back ->
-                val start = weekStart.minusWeeks(back.toLong())
-                activeConsumption(
-                    start.atStartOfDay(zone).toInstant().toEpochMilli(),
-                    start.plusWeeks(1).atStartOfDay(zone).toInstant().toEpochMilli(),
-                ).sumOf { it.amountCents }
-            }
-            val facts = MemoryReadPolicy.filter(MemoryReadScope.FINANCIAL_ANALYSIS, memoryGovernor.snapshot())
-            val inputs = com.expense.tracker.proactive.ProactiveInputs(
-                nowMillis = now,
-                zone = zone,
-                monthlyLimitCents = budgetPrefs.snapshot.first().monthlyLimitCents,
-                monthSpentCents = monthRecords.sumOf { it.amountCents },
-                monthRecordCount = monthRecords.size,
-                elapsedMonthDays = today.dayOfMonth,
-                daysInMonth = today.lengthOfMonth(),
-                currentWeekSpentCents = currentWeekSpent,
-                completedWeekSpendsCents = completedWeeks,
-                monthlyIncomeCents = facts.firstOrNull { it.type == MemoryType.MONTHLY_INCOME }?.amountCents,
-                savingsGoalCents = facts.firstOrNull { it.type == MemoryType.SAVINGS_GOAL }?.amountCents,
-            )
-            proactiveGovernor.evaluate(inputs)
-        }.getOrNull()
+    /** 主动提醒输入构建（账目 + 预算 + 已授权财务记忆），前台/后台共用。 */
+    private val proactiveEngine: com.expense.tracker.proactive.ProactiveEngine by lazy {
+        com.expense.tracker.proactive.ProactiveEngine(
+            expenseRepository = expenseRepo,
+            budgetSnapshot = { budgetPrefs.snapshot.first() },
+            memoryFacts = { memoryGovernor.snapshot() },
+            governor = proactiveGovernor,
+        )
     }
 
-    private suspend fun activeConsumption(fromMillis: Long, toMillis: Long) =
-        expenseRepo.observeInRange(fromMillis, toMillis).first()
-            .filter { it.deletedAt == null && !Category.byIdOrOther(it.categoryId).isInvestment }
+    /**
+     * 主动洞察：确定性规则决定是否提醒（预算/异常/储蓄），每日最多 1 条；
+     * LLM 仅可能改写文案，失败自动回退确定性文案。放行即写入提醒中心历史。
+     */
+    val proactiveInsightProvider: suspend () -> com.expense.tracker.proactive.ProactiveAlert? = {
+        runCatching { proactiveEngine.evaluate() }.getOrNull()
+    }
+
+    /** 系统通知投递（聊天内 🔔 之外的真正 proactive 渠道）；权限缺失时静默跳过。 */
+    val proactiveAlertNotifier: (com.expense.tracker.proactive.ProactiveAlert) -> Unit = { alert ->
+        runCatching { com.expense.tracker.proactive.ProactiveNotifier.notify(appCtx, alert) }
+        Unit
+    }
 
     /** 记账后的预算预警文案（达到 90% 或超支时非空）。 */
     val budgetWarningProvider: suspend () -> String? = suspend {

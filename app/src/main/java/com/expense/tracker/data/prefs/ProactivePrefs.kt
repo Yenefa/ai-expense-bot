@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.expense.tracker.proactive.ProactiveAlertRecord
 import com.expense.tracker.proactive.ProactiveAlertType
+import com.expense.tracker.proactive.ProactiveSeverity
 import com.expense.tracker.proactive.ProactiveState
 import com.expense.tracker.proactive.ProactiveStateStore
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +29,19 @@ private data class ProactiveStateJson(
     @SerialName("last_severity") val lastSeverity: Map<String, String> = emptyMap(),
     @SerialName("day_key") val dayKey: String? = null,
     @SerialName("count_today") val countToday: Int = 0,
+)
+
+@Serializable
+private data class ProactiveHistoryJson(
+    val entries: List<ProactiveHistoryJsonEntry> = emptyList(),
+)
+
+@Serializable
+private data class ProactiveHistoryJsonEntry(
+    val type: String,
+    val severity: String,
+    val copy: String,
+    @SerialName("created_at") val createdAt: Long,
 )
 
 /** 主动提醒的开关与运行状态（独立 DataStore，排除系统备份与迁移）。 */
@@ -61,7 +76,18 @@ class ProactivePrefs(
             }
     }
 
-    override suspend fun record(typeWire: String, severityWire: String, nowMillis: Long, dayKey: String) {
+    /** 提醒中心历史（新→旧），UI 直接订阅。 */
+    val historyFlow: Flow<List<ProactiveAlertRecord>> = store.data
+        .map { prefs -> parseHistory(prefs[HISTORY_KEY]).entries.reversed().mapNotNull { it.toRecord() } }
+        .flowOn(Dispatchers.IO)
+
+    override suspend fun record(
+        typeWire: String,
+        severityWire: String,
+        copy: String,
+        nowMillis: Long,
+        dayKey: String,
+    ) {
         store.edit { prefs ->
             val current = prefs[STATE_KEY]
                 ?.let { raw -> runCatching { json.decodeFromString(ProactiveStateJson.serializer(), raw) }.getOrNull() }
@@ -74,13 +100,42 @@ class ProactivePrefs(
                 countToday = countToday,
             )
             prefs[STATE_KEY] = json.encodeToString(ProactiveStateJson.serializer(), next)
+
+            // 同一事务内落提醒中心历史；只保留最近 MAX_HISTORY 条。
+            val history = parseHistory(prefs[HISTORY_KEY])
+            val entries = (history.entries + ProactiveHistoryJsonEntry(
+                type = typeWire,
+                severity = severityWire,
+                copy = copy,
+                createdAt = nowMillis,
+            )).takeLast(MAX_HISTORY)
+            prefs[HISTORY_KEY] = json.encodeToString(ProactiveHistoryJson.serializer(), ProactiveHistoryJson(entries))
         }
+    }
+
+    override suspend fun history(): List<ProactiveAlertRecord> = historyFlow.first()
+
+    override suspend fun clearHistory() {
+        store.edit { prefs -> prefs.remove(HISTORY_KEY) }
+    }
+
+    private fun parseHistory(raw: String?): ProactiveHistoryJson =
+        raw?.let { runCatching { json.decodeFromString(ProactiveHistoryJson.serializer(), it) }.getOrNull() }
+            ?: ProactiveHistoryJson()
+
+    private fun ProactiveHistoryJsonEntry.toRecord(): ProactiveAlertRecord? {
+        val type = ProactiveAlertType.fromWire(type)
+        val severity = ProactiveSeverity.fromWire(severity)
+        if (type == null || severity == null || copy.isBlank()) return null
+        return ProactiveAlertRecord(type = type, severity = severity, copy = copy, createdAtMillis = createdAt)
     }
 
     private fun keyFor(type: ProactiveAlertType) = booleanPreferencesKey("enabled_${type.wire}")
 
     companion object {
         private val STATE_KEY = stringPreferencesKey("alert_state_json")
+        private val HISTORY_KEY = stringPreferencesKey("alert_history_json")
+        const val MAX_HISTORY = 50
 
         fun create(context: Context): ProactivePrefs =
             ProactivePrefs(context.applicationContext.proactiveDataStore)

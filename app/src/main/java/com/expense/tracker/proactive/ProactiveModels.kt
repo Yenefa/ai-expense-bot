@@ -1,5 +1,7 @@
 package com.expense.tracker.proactive
 
+import com.expense.tracker.data.finance.SavingsPaceCalculator
+
 /** 主动提醒类型（v1 只做三类）。 */
 enum class ProactiveAlertType(val wire: String, val typeLabel: String) {
     BUDGET_THRESHOLD("budget_threshold", "预算临界"),
@@ -51,6 +53,14 @@ data class ProactiveAlert(
     val deterministicCopy: String,
     /** 最终展示文案：默认等于确定性文案；LLM 只可覆盖这一字段。 */
     val copy: String = deterministicCopy,
+)
+
+/** 提醒中心/历史记录：每次真正产出的提醒（治理已放行）记一条。 */
+data class ProactiveAlertRecord(
+    val type: ProactiveAlertType,
+    val severity: ProactiveSeverity,
+    val copy: String,
+    val createdAtMillis: Long,
 )
 
 /** 规则引擎只做"该不该提醒"；LLM 无权参与该判断。 */
@@ -111,17 +121,24 @@ object ProactiveRules {
     private fun savingsAlert(inputs: ProactiveInputs): ProactiveAlert? {
         val income = inputs.monthlyIncomeCents ?: return null
         val goal = inputs.savingsGoalCents ?: return null
-        if (income <= 0L || goal <= 0L) return null
         if (inputs.monthRecordCount < MIN_COMPARABLE_SAMPLES) return null
-        if (inputs.elapsedMonthDays < MIN_COMPARABLE_SAMPLES || inputs.daysInMonth <= 0) return null
-        val projectedSpend = inputs.monthSpentCents.toDouble() / inputs.elapsedMonthDays * inputs.daysInMonth
-        val projectedLeftover = income - projectedSpend
-        if (projectedLeftover >= goal) return null
-        val over = projectedLeftover <= 0.0
+        if (inputs.elapsedMonthDays < MIN_COMPARABLE_SAMPLES) return null
+        // P3：储蓄规则与查询分析共用同一确定性计算（SavingsPaceCalculator），不再各自手算。
+        val pace = SavingsPaceCalculator.compute(
+            incomeCents = income,
+            goalCents = goal,
+            spentCents = inputs.monthSpentCents,
+            elapsedDays = inputs.elapsedMonthDays,
+            daysInMonth = inputs.daysInMonth,
+        ) ?: return null
+        if (pace.onTrack) return null
+        val over = pace.projectedLeftoverCents <= 0L
+        val requiredDaily = SavingsPaceCalculator.requiredDailySpendCents(income, goal, inputs.daysInMonth)
         val copy = if (over) {
-            "按当前节奏，本月预计入不敷出 ¥${fmt((-projectedLeftover).toLong())}，储蓄目标 ¥${fmt(goal)} 可能落空。"
+            "按当前节奏，本月预计入不敷出 ¥${fmt(-pace.projectedLeftoverCents)}（储蓄目标 ¥${fmt(goal)} 可能落空）；剩余 ${pace.remainingDays} 天，建议压降支出。"
         } else {
-            "按当前节奏，本月预计可存 ¥${fmt(projectedLeftover.toLong())}，低于储蓄目标 ¥${fmt(goal)}。"
+            "按当前节奏，本月预计可存 ¥${fmt(pace.projectedLeftoverCents)}，低于储蓄目标 ¥${fmt(goal)}（还差 ¥${fmt(-pace.goalGapCents)}）；" +
+                "剩余 ${pace.remainingDays} 天，日均支出需控制在 ¥${fmt(requiredDaily)} 内。"
         }
         return ProactiveAlert(
             type = ProactiveAlertType.SAVINGS_GOAL_DEVIATION,
@@ -129,7 +146,12 @@ object ProactiveRules {
             facts = mapOf(
                 "income_cents" to income,
                 "goal_cents" to goal,
-                "projected_leftover_cents" to projectedLeftover.toLong(),
+                "projected_spend_cents" to pace.projectedSpendCents,
+                "projected_leftover_cents" to pace.projectedLeftoverCents,
+                "goal_gap_cents" to pace.goalGapCents,
+                "remaining_days" to pace.remainingDays.toLong(),
+                "remaining_spendable_cents" to pace.remainingSpendableCents,
+                "required_daily_cents" to requiredDaily,
             ),
             deterministicCopy = copy,
         )

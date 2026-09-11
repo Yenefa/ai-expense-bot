@@ -1,5 +1,7 @@
 package com.expense.tracker.llm
 
+import com.expense.tracker.agent.FakeChatDao
+import com.expense.tracker.agent.FakeExpenseDao
 import com.expense.tracker.data.db.ChatMessageDao
 import com.expense.tracker.data.db.ChatMessageEntity
 import com.expense.tracker.data.db.ExpenseDao
@@ -8,7 +10,9 @@ import com.expense.tracker.data.prefs.ThemeMode
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.data.repo.ChatRepository
 import com.expense.tracker.data.repo.ExpenseRepository
+import com.expense.tracker.data.repo.LlmMutationApplier
 import com.expense.tracker.data.repo.MutationApplyResult
+import com.expense.tracker.data.repo.TransactionRunner
 import com.expense.tracker.ui.chat.LlmResult
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +26,7 @@ import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 
 class ChatLlmCoordinatorTest {
     @Test fun multiAddAppliesImmediatelyAndDeleteWaitsForConfirmationOnce() = runBlocking {
@@ -317,6 +322,136 @@ class ChatLlmCoordinatorTest {
         assertThat(applyCalls).isEqualTo(0)
     }
 
+    @Test fun followUpWordsLoadRecordedHistoryAndOnlyTheNewExpenseIsApplied() = runBlocking {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val now = LocalDateTime.of(2026, 9, 6, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        val dao = FakeExpenseDao()
+        val seedId = dao.insert(
+            ExpenseEntity(
+                amountCents = 5_000L,
+                categoryId = "transport",
+                note = "打车",
+                occurredAt = LocalDateTime.of(2026, 9, 6, 9, 0).atZone(zone).toInstant().toEpochMilli(),
+                createdAt = now,
+            ),
+        )
+        val chatDao = FakeChatDao().apply {
+            insert(ChatMessageEntity("user", "打车50", now - 2_000L))
+            insert(ChatMessageEntity("assistant", "已记录 1 笔", now - 1_000L, relatedExpenseIdsCsv = seedId.toString()))
+        }
+        var requestedPrompt = ""
+        var requestedHistory = emptyList<ChatMsg>()
+        val coordinator = ChatLlmCoordinator(
+            expenseRepository = ExpenseRepository(dao),
+            chatRepository = ChatRepository(chatDao),
+            requestJson = { _, _, prompt, history, _ ->
+                requestedPrompt = prompt
+                requestedHistory = history
+                """{"reply":"已记奶茶","expenses":[{"amount":16,"category":"drink","note":"奶茶","occurred_at":null}],"actions":[]}"""
+            },
+            applyPlan = LlmMutationApplier(ExpenseRepository(dao), ChatRepository(chatDao), CoordinatorInlineRunner())::apply,
+            nowProvider = { now },
+            zone = zone,
+        )
+
+        // P0 回归（mt-02 场景）：上一轮「打车50」已记录，本轮「还有一杯奶茶16」只应新增奶茶一笔。
+        val result = coordinator.submit("还有一杯奶茶16", prefs()) as LlmResult.Ok
+
+        // 上下文触发词让已有账目进入提示词，模型能看到"历史已记录"的去重依据。
+        assertThat(requestedPrompt).contains("不得再次提取")
+        assertThat(requestedPrompt).contains("$seedId|09-06 09:00")
+        assertThat(requestedPrompt).contains("打车")
+        assertThat(requestedHistory.map { it.content }).containsExactly("打车50", "已记录 1 笔").inOrder()
+        assertThat(result.expenseIds).hasSize(1)
+        val rows = dao.getAllActiveOnce()
+        assertThat(rows.map { it.amountCents }).containsExactly(5_000L, 1_600L)
+        assertThat(rows.count { it.amountCents == 5_000L }).isEqualTo(1)
+    }
+
+    @Test fun continuationTriggersLoadExistingRecordContextForAllMultiTurnCases() = runBlocking {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val now = LocalDateTime.of(2026, 9, 6, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        val existing = ExpenseEntity(
+            amountCents = 5_000L,
+            categoryId = "transport",
+            note = "打车",
+            occurredAt = LocalDateTime.of(2026, 9, 6, 9, 0).atZone(zone).toInstant().toEpochMilli(),
+            createdAt = now,
+            id = 7L,
+        )
+        listOf(
+            "还有一杯奶茶16", // mt-02
+            "昨天也买了支笔10块", // mt-03
+            "再记一笔晚饭30", // mt-16
+            "又买了一瓶水3块",
+        ).forEach { text ->
+            val chatDao = CoordinatorChatDao().apply {
+                rows += ChatMessageEntity("user", "打车50", now - 2_000L, id = 1L)
+                rows += ChatMessageEntity("assistant", "已记录 1 笔", now - 1_000L, relatedExpenseIdsCsv = "7", id = 2L)
+            }
+            var requestedPrompt = ""
+            val coordinator = ChatLlmCoordinator(
+                expenseRepository = ExpenseRepository(CoordinatorExpenseDao(listOf(existing))),
+                chatRepository = ChatRepository(chatDao),
+                requestJson = { _, _, prompt, _, _ ->
+                    requestedPrompt = prompt
+                    """{"reply":"ok","expenses":[],"actions":[]}"""
+                },
+                applyPlan = { error("不应执行空计划") },
+                nowProvider = { now },
+                zone = zone,
+            )
+
+            coordinator.submit(text, prefs())
+
+            assertThat(requestedPrompt).contains("不得再次提取")
+            assertThat(requestedPrompt).contains("7|09-06 09:00")
+        }
+    }
+
+    @Test fun onlyDateCorrectionOnLastBatchBindsTargetDateDeterministically() = runBlocking {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val now = LocalDateTime.of(2026, 9, 6, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        val dao = FakeExpenseDao()
+        val seedId = dao.insert(
+            ExpenseEntity(
+                amountCents = 1_800L,
+                categoryId = "drink",
+                note = "咖啡",
+                occurredAt = LocalDateTime.of(2026, 9, 6, 15, 0).atZone(zone).toInstant().toEpochMilli(),
+                createdAt = now,
+            ),
+        )
+        val chatDao = FakeChatDao().apply {
+            insert(ChatMessageEntity("user", "下午咖啡18", now - 2_000L))
+            insert(ChatMessageEntity("assistant", "已记录 1 笔", now - 1_000L, relatedExpenseIdsCsv = seedId.toString()))
+        }
+        var requestedPrompt = ""
+        val coordinator = ChatLlmCoordinator(
+            expenseRepository = ExpenseRepository(dao),
+            chatRepository = ChatRepository(chatDao),
+            requestJson = { _, _, prompt, _, _ ->
+                requestedPrompt = prompt
+                // P1 回归（mt-15 场景）：模型只产出 update（不带 occurred_at），日期绑定由客户端确定性完成。
+                """{"reply":"那杯咖啡已改到前天","expenses":[],"actions":[{"action":"update","expense_id":$seedId}]}"""
+            },
+            applyPlan = LlmMutationApplier(ExpenseRepository(dao), ChatRepository(chatDao), CoordinatorInlineRunner())::apply,
+            nowProvider = { now },
+            zone = zone,
+        )
+
+        val result = coordinator.submit("刚才那杯咖啡记到前天", prefs())
+
+        assertThat(result).isInstanceOf(LlmResult.Ok::class.java)
+        assertThat(requestedPrompt).contains("必须输出 update 动作")
+        assertThat(requestedPrompt).contains("$seedId|09-06 15:00")
+        val rows = dao.getAllActiveOnce()
+        assertThat(rows).hasSize(1)
+        val updated = Instant.ofEpochMilli(rows.single().occurredAt).atZone(zone)
+        assertThat(updated.toLocalDate()).isEqualTo(LocalDate.of(2026, 9, 4))
+        assertThat(updated.toLocalTime()).isEqualTo(LocalTime.of(15, 0))
+    }
+
     private fun prefs() = UserPrefsSnapshot(
         llmEnabled = true,
         baseUrl = "https://example.com/v1",
@@ -324,6 +459,10 @@ class ChatLlmCoordinatorTest {
         model = "hy3",
         themeMode = ThemeMode.SYSTEM,
     )
+}
+
+private class CoordinatorInlineRunner : TransactionRunner {
+    override suspend fun <T> run(block: suspend () -> T): T = block()
 }
 
 private class CoordinatorExpenseDao(initialRows: List<ExpenseEntity> = emptyList()) : ExpenseDao {

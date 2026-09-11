@@ -118,6 +118,41 @@ class AgentToolsAnalyzeTest {
     }
 
     @Test
+    fun `储蓄节奏工具只统计本月非投资消费并上报名`() = runBlocking<Unit> {
+        seed()
+        val tools = mutableListOf<String>()
+        val ctx = AgentToolContext(
+            expenseRepository = ExpenseRepository(dao),
+            budgetSnapshotProvider = { com.expense.tracker.data.budget.BudgetSnapshot() },
+            zone = zone,
+            onToolCall = { tools += it },
+        )
+
+        val pace = AgentTools.savingsPace(
+            context = ctx,
+            incomeCents = 800_000L,
+            goalCents = 500_000L,
+            nowMillis = epoch(2026, 9, 9),
+            zone = zone,
+        )!!
+
+        assertThat(tools).containsExactly(AgentTools.TOOL_SAVINGS_PACE)
+        // 9 月非投资 5300（投资 100000 与 8 月记录都不进窗口）
+        assertThat(pace.spentCents).isEqualTo(5_300L)
+        assertThat(pace.elapsedDays).isEqualTo(9)
+        assertThat(pace.daysInMonth).isEqualTo(30)
+        assertThat(pace.projectedSpendCents).isEqualTo(5_300L * 30 / 9)
+        assertThat(pace.onTrack).isTrue()
+    }
+
+    @Test
+    fun `储蓄节奏输入缺失不计算`() = runBlocking<Unit> {
+        seed()
+        assertThat(AgentTools.savingsPace(context(), 0L, 500_000L, epoch(2026, 9, 9), zone)).isNull()
+        assertThat(AgentTools.savingsPace(context(), 800_000L, 0L, epoch(2026, 9, 9), zone)).isNull()
+    }
+
+    @Test
     fun `非整月区间不预测`() = runBlocking<Unit> {
         seed()
         val spec = AgentPeriodSpec(

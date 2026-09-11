@@ -4,6 +4,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.WeekFields
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** 已持久化的提醒状态：每日额度 + 同类冷却 + 上次严重度（hysteresis 用）。 */
 data class ProactiveState(
@@ -15,7 +17,18 @@ data class ProactiveState(
 
 interface ProactiveStateStore {
     suspend fun state(): ProactiveState
-    suspend fun record(typeWire: String, severityWire: String, nowMillis: Long, dayKey: String)
+
+    /**
+     * 记录一次真正放行的提醒（治理状态 + 提醒中心历史）。
+     * [copy] 是最终展示文案（LLM 改写成功则是改写后的），历史记录不得晚于投递。
+     */
+    suspend fun record(typeWire: String, severityWire: String, copy: String, nowMillis: Long, dayKey: String)
+
+    /** 提醒中心历史，新→旧；默认无历史（测试/最小实现可忽略）。 */
+    suspend fun history(): List<ProactiveAlertRecord> = emptyList()
+
+    /** 清空提醒中心历史（不影响治理状态与冷却）。 */
+    suspend fun clearHistory() = Unit
 }
 
 /** LLM 只允许改文案；返回 null/超长/失败都回退确定性文案。 */
@@ -32,13 +45,17 @@ class ProactiveGovernor(
     private val stateStore: ProactiveStateStore,
     private val enabledProvider: suspend () -> Set<ProactiveAlertType>,
     private val copywriter: ProactiveCopywriter? = null,
-    private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
 
     suspend fun evaluate(inputs: ProactiveInputs): ProactiveAlert? {
         val enabled = enabledProvider()
         val decision = ProactiveRules.evaluate(inputs, enabled) ?: return null
+        // 检查与落库必须原子：前台聊天轮与后台 Worker 各自持有实例，否则可能同时通过
+        // "每日 1 条 / 同类冷却"检查后各自 record + 投递（TOCTOU，文案调用还会拉大窗口）。
+        return COMMIT_LOCK.withLock { commit(decision, inputs) }
+    }
 
+    private suspend fun commit(decision: ProactiveAlert, inputs: ProactiveInputs): ProactiveAlert? {
         val state = stateStore.state()
         val today = dayKey(inputs.nowMillis, inputs.zone)
         if (state.dayKey == today && state.countToday >= MAX_ALERTS_PER_DAY) return null
@@ -55,7 +72,8 @@ class ProactiveGovernor(
             ?.takeIf { it.isNotBlank() && it.length <= MAX_COPY_CHARS && '\n' !in it }
             ?: decision.deterministicCopy
 
-        stateStore.record(decision.type.wire, decision.severity.wire, inputs.nowMillis, today)
+        // 历史（提醒中心）与治理状态同点落库：凡是放行的提醒都可查，投递失败也不会重复触发。
+        stateStore.record(decision.type.wire, decision.severity.wire, copy, inputs.nowMillis, today)
         return decision.copy(copy = copy)
     }
 
@@ -66,9 +84,12 @@ class ProactiveGovernor(
     }
 
     private fun dayKey(nowMillis: Long, zone: ZoneId): String =
-        LocalDate.ofInstant(Instant.ofEpochMilli(nowMillis), zone).toString()
+        Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate().toString()
 
     companion object {
+        /** 进程级提交互斥：前台（聊天轮）与后台（Worker）共用同一进程内的治理实例。 */
+        private val COMMIT_LOCK = Mutex()
+
         const val MAX_ALERTS_PER_DAY = 1
         const val MAX_COPY_CHARS = 120
         const val BUDGET_COOLDOWN_MS = 24 * 60 * 60_000L

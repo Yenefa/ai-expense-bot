@@ -1,5 +1,6 @@
 package com.expense.tracker.agent
 
+import com.expense.tracker.data.finance.SavingsPace
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.llm.ChatLlmCoordinator
 import com.expense.tracker.llm.ChatTurnContext
@@ -133,13 +134,26 @@ class ExpenseAgent(
             null
         }
         // 财务分析读权限：仅 QUERY 轮注入 income/savings/preference；其他轮次不读。
-        val memoryBlock = MemoryReadPolicy.promptBlock(MemoryReadScope.FINANCIAL_ANALYSIS, scopedProfile()).orEmpty()
-        val suffix = AgentPrompts.toolResultBlock(query, budget, analyze) + memoryBlock + AgentPrompts.queryDirective()
+        val profile = scopedProfile()
+        val memoryBlock = MemoryReadPolicy.promptBlock(MemoryReadScope.FINANCIAL_ANALYSIS, profile).orEmpty()
+        // P3：月收入/储蓄目标不只作分析上下文——确定性计算储蓄进度并注入可信数据块。
+        val savingsPace = savingsPaceFor(profile, now)
+        val suffix = AgentPrompts.toolResultBlock(query, budget, analyze) +
+            savingsPace?.let { AgentPrompts.savingsPaceBlock(it) }.orEmpty() +
+            memoryBlock +
+            AgentPrompts.queryDirective()
         return coordinator.submit(
             text = text,
             prefs = prefs,
             turnContext = QUERY_TURN_CONTEXT.copy(systemPromptSuffix = suffix),
         )
+    }
+
+    /** 只有已授权画像同时含月收入与储蓄目标时才计算；输入缺失返回 null（不注入）。 */
+    private suspend fun savingsPaceFor(profile: List<MemoryFact>, nowMillis: Long): SavingsPace? {
+        val income = profile.firstOrNull { it.type == MemoryType.MONTHLY_INCOME }?.amountCents ?: return null
+        val goal = profile.firstOrNull { it.type == MemoryType.SAVINGS_GOAL }?.amountCents ?: return null
+        return runCatching { AgentTools.savingsPace(toolContext, income, goal, nowMillis, zone) }.getOrNull()
     }
 
     private suspend fun scopedProfile(): List<MemoryFact> =

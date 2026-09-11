@@ -5,4 +5,5 @@
     <exclude domain="file" path="datastore/user_prefs.preferences_pb" />
     <exclude domain="file" path="datastore/subscription_prefs.preferences_pb" />
     <exclude domain="file" path="datastore/user_profile_prefs.preferences_pb" />
+    <exclude domain="file" path="datastore/proactive_prefs.preferences_pb" />
 </full-backup-content>

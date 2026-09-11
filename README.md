@@ -56,9 +56,9 @@
 - **设置 → 🧠 我的记忆**：查看（含来源/创建时间）、修改、删除、清空；删除后任何 Agent 路径不再读取
 - **完整 JSON 备份 v3** 包含长期记忆，v2 旧备份兼容
 - **Bench 双保险**：写侧 Silent Memory Write Rate = 0%（36 条）；读侧 Unauthorized Read = 0% / Deleted Reuse = 0% / Correct Application = 100%（38 条，[docs/memory-consumption.md](docs/memory-consumption.md)）
-- v1 边界：分析类记忆只作上下文不参与计算；无冲突合并
+- v3.13 起：月收入 + 储蓄目标进入**确定性储蓄节奏计算**（查询轮注入【储蓄进度】可信块；主动提醒储蓄规则与查询共用同一 `SavingsPaceCalculator`）；常用分类仍只作上下文；无冲突合并
 
-## 🔮 Proactive Insight（v3.12）
+## 🔮 Proactive Insight（v3.13）
 
 **规则决定"该不该提醒"，LLM 只负责"怎么说"** —— 模型无权判断异常、无权直接发通知。
 
@@ -70,6 +70,7 @@
 
 硬约束（治理层，模型不可见）：至少 4 个可比样本 / 冷启动不提醒 / **每日最多 1 条** / 同类冷却（预算 24h、异常与储蓄 7d）/ 预算 WARN→OVER 可升级突破冷却 / 设置内可逐类关闭。
 
+- **投递（v3.13）**：规则放行 → 聊天内 🔔 + **系统通知**（独立渠道 `proactive_insight`，点击直达提醒中心）+ **提醒中心历史**（最近 50 条，可清空）；后台每日 20:00 由 WorkManager 检查（重启自恢复，后台只用确定性文案、无网络）
 - **ProactiveInsightBench**：38 条六桶，五项指标 **False Alert / Missed Alert / Duplicate / Cold-start Violation / Notification Budget Violation 全部 0%**（`docs/proactive-insight-local-report.md`，协议见 [docs/proactive-insight.md](docs/proactive-insight.md)）
 - 完整链路：**Deterministic Routing → Short-term Context → Governed Memory → Scoped Memory Read → Deterministic Finance Tools → Controlled Mutation → Rule-governed Proactive Insight**
 
@@ -322,6 +323,9 @@ Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有�
 | **v3.10.0** | **Memory Governance v1** - 四类长期记忆（月收入/储蓄目标/商户别名/常用分类）；提案→类型校验→预览→确认→UserProfile；LLM 无写接口；Silent Memory Write Rate = 0%（Bench 36 条） |
 | **v3.11.0** | **Memory Consumption & Control** - MemoryReadScope 读权限 + 别名确定性应用；我的记忆（查看/修改/删除/清空）；JSON 备份 v3 含记忆；Unauthorized Read 0% / Deleted Reuse 0% / Application 100%（Bench 38 条） |
 | **v3.12.0** | **Proactive Insight v1** - 预算临界/异常消费/储蓄偏离三类；规则决策 + 硬约束（4 样本/冷启动/每日 1 条/冷却/可关闭）；LLM 仅文案；五项 Bench 指标全 0% |
+| **v3.12.1** | **分类口径修正** - 文具/笔→education、日用品/超市/理发→shopping、水电/酒店→housing（主链路 + 账单导入同步）；数据集 mtp-29/30 按 owner 裁定更新 |
+| **v3.12.2** | **多轮防重记 + 更新动作可靠性** - 历史已确认记录的账目禁止重复提取（还有/也买/又买/再记 追加语义 + 已有账目上下文加载）；改日期必须输出 update（occurred_at + 客户端确定性日期绑定）；新增 5 条攻击/回归用例 |
+| **v3.13.0** | **主动提醒通知投递 + 提醒中心 + 储蓄节奏入计算** - 独立通知渠道与点击直达提醒中心；后台每日 20:00 WorkManager 检查（确定性文案、零网络）；提醒历史 50 条可清空；月收入+储蓄目标进入确定性 `SavingsPaceCalculator`（查询【储蓄进度】可信块 + 主动储蓄规则共用） |
 
 > 版本管理规范（2026-08-08 起）：每次交付 versionCode +1、versionName 语义化递增，变更记录维护在 `CHANGELOG.md`。
 

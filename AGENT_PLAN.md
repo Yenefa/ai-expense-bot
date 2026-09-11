@@ -11,8 +11,8 @@
 
 - Android 记账 App「Y.E cost」（`com.expense.tracker`）：Kotlin 1.9.22 + Jetpack Compose + Room + ML Kit OCR + LLM Agent
 - 仓库：https://github.com/Yenefa/ai-expense-bot（`dev` 分支）
-- 版本：v3.9.1（versionCode 33）
-- 测试：**278 个 JVM 单测**（`./gradlew :app:testDebugUnitTest`，其中 1 个 LLM bench 在无 Key 时 skip）
+- 版本：v3.13.0（versionCode 41；v3.12.2 的 versionCode 40 未单独发布，合并入本版）
+- 测试：**354 个 JVM 单测**（`./gradlew :app:testDebugUnitTest`，其中 2 个 LLM bench 与 1 个平台相关用例在缺省环境下 skip）
 - 服务器：腾讯云 CloudBase 云函数 `ye-cost-api`（兑换码核销 + AI 代理 `hy3`），/health 在线
 
 ## ExpenseBench v2（当前阶段）
@@ -33,8 +33,10 @@
 - **真实模型复测已完成（2026-09-11，owner 指令）**：qwen3.7-flash ×3 轮，
   **False Mutation Rate 0.0%（0/54）**；Router 100% / Query Recall 100% / Tool 100%；Date Binding 98.9%；E2E 90.9–91.8%；
   详见 `docs/expensebench-v2-verification-post-hardening.md`
-- LLM Bench 继续按需（不再自动跑）；剩余：多轮重复记录、更新未产出（分类灰区已按 owner 裁定落地，见 docs/gold-review-mtp-classification.md）
-- 后续候选：分类灰区 gold 复核
+- **v3.12.2 已按 owner P0/P1 落地**（2026-09-11）：多轮防重记（提示词硬规则 + `还有/也买/又买/再记` 上下文触发词 + 攻击/回归用例）；更新动作可靠性（update schema/规则/示例 + 确定性日期绑定回归）
+- **v3.13.0 已按 owner P2/P3 落地**（2026-09-11）：系统通知投递 + 提醒中心（放行即落历史，后台每日 20:00 检查，后台零网络）；`SavingsPaceCalculator` 接入查询注入与主动储蓄规则
+- LLM Bench 继续按需（不再自动跑）；真实模型 3 轮复测（新数据集 sha、分类修正、mt-02/03/16、mt-15）与 LLM 文案真实复测待 owner 指令
+- 后续候选：分类级异常基线、储蓄 pace 非线性化、提醒中心已读态/角标
 
 ## Memory Governance（v3.10 写 / v3.11 读+管理，已完成，2026-09-11）
 

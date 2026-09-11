@@ -55,4 +55,22 @@ class LlmPromptContractTest {
         assertThat(prompt).contains("禁止重复")
         assertThat(prompt).contains("最近一个明确日期")
     }
+
+    @Test fun chatPromptForbidsReExtractingAlreadyRecordedHistoryOnFollowUps() {
+        val prompt = LlmPrompt.systemPrompt()
+
+        assertThat(prompt).contains("历史对话里已经确认记录过的账目")
+        assertThat(prompt).contains("不得再次提取")
+        assertThat(prompt).contains("只提取本轮新出现的消费")
+        assertThat(prompt).contains("还有/也买/又买/再记")
+        assertThat(prompt).contains("不是把历史里已记录的那笔重新记一遍")
+    }
+
+    @Test fun chatPromptRequiresUpdateActionWhenOnlyTheDateChanges() {
+        val prompt = LlmPrompt.systemPrompt()
+
+        assertThat(prompt).contains("\"occurred_at\":<新ISO时间|null>")
+        assertThat(prompt).contains("必须输出 update 动作")
+        assertThat(prompt).contains("禁止用新增一笔代替修改")
+    }
 }

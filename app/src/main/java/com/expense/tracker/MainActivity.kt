@@ -49,6 +49,8 @@ import com.expense.tracker.ui.history.DeletedItemsScreen
 import com.expense.tracker.ui.settings.DataExportScreen
 import com.expense.tracker.ui.settings.MemoryScreen
 import com.expense.tracker.ui.settings.MemoryViewModel
+import com.expense.tracker.ui.settings.ProactiveCenterScreen
+import com.expense.tracker.ui.settings.ProactiveCenterViewModel
 import com.expense.tracker.ui.settings.ProactiveScreen
 import com.expense.tracker.ui.settings.ProactiveViewModel
 import com.expense.tracker.ui.settings.SettingsMenuScreen
@@ -80,6 +82,7 @@ class MainActivity : ComponentActivity() {
                 memoryCancellationHandler = container.llmMemoryCancellationHandler,
                 budgetWarningProvider = container.budgetWarningProvider,
                 proactiveInsightProvider = container.proactiveInsightProvider,
+                proactiveNotifier = container.proactiveAlertNotifier,
             ) as T
         }
     }
@@ -97,6 +100,25 @@ class MainActivity : ComponentActivity() {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
                 ProactiveViewModel(container.proactivePrefs) as T
+        }
+    }
+
+    private val proactiveCenterVm: ProactiveCenterViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                ProactiveCenterViewModel(container.proactivePrefs) as T
+        }
+    }
+
+    /** 通知点击 → 打开提醒中心；onCreate 与 onNewIntent 都通过该状态驱动。 */
+    private val openProactiveCenter = mutableStateOf(false)
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(com.expense.tracker.proactive.ProactiveNotifier.EXTRA_OPEN_CENTER, false)) {
+            openProactiveCenter.value = true
         }
     }
 
@@ -185,6 +207,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        if (intent?.getBooleanExtra(com.expense.tracker.proactive.ProactiveNotifier.EXTRA_OPEN_CENTER, false) == true) {
+            openProactiveCenter.value = true
+        }
         setContent {            var showBrandSplash by remember { mutableStateOf(savedInstanceState == null) }
             val splashAlpha = remember { Animatable(1f) }
             LaunchedEffect(showBrandSplash) {
@@ -211,6 +236,16 @@ class MainActivity : ComponentActivity() {
                 } else {
                     var screen by rememberSaveable { mutableStateOf(Screen.Chat) }
                     var subScreen by rememberSaveable { mutableStateOf<SubScreen?>(null) }
+
+                    // 通知点击进入提醒中心（冷启动 / 已在栈顶均适用）
+                    val shouldOpenProactiveCenter by openProactiveCenter
+                    LaunchedEffect(shouldOpenProactiveCenter) {
+                        if (shouldOpenProactiveCenter) {
+                            screen = Screen.Settings
+                            subScreen = SubScreen.ProactiveCenter
+                            openProactiveCenter.value = false
+                        }
+                    }
 
                 // 系统返回键：非 Chat 时回到 Chat，而不是退出 App
                 BackHandler(enabled = screen != Screen.Chat || subScreen != null) {
@@ -287,6 +322,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenUserManual = { subScreen = SubScreen.UserManual },
                                 onOpenMemory = { subScreen = SubScreen.Memory },
                                 onOpenProactive = { subScreen = SubScreen.Proactive },
+                                onOpenReminderCenter = { subScreen = SubScreen.ProactiveCenter },
                                 prefs = container.userPrefs,
                             )
                         }
@@ -459,6 +495,21 @@ class MainActivity : ComponentActivity() {
                         ProactiveScreen(vm = proactiveVm, onClose = { subScreen = null })
                     }
 
+                    // 提醒中心 sub-screen 从右侧滑入
+                    AnimatedVisibility(
+                        visible = subScreen == SubScreen.ProactiveCenter,
+                        enter = slideInHorizontally(
+                            animationSpec = tween(320, easing = FastOutSlowInEasing),
+                            initialOffsetX = { it },
+                        ) + fadeIn(animationSpec = tween(160)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                            targetOffsetX = { it },
+                        ) + fadeOut(animationSpec = tween(140)),
+                    ) {
+                        ProactiveCenterScreen(vm = proactiveCenterVm, onClose = { subScreen = null })
+                    }
+
                     // 智核分析 sub-screen 从右侧滑入
                     AnimatedVisibility(
                         visible = subScreen == SubScreen.Insights,
@@ -523,6 +574,7 @@ class MainActivity : ComponentActivity() {
         UserManual,
         Memory,
         Proactive,
+        ProactiveCenter,
         Insights,
         BillImport,
     }

@@ -219,3 +219,64 @@
 - 记录：`docs/gold-review-mtp-classification.md`；未改评分器
 - 按 owner 指示未重跑 LLM Bench；新数据集 sha 下复测待下次运行（预期分类不一致 5 → 0-1）
 - 测试：JVM 334/334（含更新后的 prompt contract）
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.12.2 多轮防重记 + 更新动作可靠性（opencode，owner P0/P1）
+
+## 范围（按 owner 下发的方案，不扩权）
+- **P0 多轮防重记（mt-02/03/16）**：提示词硬规则"历史中已确认记录的账目不得重复提取，只提取本轮新出现的消费"；`ChatLlmCoordinator.EXISTING_RECORD_INTENT` 扩展 `还有/也买/又买/再买/再记/接着记`（追加表达加载已有账目上下文）；新增"追加式表达"示例
+- **P1 更新动作可靠性（mt-15）**：update 动作 schema 补全 `note/occurred_at`；规则"把已有账目改到某日期必须输出 update、occurred_at 为新 ISO 时间、禁止新增代替"；新增"修改日期"示例
+- 客户端日期绑定保持确定性：模型只给 `update + expense_id` 时仍由 `ChineseDateResolver` + Planner 落到目标日期（回归覆盖）
+- **未加确定性去重兜底**（owner 计划：先 prompt/上下文，真实模型仍不稳再评估）
+
+## 攻击/回归用例（新增 5）
+- `LlmPromptContractTest`：防重记规则契约 + 日期修改 update 契约
+- `ChatLlmCoordinatorTest`：
+  - mt-02 场景（seed 打车50 + 历史"已记录" + 提示词含已有账目行）→ 只新增奶茶，5000 不重复
+  - mt-02/03/16 + 又买：全部触发词都加载已有账目上下文（防止触发词被静默移除）
+  - mt-15 场景（模型仅输出 update ID，无 occurred_at）→ 日期确定性落 2026-09-04 且保持 15:00
+
+## 验收（本地）
+- JVM 单测 334 → **339，0 failed**
+- 未跑 LLM Bench（owner：真实模型复测议题暂且搁置）；恢复时用新数据集 sha 跑 3 轮，预期分类错 5 → 0-1、mt-02/03/16 → 0
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.13.0 主动提醒投递 + 提醒中心 + 储蓄节奏入计算（opencode，owner P2/P3）
+
+## 范围（owner 下发 P2/P3，纯本地；不动规则阈值与数据集）
+- **P2 系统通知投递**：`ProactiveNotifier`（独立渠道 `proactive_insight`、点击直达提醒中心）；前台规则触发时聊天 🔔 + 通知栏双投递
+- **P2 提醒中心**：治理器放行即写历史（`ProactiveStateStore.record` 增 copy 参数，ProactivePrefs 同一事务落 JSON，最近 50 条）；设置 → 📣 提醒中心查看/清空；存于独立 DataStore 并排除系统备份/设备迁移
+- **P2 后台检查**：`ProactiveInsightWorker` + `ProactiveScheduler`（WorkManager 每日 20:00 自续、重启恢复）；后台 `copywriter=null`（确定性文案、零网络）；无通知权限时跳过评估、不消耗当日额度
+- **P2 输入构建抽取**：`ProactiveEngine`（账目窗口 / 预算 / FINANCIAL_ANALYSIS 授权记忆），前台 AppContainer 与后台 Worker 共用
+- **P3 储蓄节奏**：新增 `data/finance/SavingsPaceCalculator`；主动储蓄规则改共用；QUERY 轮注入【储蓄进度】可信块（`AgentTools.savingsPace` + `ExpenseAgent`），提示词禁止自行推算
+- 边界：规则阈值 / 冷却 / 数据集均未改；通知权限缺失降级为聊天 + 提醒中心
+
+## 验收（本地）
+- JVM 单测 339 → **354，0 failed**（新增 15：SavingsPace 5 / ProactiveEngine 4 / 规则 2 / 工具 2 / governor 历史 1 / ChatViewModel 投递 1）
+- ProactiveInsightBench 38 条新增"放行必落历史、抑制零历史"校验；五项指标仍全 0%
+- MemoryConsumptionBench 删除复用仍 0%（修正：查询指令文案避免出现记忆标记词，防误判）
+- 离线行为基线保持 80/80、工具 16/16；`assembleDebug` 成功；`lintDebug` 通过（顺带修复 v3.12.0 遗留 `LocalDate.ofInstant` NewApi 错误）
+
+## 决定 / 后续
+- 真实模型 3 轮复测（新数据集 sha、分类修正、mt-02/03/16、mt-15）与 LLM 文案真实复测待 owner 指令
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.13.0 二审修复 + 补提交（opencode，owner 审阅 findings）
+
+## H1 治理处置
+- 问题：HEAD=5903d1a 仍为 v3.12.1（v39），工作区 36 改 + 9 新直接到 v41；CHANGELOG 的 v3.12.2/v40 无可追溯提交
+- 处置：P0–P3 合并为一个 v3.13.0（v41）提交，CHANGELOG 注明 v40 未单独发布；推送 origin/dev
+
+## 二审修复（逐条对应 owner findings）
+- **M2（正确性）**：`ProactiveEngine` 月度窗口上界 `Long.MAX_VALUE` → 下月初，与 `AgentTools.savingsPace` 统一；新增"未来月份账目不计入"回归
+- **M3（并发）**：治理"检查 + 落库"移入进程级 `COMMIT_LOCK`（前台/后台单进程共享）；新增并发回归（用挂起的 copywriter 复现原 TOCTOU 窗口，断言只提交一次）
+- **L4（体验）**：主动提醒页在"类型已开启但无通知权限"时显示横幅 + "开启"入口（原先只有关→开才触发请求）
+- **L5（隐私）**：通知 `VISIBILITY_PRIVATE` + 锁屏泛化文案；渠道 `lockscreenVisibility=PRIVATE`
+- **L6（健壮性）**：一次性任务自续（REPLACE 自我取消）→ `PeriodicWorkRequest`（1 天，KEEP 不重置）；移除未调用 `ProactiveScheduler.cancel()`
+- **I7（文档/清理）**：README 主动提醒节标题（v3.12→v3.13）；AGENT_PLAN 版本/测试数（v3.9.1/278 → v3.13.0/354+）；移除 `ProactiveGovernor.zone` 未用参数；`MemoryReadPolicy.BLOCK_MARKER` 常量供评测器复用（消除字面量耦合）
+
+## 验收（本地）
+- JVM **356，0 failed**（354 + M2/M3 回归 2）；`lintDebug` / `assembleDebug` 通过

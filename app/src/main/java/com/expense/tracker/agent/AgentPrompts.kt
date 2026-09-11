@@ -2,6 +2,8 @@ package com.expense.tracker.agent
 
 import com.expense.tracker.data.budget.BudgetEntry
 import com.expense.tracker.data.budget.BudgetStatus
+import com.expense.tracker.data.finance.SavingsPace
+import com.expense.tracker.data.finance.SavingsPaceCalculator
 import com.expense.tracker.data.model.Money
 
 /** 查询轮的 system prompt 片段：工具结果 + 回答规则。 */
@@ -80,9 +82,33 @@ object AgentPrompts {
         appendLine("=== 本轮是查询轮：用户在问数据，不是在记账 ===")
         appendLine("- 优先直接回答问题，所有金额、笔数、占比、环比、预测必须来自【查询结果】或【对比分析】，禁止编造或口算出不同数字")
         appendLine("- 引用预测时必须说明是按当前消费节奏推算的估算值")
+        appendLine("- 涉及存钱进度 / 结余的问题时，必须使用【储蓄进度】的数字（本地计算），不得自行推算")
         appendLine("- 本轮只读：expenses 与 actions 必须输出空数组；代码层会拒绝本轮的任何写操作")
         appendLine("- 查询结果为空时如实说明该时段没有匹配记录，不要编造")
         appendLine("- reply ≤120 字，先给结论再给 1-2 个关键数字")
+    }
+
+    /**
+     * 储蓄进度块（P3）：月收入/储蓄目标来自已确认画像，消费来自本地数据库，
+     * 全部由 SavingsPaceCalculator 确定性计算；LLM 只允许转述这些数字。
+     */
+    fun savingsPaceBlock(pace: SavingsPace): String = buildString {
+        appendLine("【储蓄进度 — 本月至今日，基于已确认画像 + 本地数据库计算，可信数据】")
+        appendLine("月收入 ¥${Money.formatYuan(pace.incomeCents)}，储蓄目标 ¥${Money.formatYuan(pace.goalCents)}，本月已消费 ¥${Money.formatYuan(pace.spentCents)}")
+        val leftoverLabel = if (pace.onTrack) "可达标" else "低于目标"
+        appendLine(
+            "按当前节奏预计月末消费 ¥${Money.formatYuan(pace.projectedSpendCents)}，" +
+                "结余 ¥${Money.formatYuan(pace.projectedLeftoverCents)}（$leftoverLabel）",
+        )
+        if (!pace.onTrack) {
+            val requiredDaily = SavingsPaceCalculator
+                .requiredDailySpendCents(pace.incomeCents, pace.goalCents, pace.daysInMonth)
+            appendLine(
+                "还差 ¥${Money.formatYuan(-pace.goalGapCents)}；剩余 ${pace.remainingDays} 天，" +
+                    "日均支出需控制在 ¥${Money.formatYuan(requiredDaily)} 内",
+            )
+        }
+        append("（该计算结果来自用户已确认的长期信息，仅限本轮授权范围使用）")
     }
 
     private fun StringBuilder.appendBudget(budget: BudgetToolResult) {

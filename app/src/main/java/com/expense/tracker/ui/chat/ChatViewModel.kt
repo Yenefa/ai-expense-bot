@@ -58,6 +58,8 @@ class ChatViewModel(
     private val budgetWarningProvider: suspend () -> String? = { null },
     /** 主动洞察：规则判定 + 硬约束在 provider 内部完成；这里只负责展示文案。 */
     private val proactiveInsightProvider: suspend () -> com.expense.tracker.proactive.ProactiveAlert? = { null },
+    /** 系统通知投递（P2）：历史已由治理器记录；权限缺失时实现方自行跳过。 */
+    private val proactiveNotifier: (com.expense.tracker.proactive.ProactiveAlert) -> Unit = {},
 ) : ViewModel() {
 
     private val internal = MutableStateFlow(ChatUiState())
@@ -235,6 +237,7 @@ class ChatViewModel(
     private suspend fun maybeEmitProactive() {
         val alert = runCatching { proactiveInsightProvider() }.getOrNull() ?: return
         chatRepo.appendAssistant("🔔 ${alert.copy}")
+        runCatching { proactiveNotifier(alert) }
     }
 
     private suspend fun appendError(result: LlmResult.Error) {
