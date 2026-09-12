@@ -39,17 +39,34 @@ class MlKitOcrRecognizer : OcrRecognizer {
     }
 
     override suspend fun recognize(bitmap: Bitmap): String {
-        val passes = buildList {
-            add(bitmap)
-            if (isDarkDominant(bitmap)) add(invert(bitmap))
-            add(enhance(bitmap))
+        // 位图所有权约定：
+        // - 入参 bitmap 由调用方持有，本方法只读、绝不 recycle，返回后调用方仍可继续使用；
+        // - invert()/enhance() 派生出的 bitmap 归本方法所有，必须在使用后回收。
+        // 各路识别按需懒创建：仅当前一路没有结果时才创建下一路派生图，
+        // 每张派生图一经用完立即在 finally 中回收，保证同一时刻最多只有一张派生大图驻留。
+        val originalText = runBoth(bitmap)
+        if (originalText.isNotBlank()) return originalText
+
+        if (isDarkDominant(bitmap)) {
+            val invertedText = runAndRecycle(invert(bitmap))
+            if (invertedText.isNotBlank()) return invertedText
         }
 
-        for (pass in passes) {
-            val text = runBoth(pass)
-            if (text.isNotBlank()) return text
+        return runAndRecycle(enhance(bitmap))
+    }
+
+    /**
+     * 识别单路派生 bitmap，并保证在 finally 中回收它（提前 return 或异常也不例外）。
+     *
+     * 所有权：[pass] 必须是由本类派生的位图，由本方法负责回收；
+     * 调用方持有的原始 bitmap 不得传入本方法。
+     */
+    private suspend fun runAndRecycle(pass: Bitmap): String {
+        return try {
+            runBoth(pass)
+        } finally {
+            pass.recycle()
         }
-        return ""
     }
 
     /** 中文与拉丁识别器并行，取文字更多的一路。 */

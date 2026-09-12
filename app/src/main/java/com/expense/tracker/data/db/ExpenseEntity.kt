@@ -1,9 +1,13 @@
 package com.expense.tracker.data.db
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "expenses")
+@Entity(
+    tableName = "expenses",
+    indices = [Index("occurredAt"), Index("deletedAt")],
+)
 data class ExpenseEntity(
     val amountCents: Long,
     val categoryId: String,

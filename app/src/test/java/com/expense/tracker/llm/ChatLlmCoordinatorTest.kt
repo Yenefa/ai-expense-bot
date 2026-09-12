@@ -454,6 +454,36 @@ class ChatLlmCoordinatorTest {
         assertThat(updated.toLocalTime()).isEqualTo(LocalTime.of(15, 0))
     }
 
+    @Test fun continuationResolvesPreviousRelativeDateAgainstItsOwnTimestamp() = runBlocking {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val day1Noon = LocalDateTime.of(2026, 8, 1, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        val now = LocalDateTime.of(2026, 8, 3, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        val chatDao = CoordinatorChatDao().apply {
+            rows += ChatMessageEntity("user", "昨天午饭35", day1Noon, id = 1L)
+            rows += ChatMessageEntity("assistant", "已记录 1 笔", day1Noon + 1_000L, id = 2L)
+        }
+        var capturedTargetDateLabel: String? = null
+        val coordinator = ChatLlmCoordinator(
+            expenseRepository = ExpenseRepository(CoordinatorExpenseDao()),
+            chatRepository = ChatRepository(chatDao),
+            requestJson = { _, _, _, _, _ ->
+                """{"reply":"已记7元","expenses":[{"amount":7,"category":"food","note":"补充","occurred_at":null}],"actions":[]}"""
+            },
+            applyPlan = { plan ->
+                capturedTargetDateLabel = plan.preview.targetDateLabel
+                MutationApplyResult(listOf(3L), listOf(3L), assistantMessageId = 3L)
+            },
+            nowProvider = { now },
+            zone = zone,
+        )
+
+        val result = coordinator.submit("还有一笔7元", prefs()) as LlmResult.Ok
+
+        // Day1 的“昨天”按 Day1 解析为 7月31日，而不是按 Day3 解析成 8月2日。
+        assertThat(capturedTargetDateLabel).isEqualTo("2026-07-31")
+        assertThat(result.expenseIds).isEqualTo(listOf(3L))
+    }
+
     /** LlmPrompt 渲染记录时间使用 JVM 默认时区（CI 为 UTC），断言需按运行环境动态计算。 */
     private fun promptTime(millis: Long): String =
         java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")

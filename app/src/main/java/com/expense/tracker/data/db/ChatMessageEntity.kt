@@ -1,9 +1,13 @@
 package com.expense.tracker.data.db
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "chat_messages")
+@Entity(
+    tableName = "chat_messages",
+    indices = [Index("createdAt")],
+)
 data class ChatMessageEntity(
     val role: String,
     val content: String,

@@ -66,20 +66,39 @@ object ChineseDateResolver {
         }
     }
 
+    /**
+     * 续记消息的日期解析：当前文本始终以 [nowMillis] 为基准；
+     * 历史文本则各自以消息发送时间（Pair.second）为基准，
+     * 避免把 Day1 说的“昨天”错误地对齐到 Day3 的当前时间。
+     */
+    @JvmName("resolveForMessagesWithTimestamps")
     fun resolveForMessage(
         currentText: String,
-        previousUserTextsNewestFirst: List<String>,
+        previousUserMessagesNewestFirst: List<Pair<String, Long>>,
         nowMillis: Long,
         zone: ZoneId = ZoneId.systemDefault(),
     ): LocalDate? {
         resolveExplicit(currentText, nowMillis, zone)?.let { return it }
         if (!looksLikeContinuation(currentText)) return null
-        return previousUserTextsNewestFirst
+        return previousUserMessagesNewestFirst
             .asSequence()
             .take(MAX_CONTEXT_MESSAGES)
-            .mapNotNull { resolveExplicit(it, nowMillis, zone) }
+            .mapNotNull { (text, createdAtMillis) -> resolveExplicit(text, createdAtMillis, zone) }
             .firstOrNull()
     }
+
+    /** 兼容旧调用方：历史文本没有时间戳时，统一按 [nowMillis] 解析（保持原有语义）。 */
+    fun resolveForMessage(
+        currentText: String,
+        previousUserTextsNewestFirst: List<String>,
+        nowMillis: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): LocalDate? = resolveForMessage(
+        currentText = currentText,
+        previousUserMessagesNewestFirst = previousUserTextsNewestFirst.map { it to nowMillis },
+        nowMillis = nowMillis,
+        zone = zone,
+    )
 
     fun looksLikeContinuation(text: String): Boolean {
         val normalized = text.trim()

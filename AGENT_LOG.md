@@ -375,3 +375,29 @@
 - JVM 359 → **372，0 failed**（+13：解析器 2 / 历史 1 / 周期 6 / 备份 2 / Locale 2）
 - GitHub Actions：timezone 修复后 run 34622309914 **success**；本版推送后跑新工作流（含 release 编译检查）
 - 未修/待 owner 决定：云备份是否排除 `expense.db`（与"仅本地存储"文案相关，属产品决策）
+
+---
+
+# AGENT_LOG.md — 2026-09-11 v3.14.2 第二轮深度审计修复（opencode，多 subagent 并行 + 分支 PR 审核流）
+
+## 背景
+- owner 指令：递归再审一轮、能修就修（技术选型用最推荐方案），成果走 GitHub 审核；审核通过后再部署网站；软著材料同步初步准备
+
+## 并行分工（7 路，文件集互不重叠）
+- 修复 1：截图导入未配置 AI 崩溃（双层防护）+ 口语金额（23块5/3块半/3.5元歧义）
+- 修复 2：DataStore corruptionHandler（6 处）+ 长期记忆解码失败不覆写 + Keystore 失效防崩
+- 修复 3：历史相对日期按消息时间戳解析（新 API + coordinator 传参）
+- 修复 4：路由代词误判（查询优先，显式写动词保留 MUTATION）
+- 修复 5：LlmClient 取消/超时/单次重试/响应限长
+- 修复 6：OCR 派生位图懒创建 + finally 回收
+- 修复 7：Room 索引 migration 5→6 + CSV 去重基线改活跃记录
+- 主线程：真实平台账单 preamble 表头定位 + force-stop 文档 + 集成/验证/发布
+
+## 验收（本地）
+- JVM 372 → **398，0 failed**（+26）
+- 行为基线：路由 80/80、Query 16/16、工具 16/16 保持；Proactive/Memory Bench 不变
+- `lintDebug` / `assembleRelease` 通过；分支 PR 待 owner 审核（APPROVED 后自动合并 + 部署下载站）
+
+## 软著材料（初步）
+- `project_023_ai-expense-bot/软著材料/`：源程序文档.pdf（60 页：前 30 + 后 30，共 322 页；127 文件 / 15971 行）、软件说明书（md+pdf）、软著申请信息表、提交清单
+- 待 owner 确认：软件全称/版本号写法、开发完成日期与首次发表日期（信息表已标出逻辑矛盾）、著作权人身份材料、界面截图补拍（清单 28 项）

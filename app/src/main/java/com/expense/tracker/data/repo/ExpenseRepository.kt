@@ -78,7 +78,8 @@ class ExpenseRepository(private val dao: ExpenseDao) {
     suspend fun getAllActiveOnce(): List<ExpenseEntity> = dao.getAllActiveOnce()
 
     suspend fun importExpenses(rows: List<ImportedExpense>): ExpenseImportSummary {
-        val seen = dao.getAllOnce().mapTo(HashSet()) { it.importKey() }
+        // 去重基线只取活跃记录：软删除的账目允许再次导入
+        val seen = dao.getAllActiveOnce().mapTo(HashSet()) { it.importKey() }
         val toInsert = ArrayList<ExpenseEntity>(rows.size)
         var skipped = 0
 

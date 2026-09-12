@@ -2,9 +2,11 @@ package com.expense.tracker.data.prefs
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -22,7 +24,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-private val Context.proactiveDataStore: DataStore<Preferences> by preferencesDataStore(name = "proactive_prefs")
+// 文件损坏时替换为空 Preferences，主动提醒状态重置而非崩溃。
+private val Context.proactiveDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "proactive_prefs",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 @Serializable
 private data class ProactiveStateJson(

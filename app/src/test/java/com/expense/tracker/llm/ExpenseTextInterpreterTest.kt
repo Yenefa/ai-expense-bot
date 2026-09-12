@@ -73,6 +73,47 @@ class ExpenseTextInterpreterTest {
         assertThat(interpreted.expenseHints.single().amountCents).isEqualTo(1_660L)
     }
 
+    @Test fun colloquialYuanJiaoAmountMatchesModelResponseThroughPlanner() {
+        val interpreted = ExpenseTextInterpreter.interpret("昨天打车花了23块5", now, zone)
+
+        // 「23块5」= 23.5 元，端侧提示必须是 2350，模型返回 2350 时不能被金额一致性 guard 拒绝。
+        assertThat(interpreted.expenseHints.map { it.amountCents }).containsExactly(2_350L)
+        assertThat(interpreted.hasCompleteExpenseHints).isTrue()
+
+        val plan = LlmMutationPlanner.create(
+            result = LlmParseResult(
+                reply = "候选1笔",
+                expenses = listOf(ParsedExpense(2_350L, "transport", "打车", null)),
+            ),
+            nowMillis = now,
+            availableRecords = emptyList(),
+            lastBatchIds = emptyList(),
+            currentText = interpreted.normalizedText,
+            targetDate = null,
+            sourceExpenseHints = interpreted.expenseHints,
+            zone = zone,
+        )
+
+        assertThat(plan.preview.count).isEqualTo(1)
+        assertThat(plan.preview.totalCents).isEqualTo(2_350L)
+        assertThat(plan.result.expenses.map { it.amountCents }).containsExactly(2_350L)
+    }
+
+    @Test fun halfYuanColloquialAmountProduces350Cents() {
+        // hint 依赖日期锚点，故用「昨天」验证 3块半 = 3.5 元。
+        val interpreted = ExpenseTextInterpreter.interpret("昨天奶茶3块半", now, zone)
+
+        assertThat(interpreted.expenseHints.map { it.amountCents }).containsExactly(350L)
+    }
+
+    @Test fun decimalAmountAfterPeriodWordStaysAnAmountWhenFollowedByItem() {
+        val interpreted = ExpenseTextInterpreter.interpret("今天下午3.5元咖啡", now, zone)
+
+        // 「3.5元」后接商品（咖啡），不能再改写成「下午 3点，5元」。
+        assertThat(interpreted.normalizedText).isEqualTo("今天下午3.5元咖啡")
+        assertThat(interpreted.expenseHints.map { it.amountCents }).containsExactly(350L)
+    }
+
     @Test fun invalidLaterClockDoesNotEraseAnEarlierValidClockInTheSameExpense() {
         val interpreted = ExpenseTextInterpreter.interpret(
             "8月1日上午8点，口误晚上25点，早餐6元",

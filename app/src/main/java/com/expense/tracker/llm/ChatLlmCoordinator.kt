@@ -70,16 +70,18 @@ class ChatLlmCoordinator(
             message.role.takeIf { it == "user" || it == "assistant" }
                 ?.let { ChatMsg(it, message.content) }
         }
-        val previousUserTexts = priorMessages
+        // 续记消息中的相对日期（昨天/今天）必须按各条历史消息自己的发送时间解析，
+        // 不能统一按当前时间解析，否则旧消息的“昨天”会整体漂移。
+        val previousUserMessages = priorMessages
             .asReversed()
             .filter { it.role == "user" }
-            .map { it.content }
+            .map { it.content to it.createdAt }
         val targetDate = if (interpreted.hasMultipleDates) {
             null
         } else {
             ChineseDateResolver.resolveForMessage(
                 currentText = requestText,
-                previousUserTextsNewestFirst = previousUserTexts,
+                previousUserMessagesNewestFirst = previousUserMessages,
                 nowMillis = now,
                 zone = zone,
             )

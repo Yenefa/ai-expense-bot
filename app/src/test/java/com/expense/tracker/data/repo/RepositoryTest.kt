@@ -140,4 +140,22 @@ class RepositoryTest {
         assertThat(all).hasSize(2)
         assertThat(all.last().createdAt).isEqualTo(201L)
     }
+
+    @Test fun expenseImportReinsertsAfterSoftDelete() = runBlocking {
+        val dao = FakeExpenseDao()
+        val repo = ExpenseRepository(dao)
+        val row = ImportedExpense(3_500L, "food", "午饭", 200L, 201L)
+
+        val first = repo.importExpenses(listOf(row))
+        assertThat(first.inserted).isEqualTo(1)
+        val insertedId = repo.getAllActiveOnce().single().id
+
+        repo.softDelete(insertedId)
+
+        val second = repo.importExpenses(listOf(row))
+
+        assertThat(second.inserted).isEqualTo(1)
+        assertThat(second.skippedDuplicates).isEqualTo(0)
+        assertThat(repo.getAllActiveOnce()).hasSize(1)
+    }
 }

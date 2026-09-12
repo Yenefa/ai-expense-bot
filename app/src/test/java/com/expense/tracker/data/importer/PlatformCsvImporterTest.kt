@@ -83,6 +83,28 @@ class PlatformCsvImporterTest {
     }
 
     @Test
+    fun wechatBillWithPreambleFindsHeaderRowAndImports() {
+        // 官方导出常带前置元信息行，表头不在第一行
+        val csv = """
+            微信支付账单明细,,,,,,,,,,
+            导出时间：2026-08-07 10:00:00,,,,,,,,,,
+            --------------------------
+            交易时间,交易类型,交易对方,商品,收/支,金额(元),支付方式,当前状态,交易单号,商户单号,备注
+            2026-08-06 09:15:23,商户消费,蜜雪冰城,柠檬水,支出,8.00,零钱,支付成功,2026080622001,1001,
+            2026-08-06 12:30:11,商户消费,美团外卖,午餐,支出,25.50,零钱,支付成功,2026080622002,1002,
+        """.trimIndent()
+
+        assertThat(PlatformCsvImporter.looksLikePlatformCsv(csv)).isTrue()
+        val result = PlatformCsvImporter.parse(csv, zone)
+
+        assertThat(result.expenses).hasSize(2)
+        assertThat(result.expenses[0].amountCents).isEqualTo(800L)
+        assertThat(result.expenses[0].occurredAt)
+            .isEqualTo(LocalDateTime.of(2026, 8, 6, 9, 15, 23).atZone(zone).toInstant().toEpochMilli())
+        assertThat(result.expenses[1].amountCents).isEqualTo(2_550L)
+    }
+
+    @Test
     fun detectRecognizesPlatformHeaders() {
         assertThat(PlatformCsvImporter.looksLikePlatformCsv("交易时间,交易类型,交易对方,商品,收/支,金额(元)"))
             .isTrue()

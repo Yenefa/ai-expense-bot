@@ -2,8 +2,10 @@ package com.expense.tracker.data.subscription
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -21,8 +23,10 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
+// 文件损坏时替换为空：本地凭证随之不可用（可接受），但 UI 不崩溃。
 private val Context.subscriptionDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "subscription_prefs",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
 class SubscriptionPrefs(
@@ -91,7 +95,13 @@ class SubscriptionPrefs(
             clearSubscriptionLocked()
             return@withLock null
         }
-        withContext(Dispatchers.IO) { tokenStorage.read() }.ifBlank { null }
+        // Keystore 条目失效（GeneralSecurityException 等）时返回 null 并清理陈旧元数据，不向上抛。
+        val tokenRead = runCatching { withContext(Dispatchers.IO) { tokenStorage.read() } }
+        if (tokenRead.isFailure) {
+            clearSubscriptionLocked()
+            return@withLock null
+        }
+        tokenRead.getOrNull().orEmpty().ifBlank { null }
     }
 
     suspend fun activeAccess(nowMillis: Long = clock()): SubscriptionAccess? = mutex.withLock {
@@ -106,7 +116,12 @@ class SubscriptionPrefs(
             return@withLock null
         }
 
-        val token = withContext(Dispatchers.IO) { tokenStorage.read() }
+        val tokenRead = runCatching { withContext(Dispatchers.IO) { tokenStorage.read() } }
+        if (tokenRead.isFailure) {
+            clearSubscriptionLocked()
+            return@withLock null
+        }
+        val token = tokenRead.getOrNull().orEmpty()
         if (token.isEmpty()) return@withLock null
         var installationId = preferences[INSTALLATION_ID]
         if (installationId.isNullOrBlank()) {
@@ -126,7 +141,8 @@ class SubscriptionPrefs(
     }
 
     private suspend fun clearSubscriptionLocked() {
-        withContext(Dispatchers.IO) { tokenStorage.write("") }
+        // Keystore 写入也可能因条目失效而失败；清理预失败不影响元数据清理。
+        runCatching { withContext(Dispatchers.IO) { tokenStorage.write("") } }
         store.edit { preferences ->
             preferences.remove(EXPIRES_AT)
             preferences.remove(TOKEN_FORMAT_VERSION)
