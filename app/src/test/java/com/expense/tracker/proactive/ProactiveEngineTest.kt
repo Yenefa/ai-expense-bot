@@ -22,13 +22,13 @@ class ProactiveEngineTest {
     private val dao = FakeExpenseDao()
     private val store = FakeProactiveStateStore()
 
-    private suspend fun insert(cents: Long, category: String, date: LocalDate) {
+    private suspend fun insert(cents: Long, category: String, date: LocalDate, note: String = "") {
         val at = date.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
         dao.insert(
             ExpenseEntity(
                 amountCents = cents,
                 categoryId = category,
-                note = "",
+                note = note,
                 occurredAt = at,
                 createdAt = at,
             ),
@@ -160,5 +160,30 @@ class ProactiveEngineTest {
 
         assertThat(alert).isNull()
         assertThat(store.history()).isEmpty()
+    }
+
+    @Test
+    fun `总量与分类正常时按商户基线发现单一商户异常`() = runBlocking<Unit> {
+        // 近 4 周：食堂 190k + 星巴克 10k（合计 200k，分类 food 正常）
+        // 本周：食堂 190k + 星巴克 60k（合计 250k = 1.25x，总量与分类都不达 1.5x）→ 仅商户级命中
+        listOf(
+            LocalDate.of(2026, 8, 19),
+            LocalDate.of(2026, 8, 26),
+            LocalDate.of(2026, 9, 2),
+            LocalDate.of(2026, 9, 9),
+        ).forEach { day ->
+            insert(190_000L, "food", day, note = "食堂")
+            insert(10_000L, "food", day, note = "星巴克")
+        }
+        insert(190_000L, "food", LocalDate.of(2026, 9, 15), note = "食堂")
+        insert(60_000L, "food", LocalDate.of(2026, 9, 15), note = "星巴克")
+
+        val alert = engine(LocalDate.of(2026, 9, 16)).evaluate()!!
+
+        assertThat(alert.type).isEqualTo(ProactiveAlertType.ANOMALOUS_SPENDING)
+        assertThat(alert.deterministicCopy).contains("星巴克")
+        assertThat(alert.facts["current_week_cents"]).isEqualTo(60_000L)
+        assertThat(alert.facts["baseline_cents"]).isEqualTo(10_000L)
+        assertThat(alert.facts["delta_cents"]).isEqualTo(50_000L)
     }
 }

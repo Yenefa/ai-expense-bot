@@ -401,3 +401,40 @@
 ## 软著材料（初步）
 - `project_023_ai-expense-bot/软著材料/`：源程序文档.pdf（60 页：前 30 + 后 30，共 322 页；127 文件 / 15971 行）、软件说明书（md+pdf）、软著申请信息表、提交清单
 - 待 owner 确认：软件全称/版本号写法、开发完成日期与首次发表日期（信息表已标出逻辑矛盾）、著作权人身份材料、界面截图补拍（清单 28 项）
+
+---
+
+# AGENT_LOG.md — 2026-09-13 v3.15.0 商户级异常基线（AI 执行线，owner 指定 D）
+
+## 背景 / owner 决策
+- 本轮无 `EXPENSEBENCH_API_KEY` → 待办 A（真实模型 3 轮复测）暂缓
+- owner 指定做 B + D：B 软著材料**沿用 V3.14.1、不重生成**；D 选**商户级异常基线**
+- B 日期口径：著作权人确认**发表状态＝未发表**，首次发表日期不再填写 → 消除「发表日期早于开发完成日期」的逻辑矛盾
+
+## 交付（D：代码，走分支 PR，未合并 dev）
+- 输入：新增 `MerchantWeeklySpending(note, currentWeekCents, completedWeeksCents)`；`ProactiveInputs` 增 `merchantWeekSpends`
+- 构建：`ProactiveEngine` 按 `note`（trim 后非空）聚合「本周 + 近 4 个完整周」的商户级周消费
+- 判定：`ProactiveRules.anomalyAlert` 改为三级兜底 **总量 → 分类 → 商户**；抽出共用 `weeklyAnomaly(...)`（≥4 样本 / 1.5x / ¥100 口径不变）
+- 文案：`本周在「<商户>」消费 ¥X，明显高于近 4 周平均 ¥Y，建议看看是哪几笔。`；商户名超 12 字截断展示（`MAX_MERCHANT_LABEL_CHARS`）
+
+## 交付（B：软著材料，仓库外 `project_023_ai-expense-bot/软著材料/`）
+- `软著申请信息表.md`：发表状态「未发表」、首次发表日期留空（已确认）；「日期逻辑自检」标记为已解决
+- `提交清单.md`：一致性检查同步为「未发表、不填发表日期」
+- 版本保持 V3.14.1；源程序文档 / 软件说明书**未重生成**（owner 决定）
+
+## 边界 / 未改
+- 阈值（1.5x / ¥100 / 4 样本）、冷却、每日额度、评测器与数据集均未改动
+- 商户级仅在总量与分类都未命中时评估；既有分类级判定结果不变
+- 商户按 `note` 精确匹配（同一商户不同写法不合并；空备注不参与）
+
+## 验收（本地）
+- JVM 398 → **402，0 failed**（规则 +3 / 引擎 +1；先写测试见红，再实现见绿）；`lintDebug` 通过
+- ProactiveInsightBench 38 条五项指标仍全 0%、文案覆盖率 100%（dataset sha 不变）
+- 版本 v3.15.0 / versionCode 47；CHANGELOG / README / AGENT_PLAN / `docs/proactive-insight.md` 已同步
+- **Human Review PENDING**：分支 `feat/merchant-anomaly-baseline`，等 owner 审核后合并 dev；是否出包 / 部署下载站待 owner 指令
+
+## 待办（更新）
+- A：真实模型 3 轮复测（需 `EXPENSEBENCH_API_KEY`）
+- B：界面截图补拍（清单 28 项，需真机）＋ 著作权人身份材料；开发完成日期待著作权人核实
+- C：云自动备份是否排除 `expense.db`（当前包含；记忆/偏好类 DataStore 均已排除）
+- D：后续候选 主动提醒按分类独立冷却 / 上架正式签名

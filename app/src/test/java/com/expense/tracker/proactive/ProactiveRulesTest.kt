@@ -17,6 +17,7 @@ class ProactiveRulesTest {
         currentWeek: Long = 0L,
         weeks: List<Long> = listOf(0L, 0L, 0L, 0L),
         categoryWeeks: List<CategoryWeeklySpending> = emptyList(),
+        merchantWeeks: List<MerchantWeeklySpending> = emptyList(),
         income: Long? = null,
         savings: Long? = null,
     ) = ProactiveInputs(
@@ -30,6 +31,7 @@ class ProactiveRulesTest {
         currentWeekSpentCents = currentWeek,
         completedWeekSpendsCents = weeks,
         categoryWeekSpends = categoryWeeks,
+        merchantWeekSpends = merchantWeeks,
         monthlyIncomeCents = income,
         savingsGoalCents = savings,
     )
@@ -163,5 +165,80 @@ class ProactiveRulesTest {
             inputs(spent = 210_000L, currentWeek = 500_000L, weeks = listOf(10_000L, 10_000L, 10_000L, 10_000L), income = 800_000L, savings = 200_000L),
         )!!
         assertThat(alert.type).isEqualTo(ProactiveAlertType.BUDGET_THRESHOLD)
+    }
+
+    @Test
+    fun `总量与分类均正常时按商户基线发现异常`() {
+        // 总量 250k → 290k（1.16x，不达 1.5x）；分类各项持平；单一商户 10k → 60k（6x 且 +50k）→ 商户级命中
+        val alert = ProactiveRules.evaluate(
+            inputs(
+                limit = 0L,
+                currentWeek = 290_000L,
+                weeks = listOf(250_000L, 250_000L, 250_000L, 250_000L),
+                categoryWeeks = listOf(
+                    CategoryWeeklySpending("food", 90_000L, listOf(90_000L, 90_000L, 90_000L, 90_000L)),
+                    CategoryWeeklySpending("housing", 200_000L, listOf(200_000L, 200_000L, 200_000L, 200_000L)),
+                ),
+                merchantWeeks = listOf(
+                    MerchantWeeklySpending("星巴克", 60_000L, listOf(10_000L, 10_000L, 10_000L, 10_000L)),
+                ),
+            ),
+        )!!
+        assertThat(alert.type).isEqualTo(ProactiveAlertType.ANOMALOUS_SPENDING)
+        assertThat(alert.deterministicCopy).contains("星巴克")
+        assertThat(alert.facts["current_week_cents"]).isEqualTo(60_000L)
+        assertThat(alert.facts["baseline_cents"]).isEqualTo(10_000L)
+        assertThat(alert.facts["delta_cents"]).isEqualTo(50_000L)
+    }
+
+    @Test
+    fun `分类异常优先于商户异常`() {
+        // 餐饮 50k → 90k 已达分类级；同一轮商户 10k → 300k 偏离更大，仍应报分类级（层级：总量 > 分类 > 商户）
+        val alert = ProactiveRules.evaluate(
+            inputs(
+                limit = 0L,
+                currentWeek = 500_000L,
+                weeks = listOf(500_000L, 500_000L, 500_000L, 500_000L),
+                categoryWeeks = listOf(
+                    CategoryWeeklySpending("food", 90_000L, listOf(50_000L, 50_000L, 50_000L, 50_000L)),
+                ),
+                merchantWeeks = listOf(
+                    MerchantWeeklySpending("星巴克", 300_000L, listOf(10_000L, 10_000L, 10_000L, 10_000L)),
+                ),
+            ),
+        )!!
+        assertThat(alert.deterministicCopy).contains("餐饮")
+        assertThat(alert.deterministicCopy).doesNotContain("星巴克")
+        assertThat(alert.facts["delta_cents"]).isEqualTo(40_000L)
+    }
+
+    @Test
+    fun `商户异常同样受样本与阈值约束`() {
+        // 只有 3 个非零样本 → 冷启动
+        assertThat(
+            ProactiveRules.evaluate(
+                inputs(
+                    limit = 0L,
+                    currentWeek = 60_000L,
+                    weeks = listOf(0L, 0L, 0L, 0L),
+                    merchantWeeks = listOf(
+                        MerchantWeeklySpending("星巴克", 60_000L, listOf(10_000L, 10_000L, 10_000L, 0L)),
+                    ),
+                ),
+            ),
+        ).isNull()
+        // 幅度不足 1.5x（14k vs 10k）
+        assertThat(
+            ProactiveRules.evaluate(
+                inputs(
+                    limit = 0L,
+                    currentWeek = 14_000L,
+                    weeks = listOf(0L, 0L, 0L, 0L),
+                    merchantWeeks = listOf(
+                        MerchantWeeklySpending("星巴克", 14_000L, listOf(10_000L, 10_000L, 10_000L, 10_000L)),
+                    ),
+                ),
+            ),
+        ).isNull()
     }
 }
