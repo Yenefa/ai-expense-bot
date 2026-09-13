@@ -451,7 +451,7 @@
 - `backup_rules.xml`（Android 8–11：云备份与设备迁移共用）：新增 `expense.db` / `-wal` / `-shm` / `-journal` 与 `datastore/budget_prefs.preferences_pb` 排除
 - `data_extraction_rules.xml`：`cloud-backup` 加同样排除；`device-transfer` **不排除**账目与预算（12+ 换机保留）
 - `BackupPolicyTest`（新增，JVM，**进 CI**）：云备份必须排除财务数据与凭据、设备迁移必须保留账目与预算、清单必须声明两套规则资源
-- `tools/test-api-key-backup-rules.ps1`：补**反向断言**（财务数据不得出现在 device-transfer），并把 user_profile / proactive 纳入必排清单
+- `tools/test-api-key-backup-rules.ps1`：**收编为薄封装**（只调用 `BackupPolicyTest`），期望清单只保留 Kotlin 一处（owner 决定：按 Kotlin 来）；反向断言（财务数据不得出现在 device-transfer）落在 Kotlin 测试里
 - 文案三处同步：README「🗂 数据安全」新增系统备份口径段；App 内置说明书「数据安全」与欢迎语；官网隐私卡 LEDGER / REMINDERS
 - 版本 v3.15.1 / versionCode 48（修订版）
 

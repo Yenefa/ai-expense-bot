@@ -12,7 +12,8 @@ import org.w3c.dom.Element
  * 系统备份边界契约（v3.15.1 起）：账目/聊天/周期账单（`expense.db`）与预算（`budget_prefs`）
  * 属于财务数据，**不得进入系统云备份**；凭据与长期记忆同样排除。
  *
- * 三条规则同时成立，本测试是它们在 CI 里的守门人（`tools/test-api-key-backup-rules.ps1` 不接 CI）：
+ * 三条规则同时成立；本测试是这条边界的**唯一权威**（在 CI 中运行）。`tools/test-api-key-backup-rules.ps1`
+ * 只是调用本测试的薄封装，不要在脚本里再维护第二份期望清单。
  * - Android 8–11（`backup_rules.xml`）：云备份与设备迁移共用同一套规则（平台限制）；
  * - Android 12+ 云备份（`data_extraction_rules.xml` 的 `cloud-backup`）：同样排除；
  * - Android 12+ 设备迁移（`device-transfer`）：**保留**账目与预算——设备对设备直传，不经服务器。
