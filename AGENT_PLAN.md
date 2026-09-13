@@ -11,8 +11,8 @@
 
 - Android 记账 App「Y.E cost」（`com.expense.tracker`）：Kotlin 1.9.22 + Jetpack Compose + Room + ML Kit OCR + LLM Agent
 - 仓库：https://github.com/Yenefa/ai-expense-bot（`dev` 分支）
-- 版本：v3.15.0（versionCode 47；分支 `feat/merchant-anomaly-baseline` PR 待 owner 审核，dev 仍为 v3.14.2/46）
-- 测试：**402 个 JVM 单测**（`./gradlew :app:testDebugUnitTest`，其中 2 个 LLM bench 与 1 个平台相关用例在缺省环境下 skip）；CI：GitHub Actions（test + lint）
+- 版本：v3.15.1（versionCode 48；堆叠分支 `fix/cloud-backup-scope` 基于 `feat/merchant-anomaly-baseline`，两个 PR 均待 owner 审核；dev 仍为 v3.14.2/46）
+- 测试：**405 个 JVM 单测**（`./gradlew :app:testDebugUnitTest`，其中 2 个 LLM bench 与 1 个平台相关用例在缺省环境下 skip）；CI：GitHub Actions（test + lint）
 - 服务器：腾讯云 CloudBase 云函数 `ye-cost-api`（兑换码核销 + AI 代理 `hy3`），/health 在线
 
 ## ExpenseBench v2（当前阶段）
@@ -40,6 +40,7 @@
 - **v3.14.1 深度审计修复**（2026-09-11，`c00e48e`）：跨年历史页崩溃 / 周期账单跳月与并发 / 未来日期窗口 / 提醒页配置覆盖 / 备份校验 / LLM 多候选解析 / Locale；正式签名基础设施与 CI 加固
 - **v3.14.2 第二轮深度审计**（2026-09-12，PR #2 → `8e72252`）：截图导入防崩 / 平台账单 preamble / 续记日期按消息时间 / 路由代词 / LlmClient 加固 / OCR 回收 / DataStore+Keystore / 口语金额 / Room 索引 / CSV 软删重导；398 单测
 - **v3.15.0 商户级异常基线**（2026-09-13，分支 `feat/merchant-anomaly-baseline`）：异常判定三级兜底 **总量 > 分类 > 商户**（按 `note`）；共用 `weeklyAnomaly` 口径不变；402 单测；待 owner 审核
+- **v3.15.1 隐私边界收紧**（2026-09-13，分支 `fix/cloud-backup-scope`，堆叠于 v3.15.0）：账目/聊天（`expense.db` 及 WAL 边车）与预算排除系统云备份；Android 12+ 保留设备迁移；新增 CI 契约 `BackupPolicyTest`；405 单测；待 owner 审核
 - LLM Bench 继续按需（不再自动跑）；真实模型 3 轮复测（新数据集 sha、分类修正、mt-02/03/16、mt-15）与 LLM 文案真实复测待 owner 指令
 - 后续候选：真实模型复测、主动提醒按分类独立冷却（当前异常/储蓄共用 7d）、上架准备（正式签名见 `docs/release-signing.md`）
 

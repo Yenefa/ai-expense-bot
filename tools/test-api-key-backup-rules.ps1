@@ -32,19 +32,33 @@ foreach ($entry in $expectedManifest.GetEnumerator()) {
     }
 }
 
+# Credentials and local prefs: excluded from cloud backup AND device transfer (all API levels).
+$credentialExclusions = @(
+    @{ domain = 'sharedpref'; path = 'secure_api_key.xml' },
+    @{ domain = 'sharedpref'; path = 'secure_subscription_credential.xml' },
+    @{ domain = 'file'; path = 'datastore/user_prefs.preferences_pb' },
+    @{ domain = 'file'; path = 'datastore/subscription_prefs.preferences_pb' },
+    @{ domain = 'file'; path = 'datastore/user_profile_prefs.preferences_pb' },
+    @{ domain = 'file'; path = 'datastore/proactive_prefs.preferences_pb' }
+)
+
+# Financial data (v3.15.1): must never enter cloud backup; Android 12+ device transfer keeps it.
+$financialExclusions = @(
+    @{ domain = 'database'; path = 'expense.db' },
+    @{ domain = 'database'; path = 'expense.db-wal' },
+    @{ domain = 'database'; path = 'expense.db-shm' },
+    @{ domain = 'database'; path = 'expense.db-journal' },
+    @{ domain = 'file'; path = 'datastore/budget_prefs.preferences_pb' }
+)
+
 function Assert-Exclusions {
     param(
         [Parameter(Mandatory = $true)][object[]]$Nodes,
-        [Parameter(Mandatory = $true)][string]$Scope
+        [Parameter(Mandatory = $true)][string]$Scope,
+        [Parameter(Mandatory = $true)][object[]]$Required
     )
 
-    $required = @(
-        @{ domain = 'sharedpref'; path = 'secure_api_key.xml' },
-        @{ domain = 'sharedpref'; path = 'secure_subscription_credential.xml' },
-        @{ domain = 'file'; path = 'datastore/user_prefs.preferences_pb' },
-        @{ domain = 'file'; path = 'datastore/subscription_prefs.preferences_pb' }
-    )
-    foreach ($item in $required) {
+    foreach ($item in $Required) {
         $found = @(@($Nodes) | Where-Object {
             $_.domain -eq $item.domain -and $_.path -eq $item.path
         })
@@ -54,17 +68,39 @@ function Assert-Exclusions {
     }
 }
 
+# Reverse assertion: financial data must NOT creep back into device transfer.
+function Assert-NotExcluded {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Nodes,
+        [Parameter(Mandatory = $true)][string]$Scope,
+        [Parameter(Mandatory = $true)][object[]]$Forbidden
+    )
+
+    foreach ($item in $Forbidden) {
+        $found = @(@($Nodes) | Where-Object {
+            $_.domain -eq $item.domain -and $_.path -eq $item.path
+        })
+        if ($found.Count -ne 0) {
+            throw "$Scope must NOT exclude domain=$($item.domain) path=$($item.path) (financial data stays transferable)"
+        }
+    }
+}
+
 $legacyRules = Read-XmlFile 'app\src\main\res\xml\backup_rules.xml'
 if ($legacyRules.DocumentElement.Name -ne 'full-backup-content') {
     throw 'backup_rules.xml root must be full-backup-content'
 }
-Assert-Exclusions -Nodes @($legacyRules.'full-backup-content'.exclude) -Scope 'Android 8-11 backup rules'
+$legacyNodes = @($legacyRules.'full-backup-content'.exclude)
+Assert-Exclusions -Nodes $legacyNodes -Scope 'Android 8-11 backup rules' -Required ($credentialExclusions + $financialExclusions)
 
 $modernRules = Read-XmlFile 'app\src\main\res\xml\data_extraction_rules.xml'
 if ($modernRules.DocumentElement.Name -ne 'data-extraction-rules') {
     throw 'data_extraction_rules.xml root must be data-extraction-rules'
 }
-Assert-Exclusions -Nodes @($modernRules.'data-extraction-rules'.'cloud-backup'.exclude) -Scope 'Android 12+ cloud backup rules'
-Assert-Exclusions -Nodes @($modernRules.'data-extraction-rules'.'device-transfer'.exclude) -Scope 'Android 12+ device transfer rules'
+$cloudNodes = @($modernRules.'data-extraction-rules'.'cloud-backup'.exclude)
+$transferNodes = @($modernRules.'data-extraction-rules'.'device-transfer'.exclude)
+Assert-Exclusions -Nodes $cloudNodes -Scope 'Android 12+ cloud backup rules' -Required ($credentialExclusions + $financialExclusions)
+Assert-Exclusions -Nodes $transferNodes -Scope 'Android 12+ device transfer rules' -Required $credentialExclusions
+Assert-NotExcluded -Nodes $transferNodes -Scope 'Android 12+ device transfer rules' -Forbidden $financialExclusions
 
-Write-Output 'API Key backup rules: PASS'
+Write-Output 'Backup rules (credentials + financial data): PASS'
