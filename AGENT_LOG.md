@@ -506,3 +506,31 @@
 - owner：点头后执行部署 + 线上校验（index / APK / SHA 一致）
 - A：真实模型 3 轮复测（需 `EXPENSEBENCH_API_KEY`）
 - B：界面截图补拍（28 项）/ 著作权人身份材料 / 开发完成日期；「未发表」口径仍建议复核
+
+---
+
+# AGENT_LOG.md — 2026-09-13 v3.15.1 部署上线 + CI flaky 修复（AI 执行线，owner「all done, do it」）
+
+## 合并与部署
+- #5（发布物料）由 owner 合并 `bce42ad`；#6（deflake）合并 `3144520`；两条分支已清理，无遗留 open PR
+- 部署：`tcb hosting deploy website /ye-cost -e ilove-d5g0gzrpp375112b9` → 4 文件上传、0 失败
+- dev CI：两次合并的 push 运行均 **success**
+
+## 线上校验（全部实测）
+- `https://…/ye-cost/` → **200**，页面含 `v3.15.1` / `2026.09.13` / `versionCode 48` / 新 APK 文件名 / SHA-256（加 `no-cache` + 时间戳绕过 CDN）
+- 新 APK → **200**，`Content-Length=55374337`；**下载回本地比对 SHA-256 逐位一致** `FB42E9618C7866425E82D8C66AA57EBF6A2FE7976EB4B51C342D5ED95BBE6F31`
+- 旧 APK（v3.14.2）→ **200**，旧链接未破坏；图标 → 200
+
+## CI flaky 修复（#6）
+- 现象：合并 #4 后 dev CI 挂 `SubscriptionViewModelTest.startupUnauthorizedStatusClearsLocalSubscription`，而同一提交在 PR 上为绿 → flaky（#3 的 dev run 亦为绿，佐证）
+- 根因：401 处理「先清 token（触发 snapshot 发射 INACTIVE）→ 后补失效文案」，测试等待的是中间态
+- 修复：测试改等稳定态（`status == INACTIVE && errorMessage != null`）；**只改测试**，不动生产行为、不 bump 版本、不改 CHANGELOG
+- 验证：`--rerun` 连跑 5 次全绿；PR CI pass（4m35s）
+
+## 备注
+- build-tools 35 的 `apksigner` 会生成 `.idsig` v4 副产物（旧版不产生）；已把 `website/downloads/*.idsig` 补进 `.gitignore`
+- 本条为纯记录提交（零代码/零行为改动），随发布一并落到 dev
+
+## 待办（不变）
+- A：真实模型 3 轮复测（需 `EXPENSEBENCH_API_KEY`）
+- B：界面截图补拍（28 项）/ 著作权人身份材料 / 开发完成日期；「未发表」口径仍建议复核
