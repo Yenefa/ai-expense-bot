@@ -107,7 +107,11 @@ class SubscriptionViewModelTest {
             statusChecker = { _, _ -> throw SubscriptionApiException("SUBSCRIPTION_UNAUTHORIZED", 401) },
         )
 
-        val state = fixture.vm.uiState.first { it.status == SubscriptionStatus.INACTIVE }
+        // 401 处理先清空本地 token（触发 snapshot 发射 INACTIVE），随后才补上失效文案；
+        // 必须等"已失效且文案已就位"的稳定态，否则会撞上中间态而偶发失败（CI flaky）。
+        val state = fixture.vm.uiState.first {
+            it.status == SubscriptionStatus.INACTIVE && it.errorMessage != null
+        }
 
         assertThat(state.errorMessage).contains("失效")
         assertThat(fixture.storage.value).isEmpty()
