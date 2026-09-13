@@ -1,4 +1,4 @@
-# AGENT_PLAN.md — 当前执行计划（2026-09-10 更新）
+# AGENT_PLAN.md — 当前执行计划（2026-09-13 更新）
 
 > 旧版（2026-08-06 v3.6 通宵接管计划）已过时：仓库地址、版本号、测试数量均已更新。
 > 历史执行记录见 `AGENT_LOG.md`，踩坑见工作区 `全局复利与踩坑日记.md`。
@@ -11,8 +11,8 @@
 
 - Android 记账 App「Y.E cost」（`com.expense.tracker`）：Kotlin 1.9.22 + Jetpack Compose + Room + ML Kit OCR + LLM Agent
 - 仓库：https://github.com/Yenefa/ai-expense-bot（`dev` 分支）
-- 版本：v3.14.0（versionCode 44；v3.12.2/40 未单独发布，已合并入 v3.13.0）
-- 测试：**359 个 JVM 单测**（`./gradlew :app:testDebugUnitTest`，其中 2 个 LLM bench 与 1 个平台相关用例在缺省环境下 skip）；CI：GitHub Actions（test + lint）
+- 版本：v3.15.0（versionCode 47；分支 `feat/merchant-anomaly-baseline` PR 待 owner 审核，dev 仍为 v3.14.2/46）
+- 测试：**402 个 JVM 单测**（`./gradlew :app:testDebugUnitTest`，其中 2 个 LLM bench 与 1 个平台相关用例在缺省环境下 skip）；CI：GitHub Actions（test + lint）
 - 服务器：腾讯云 CloudBase 云函数 `ye-cost-api`（兑换码核销 + AI 代理 `hy3`），/health 在线
 
 ## ExpenseBench v2（当前阶段）
@@ -37,8 +37,11 @@
 - **v3.13.0 已按 owner P2/P3 落地**（2026-09-11）：系统通知投递 + 提醒中心（放行即落历史，后台每日 20:00 检查，后台零网络）；`SavingsPaceCalculator` 接入查询注入与主动储蓄规则
 - **v3.13.1/v3.13.2 真机滚动修复**（2026-09-11）：预算/设置/数据导出/周期账单页可滚动，不再截断
 - **v3.14.0 代码内收尾**（2026-09-11）：分类级异常基线；储蓄 pace"剩余日均"细化；提醒中心未读角标 + 进页已读；启动检查；Android 13 主题图标；CI（359 单测 + lint）
+- **v3.14.1 深度审计修复**（2026-09-11，`c00e48e`）：跨年历史页崩溃 / 周期账单跳月与并发 / 未来日期窗口 / 提醒页配置覆盖 / 备份校验 / LLM 多候选解析 / Locale；正式签名基础设施与 CI 加固
+- **v3.14.2 第二轮深度审计**（2026-09-12，PR #2 → `8e72252`）：截图导入防崩 / 平台账单 preamble / 续记日期按消息时间 / 路由代词 / LlmClient 加固 / OCR 回收 / DataStore+Keystore / 口语金额 / Room 索引 / CSV 软删重导；398 单测
+- **v3.15.0 商户级异常基线**（2026-09-13，分支 `feat/merchant-anomaly-baseline`）：异常判定三级兜底 **总量 > 分类 > 商户**（按 `note`）；共用 `weeklyAnomaly` 口径不变；402 单测；待 owner 审核
 - LLM Bench 继续按需（不再自动跑）；真实模型 3 轮复测（新数据集 sha、分类修正、mt-02/03/16、mt-15）与 LLM 文案真实复测待 owner 指令
-- 后续候选：商户级异常基线、真实模型复测、主动提醒按类型独立冷却（当前异常类共用 7d 冷却）
+- 后续候选：真实模型复测、主动提醒按分类独立冷却（当前异常/储蓄共用 7d）、上架准备（正式签名见 `docs/release-signing.md`）
 
 ## Memory Governance（v3.10 写 / v3.11 读+管理，已完成，2026-09-11）
 

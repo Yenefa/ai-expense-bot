@@ -34,6 +34,15 @@ data class CategoryWeeklySpending(
     val completedWeeksCents: List<Long>,
 )
 
+/** 商户/备注级周消费（旧→新 4 个完整周 + 本周），用于商户级异常基线。 */
+data class MerchantWeeklySpending(
+    val note: String,
+    /** 本周（进行中）该商户（note）消费合计。 */
+    val currentWeekCents: Long,
+    /** 最近 4 个完整周该商户消费合计（旧→新）；0 = 该周无数据。 */
+    val completedWeeksCents: List<Long>,
+)
+
 /** 规则输入（全部为端侧确定性事实；memory 字段由调用方按 FINANCIAL_ANALYSIS 授权读取后传入）。 */
 data class ProactiveInputs(
     val nowMillis: Long,
@@ -52,6 +61,8 @@ data class ProactiveInputs(
     val completedWeekSpendsCents: List<Long> = emptyList(),
     /** 分类级周消费（可选）：总消费被其他分类抵消时，仍能发现单一分类异常。 */
     val categoryWeekSpends: List<CategoryWeeklySpending> = emptyList(),
+    /** 商户/备注级周消费（可选）：总量与分类都被摊平时，仍能发现单一商户异常。 */
+    val merchantWeekSpends: List<MerchantWeeklySpending> = emptyList(),
     /** 已授权读取的财务记忆。 */
     val monthlyIncomeCents: Long? = null,
     val savingsGoalCents: Long? = null,
@@ -174,17 +185,9 @@ object ProactiveRules {
         // 分类级基线：总消费被其他分类"抵消"时（总量正常但某个分类暴涨）仍能发现异常；
         // 多个分类同时异常时只报偏离金额最大的一个。
         val worst = inputs.categoryWeekSpends.mapNotNull { spending ->
-            val weeks = spending.completedWeeksCents
-            if (weeks.isEmpty()) return@mapNotNull null
-            val samples = weeks.count { it > 0L }
-            if (samples < MIN_COMPARABLE_SAMPLES) return@mapNotNull null
-            val baseline = weeks.sum().toDouble() / weeks.size
-            if (baseline <= 0.0) return@mapNotNull null
-            val current = spending.currentWeekCents
-            val delta = current - baseline.toLong()
-            if (current < baseline * ANOMALY_RATIO || delta < ANOMALY_MIN_DELTA_CENTS) return@mapNotNull null
-            Triple(spending, baseline.toLong(), delta)
-        }.maxByOrNull { it.third } ?: return null
+            weeklyAnomaly(spending.currentWeekCents, spending.completedWeeksCents)
+                ?.let { (baseline, delta) -> Triple(spending, baseline, delta) }
+        }.maxByOrNull { it.third } ?: return merchantAnomaly(inputs)
 
         val (spending, baseline, delta) = worst
         val name = Category.byIdOrOther(spending.categoryId).displayName
@@ -201,25 +204,59 @@ object ProactiveRules {
     }
 
     private fun totalAnomaly(inputs: ProactiveInputs): ProactiveAlert? {
-        val weeks = inputs.completedWeekSpendsCents
-        val samples = weeks.count { it > 0L }
-        if (samples < MIN_COMPARABLE_SAMPLES) return null
-        val baseline = weeks.sum().toDouble() / weeks.size
-        if (baseline <= 0.0) return null
         val current = inputs.currentWeekSpentCents
-        val delta = current - baseline.toLong()
-        if (current < baseline * ANOMALY_RATIO || delta < ANOMALY_MIN_DELTA_CENTS) return null
+        val (baseline, delta) = weeklyAnomaly(current, inputs.completedWeekSpendsCents) ?: return null
         return ProactiveAlert(
             type = ProactiveAlertType.ANOMALOUS_SPENDING,
             severity = ProactiveSeverity.WARN,
             facts = mapOf(
                 "current_week_cents" to current,
-                "baseline_cents" to baseline.toLong(),
+                "baseline_cents" to baseline,
                 "delta_cents" to delta,
             ),
-            deterministicCopy = "本周消费 ¥${fmt(current)}，明显高于近 4 周平均 ¥${fmt(baseline.toLong())}，建议看看是哪几笔。",
+            deterministicCopy = "本周消费 ¥${fmt(current)}，明显高于近 4 周平均 ¥${fmt(baseline)}，建议看看是哪几笔。",
         )
     }
+
+    /**
+     * 周消费异常判定（分类级 / 商户级共用，与总量级同口径）：
+     * ≥[MIN_COMPARABLE_SAMPLES] 个非零样本，本周 ≥ 基线均值 ×[ANOMALY_RATIO] 且高出 ≥ ¥100。
+     * 返回（基线均值，高出金额）。
+     */
+    private fun weeklyAnomaly(currentCents: Long, completedWeeksCents: List<Long>): Pair<Long, Long>? {
+        if (completedWeeksCents.isEmpty()) return null
+        val samples = completedWeeksCents.count { it > 0L }
+        if (samples < MIN_COMPARABLE_SAMPLES) return null
+        val baseline = completedWeeksCents.sum().toDouble() / completedWeeksCents.size
+        if (baseline <= 0.0) return null
+        val delta = currentCents - baseline.toLong()
+        if (currentCents < baseline * ANOMALY_RATIO || delta < ANOMALY_MIN_DELTA_CENTS) return null
+        return baseline.toLong() to delta
+    }
+
+    /** 商户级兜底：总量与分类正常时，单个商户（note）暴涨；名称过长只截断展示，不影响判定。 */
+    private fun merchantAnomaly(inputs: ProactiveInputs): ProactiveAlert? {
+        val worst = inputs.merchantWeekSpends.mapNotNull { spending ->
+            weeklyAnomaly(spending.currentWeekCents, spending.completedWeeksCents)
+                ?.let { (baseline, delta) -> Triple(spending, baseline, delta) }
+        }.maxByOrNull { it.third } ?: return null
+
+        val (spending, baseline, delta) = worst
+        val name = spending.note.take(MAX_MERCHANT_LABEL_CHARS)
+        return ProactiveAlert(
+            type = ProactiveAlertType.ANOMALOUS_SPENDING,
+            severity = ProactiveSeverity.WARN,
+            facts = mapOf(
+                "current_week_cents" to spending.currentWeekCents,
+                "baseline_cents" to baseline,
+                "delta_cents" to delta,
+            ),
+            deterministicCopy = "本周在「$name」消费 ¥${fmt(spending.currentWeekCents)}，明显高于近 4 周平均 ¥${fmt(baseline)}，建议看看是哪几笔。",
+        )
+    }
+
+    /** 商户名在文案中的最大展示长度（字符）；超长截断仅影响展示。 */
+    const val MAX_MERCHANT_LABEL_CHARS = 12
 
     private fun fmt(cents: Long): String = com.expense.tracker.data.model.Money.formatYuan(cents)
 }

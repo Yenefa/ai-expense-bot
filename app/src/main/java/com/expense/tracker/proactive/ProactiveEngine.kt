@@ -68,6 +68,23 @@ class ProactiveEngine(
                     completedWeeksCents = completedByCategory.map { it[id] ?: 0L },
                 )
             }
+        // 商户级基线：总量与分类都被摊平时，仍能发现单一商户（note）异常。
+        val currentByNote = currentWeekRows.filter { it.note.isNotBlank() }
+            .groupBy { it.note.trim() }
+            .mapValues { (_, rows) -> rows.sumOf { it.amountCents } }
+        val completedByNote = completedWeekRows.map { rows ->
+            rows.filter { it.note.isNotBlank() }
+                .groupBy { it.note.trim() }
+                .mapValues { (_, items) -> items.sumOf { it.amountCents } }
+        }
+        val merchantWeekSpends = (currentByNote.keys + completedByNote.flatMap { it.keys })
+            .map { note ->
+                MerchantWeeklySpending(
+                    note = note,
+                    currentWeekCents = currentByNote[note] ?: 0L,
+                    completedWeeksCents = completedByNote.map { it[note] ?: 0L },
+                )
+            }
         val currentWeekSpent = currentWeekRows.sumOf { it.amountCents }
         val completedWeeks = completedWeekRows.map { rows -> rows.sumOf { it.amountCents } }
         val facts = MemoryReadPolicy.filter(MemoryReadScope.FINANCIAL_ANALYSIS, memoryFacts())
@@ -82,6 +99,7 @@ class ProactiveEngine(
             currentWeekSpentCents = currentWeekSpent,
             completedWeekSpendsCents = completedWeeks,
             categoryWeekSpends = categoryWeekSpends,
+            merchantWeekSpends = merchantWeekSpends,
             monthlyIncomeCents = facts.firstOrNull { it.type == MemoryType.MONTHLY_INCOME }?.amountCents,
             savingsGoalCents = facts.firstOrNull { it.type == MemoryType.SAVINGS_GOAL }?.amountCents,
         )
