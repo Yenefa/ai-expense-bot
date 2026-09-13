@@ -48,6 +48,38 @@ class ChineseDateResolverTest {
         assertThat(resolved).isEqualTo(LocalDate.of(2026, 8, 1))
     }
 
+    @Test fun historicalRelativeDateUsesItsOwnMessageTimestamp() {
+        val day1Noon = LocalDateTime.of(2026, 8, 1, 12, 0)
+            .atZone(zone).toInstant().toEpochMilli()
+        val day3Noon = LocalDateTime.of(2026, 8, 3, 12, 0)
+            .atZone(zone).toInstant().toEpochMilli()
+
+        val resolved = ChineseDateResolver.resolveForMessage(
+            currentText = "还有一笔7元",
+            previousUserMessagesNewestFirst = listOf("昨天午饭35" to day1Noon),
+            nowMillis = day3Noon,
+            zone = zone,
+        )
+
+        // Day1 说的“昨天”指 Day0（7月31日），不能按 Day3 的当前时间解析成 Day2（8月2日）。
+        assertThat(resolved).isEqualTo(LocalDate.of(2026, 7, 31))
+    }
+
+    @Test fun legacyStringOverloadResolvesHistoryAgainstNowMillis() {
+        val day3Noon = LocalDateTime.of(2026, 8, 3, 12, 0)
+            .atZone(zone).toInstant().toEpochMilli()
+
+        val resolved = ChineseDateResolver.resolveForMessage(
+            currentText = "还有一笔7元",
+            previousUserTextsNewestFirst = listOf("昨天午饭35"),
+            nowMillis = day3Noon,
+            zone = zone,
+        )
+
+        // 旧重载没有历史时间戳，只能沿用当前时间：Day3 的“昨天”= Day2（8月2日）。
+        assertThat(resolved).isEqualTo(LocalDate.of(2026, 8, 2))
+    }
+
     @Test fun independentMessageDoesNotInheritOldDate() {
         val resolved = ChineseDateResolver.resolveForMessage(
             currentText = "午饭35",

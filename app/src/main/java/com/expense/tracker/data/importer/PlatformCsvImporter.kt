@@ -25,26 +25,41 @@ object PlatformCsvImporter {
     private val wechatMarker = listOf("交易时间", "交易类型", "交易对方")
     private val alipayMarker = listOf("交易号", "商家订单号", "交易创建时间", "收/支")
 
+    /** 前置元信息扫描行数：官方账单通常在前几行说明导出时间/筛选条件。 */
+    private const val MARKER_SCAN_LINES = 15
+
+    private fun normalizeHeader(value: String, index: Int): String =
+        if (index == 0) value.trim().trimStart('\uFEFF') else value.trim()
+
+    private fun headerFields(line: String): List<String> =
+        line.trim().trimStart('\uFEFF').split(',').map { it.trim() }
+
     fun detect(headers: List<String>): Platform = when {
         headers.any { it.contains("交易时间") } && headers.any { it.contains("交易对方") } -> Platform.WECHAT
         headers.any { it.contains("交易号") } && headers.any { it.contains("收/支") } -> Platform.ALIPAY
         else -> Platform.UNKNOWN
     }
 
-    /** 表头行是否像平台账单；用于在导入入口自动切换解析器。 */
-    fun looksLikePlatformCsv(firstLine: String): Boolean {
-        val headers = firstLine.trim().trimStart('\uFEFF').split(',')
-        return detect(headers) != Platform.UNKNOWN
-    }
+    /**
+     * 文本是否像平台账单；用于在导入入口自动切换解析器。
+     * 官方导出的账单常带「微信支付账单明细…/支付宝交易记录明细…」等前置元信息行，
+     * 所以这里扫描前 [MARKER_SCAN_LINES] 行寻找真正的表头，而不是只看第一行。
+     */
+    fun looksLikePlatformCsv(text: String): Boolean =
+        text.lineSequence()
+            .take(MARKER_SCAN_LINES)
+            .any { line -> detect(headerFields(line)) != Platform.UNKNOWN }
 
     fun parse(csv: String, zone: ZoneId = ZoneId.systemDefault()): CsvImportResult {
         val records = CsvExpenseImporter.parseRecords(csv)
         require(records.isNotEmpty()) { "CSV 文件为空" }
-        val headers = records.first().fields.mapIndexed { index, value ->
-            if (index == 0) value.trim().trimStart('\uFEFF') else value.trim()
+        // 官方账单可能带若干前置元信息行：定位真正的表头行，其后才是数据。
+        val headerIndex = records.indexOfFirst { record ->
+            detect(record.fields.mapIndexed { index, value -> normalizeHeader(value, index) }) != Platform.UNKNOWN
         }
+        require(headerIndex >= 0) { "不是微信/支付宝账单格式" }
+        val headers = records[headerIndex].fields.mapIndexed { index, value -> normalizeHeader(value, index) }
         val platform = detect(headers)
-        require(platform != Platform.UNKNOWN) { "不是微信/支付宝账单格式" }
         val idx = headers.withIndex().associate { it.value.trim() to it.index }
 
         fun field(record: CsvExpenseImporter.CsvRecord, name: String): String = when (platform) {
@@ -57,7 +72,7 @@ object PlatformCsvImporter {
         val issues = mutableListOf<CsvImportIssue>()
         val now = System.currentTimeMillis()
 
-        records.drop(1).forEach { record ->
+        records.drop(headerIndex + 1).forEach { record ->
             if (record.fields.all(String::isBlank)) return@forEach
             val platformRecord = record.recordNumber
 

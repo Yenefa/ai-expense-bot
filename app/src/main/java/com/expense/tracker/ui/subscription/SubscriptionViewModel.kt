@@ -149,25 +149,25 @@ class SubscriptionViewModel(
     }
 
     private suspend fun refreshServerStatus() {
-        val token = prefs.currentToken() ?: return
-        val installationId = prefs.installationId()
-        runCatching { statusChecker(token, installationId) }
-            .onSuccess { response ->
-                prefs.activateServerToken(token, response.expiresAtMillis)
-            }
-            .onFailure { error ->
-                if (error.isUnauthorizedSubscription()) {
-                    prefs.clearSubscription()
-                    internal.update {
-                        it.copy(
-                            status = SubscriptionStatus.INACTIVE,
-                            expiresAtMillis = 0L,
-                            credentialAvailable = false,
-                            errorMessage = "AI 会员已失效，请重新兑换。",
-                        )
-                    }
+        // 整体兜底：Keystore/网络/持久化任一失败都不能让订阅页初始化协程崩溃。
+        runCatching {
+            val token = prefs.currentToken() ?: return
+            val installationId = prefs.installationId()
+            val response = statusChecker(token, installationId)
+            prefs.activateServerToken(token, response.expiresAtMillis)
+        }.onFailure { error ->
+            if (error.isUnauthorizedSubscription()) {
+                runCatching { prefs.clearSubscription() }
+                internal.update {
+                    it.copy(
+                        status = SubscriptionStatus.INACTIVE,
+                        expiresAtMillis = 0L,
+                        credentialAvailable = false,
+                        errorMessage = "AI 会员已失效，请重新兑换。",
+                    )
                 }
             }
+        }
     }
 
     private fun redemptionErrorMessage(error: Throwable): String = when {

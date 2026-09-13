@@ -26,6 +26,7 @@ import com.expense.tracker.llm.AnalyticsInsightsParser
 import com.expense.tracker.llm.BillImportResult
 import com.expense.tracker.llm.importFromBillText
 import com.expense.tracker.llm.AiAccessResolver
+import com.expense.tracker.llm.AiAccessUnavailableException
 import com.expense.tracker.memory.MemoryGovernor
 import com.expense.tracker.memory.UserProfilePrefs
 import com.expense.tracker.ocr.MlKitOcrRecognizer
@@ -33,6 +34,7 @@ import com.expense.tracker.ocr.OcrRecognizer
 import com.expense.tracker.ui.chat.LlmResult
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
 class AppContainer(context: Context) {
@@ -140,9 +142,23 @@ class AppContainer(context: Context) {
         )
     }
 
+    /**
+     * 截图账单导入：无会员且未配置 BYOK 时 [AiAccessResolver.resolve] 会抛
+     * [AiAccessUnavailableException]，必须在这里转成可展示的 [BillImportResult.Error]，
+     * 不能让异常逃逸到 viewModelScope 导致进程崩溃。
+     */
     val billImportHandler: suspend (String, UserPrefsSnapshot) -> BillImportResult = { ocrText, prefs ->
-        val config = aiAccessResolver.resolve(prefs)
-        importFromBillText(llmClient, config, ocrText)
+        runCatching {
+            val config = aiAccessResolver.resolve(prefs)
+            importFromBillText(llmClient, config, ocrText)
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            val message = when (error) {
+                is AiAccessUnavailableException -> "尚未配置 AI 服务：请在设置中填写 API Key 或兑换会员"
+                else -> error.message ?: "账单导入失败，请稍后重试"
+            }
+            BillImportResult.Error(message)
+        }
     }
 
     /** 周期账单到期检查：App 启动与每日提醒时调用。 */

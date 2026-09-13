@@ -2,9 +2,11 @@ package com.expense.tracker.data.prefs
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +20,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-private val Context.appDataStore: DataStore<Preferences> by preferencesDataStore(name = "user_prefs")
+// 文件损坏时替换为空 Preferences，避免所有 collector 因 CorruptionException 崩溃。
+private val Context.appDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "user_prefs",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /** 主题模式：浅色 / 深色 / 跟随系统。 */
 enum class ThemeMode(val label: String, val emoji: String, val desc: String) {

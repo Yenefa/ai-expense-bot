@@ -2,9 +2,11 @@ package com.expense.tracker.data.reminder
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.Dispatchers
@@ -12,7 +14,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
-private val Context.reminderDataStore: DataStore<Preferences> by preferencesDataStore(name = "reminder_prefs")
+// 文件损坏时替换为空 Preferences，提醒设置回退为默认值而非崩溃。
+private val Context.reminderDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "reminder_prefs",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 data class ReminderSnapshot(
     val enabled: Boolean = false,

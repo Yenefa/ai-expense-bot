@@ -8,6 +8,7 @@ import com.expense.tracker.data.repo.ChatRepository
 import com.expense.tracker.data.repo.ExpenseDraft
 import com.expense.tracker.data.repo.ExpenseRepository
 import com.expense.tracker.llm.BillImportResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,7 +44,14 @@ class BillImportViewModel(
     fun importFromText(ocrText: String, prefs: UserPrefsSnapshot) {
         internal.value = BillImportUiState(phase = BillImportPhase.Loading)
         viewModelScope.launch {
-            when (val result = importHandler(ocrText, prefs)) {
+            // 双保险：即使注入的 handler 违反约定抛出异常（如 AI 服务未配置），
+            // 也只把状态切到 Error，不让异常逃出 viewModelScope。
+            val result = runCatching { importHandler(ocrText, prefs) }
+                .getOrElse { error ->
+                    if (error is CancellationException) throw error
+                    BillImportResult.Error("导入失败：${error.message ?: "未知错误"}")
+                }
+            when (result) {
                 is BillImportResult.Ok -> {
                     val items = result.expenses.mapNotNull {
                         val amountCents = it.amountCents.takeIf { cents -> cents > 0L }

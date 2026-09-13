@@ -8,6 +8,7 @@ import com.expense.tracker.data.prefs.ThemeMode
 import com.expense.tracker.data.prefs.UserPrefsSnapshot
 import com.expense.tracker.data.repo.ChatRepository
 import com.expense.tracker.data.repo.ExpenseRepository
+import com.expense.tracker.llm.AiAccessUnavailableException
 import com.expense.tracker.llm.BillImportResult
 import com.expense.tracker.llm.ParsedExpense
 import com.google.common.truth.Truth.assertThat
@@ -50,6 +51,24 @@ class BillImportViewModelTest {
 
         assertThat(expenseDao.rows).hasSize(1)
         assertThat(vm.uiState.value.phase).isEqualTo(BillImportPhase.Done)
+    }
+
+    @Test fun handlerFailureBecomesErrorStateWithoutInsertingExpenses() = runTest(dispatcher) {
+        val expenseDao = BillExpenseDao()
+        val vm = BillImportViewModel(
+            // 模拟无会员且未配置 BYOK：handler 直接抛 AI 服务未配置异常。
+            importHandler = { _, _ -> throw AiAccessUnavailableException() },
+            expenseRepo = ExpenseRepository(expenseDao),
+            chatRepo = ChatRepository(BillChatDao()),
+        )
+        val prefs = UserPrefsSnapshot(false, "", "", "", ThemeMode.SYSTEM)
+
+        vm.importFromText("午饭 12.34", prefs)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertThat(vm.uiState.value.phase).isEqualTo(BillImportPhase.Error)
+        assertThat(vm.uiState.value.errorMessage).contains("AI 服务未配置")
+        assertThat(expenseDao.rows).isEmpty()
     }
 }
 

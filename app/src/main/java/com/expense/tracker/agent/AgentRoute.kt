@@ -27,10 +27,11 @@ data class AgentDecision(
  * 意图路由（v3.8 Agent 层，v3.9.3 会话上下文）：本地确定性规则，零成本、零延迟。
  *
  * 写路径收敛：只有 MUTATION 可以写库；QUERY 与 CHAT 在协调器层被代码拒绝任何
- * expenses/actions（write firewall）。路由规则：
- * 1. 明确的删改意图 → MUTATION；
- * 2. 条件更正/续记（依赖上一轮行为 + 最近账目，非裸关键词）→ MUTATION；
- * 3. 查询（强规则 / 软规则 / 分析问句 / 上一轮 QUERY 的追问回承）→ QUERY；
+ * expenses/actions（write firewall）。路由规则（v3.9.4 查询优先）：
+ * 1. 查询（强规则 / 软规则 / 分析问句 / 上一轮 QUERY 的追问回承）→ QUERY；
+ *    纯查询句优先于指代词/「刚才」，但显式写动词（删除/改成…）仍走 MUTATION；
+ * 2. 明确的删改意图（显式写动词 / 指代词）→ MUTATION；
+ * 3. 条件更正/续记（依赖上一轮行为 + 最近账目，非裸关键词）→ MUTATION；
  * 4. 非支出语义（收入/负债/预算/估值/假设/否定/第三方…）→ CHAT（写防火墙保护）；
  *    其余带金额的支出语境 → MUTATION（含无元/块的裸金额）。
  */
@@ -45,6 +46,18 @@ object AgentRouter {
         knownMerchants: Set<String> = emptySet(),
     ): AgentDecision {
         val normalized = text.trim()
+        // v3.9.4 查询优先：先判定强/软/分析/追问回承查询。纯查询句（"这些一共花了多少"）
+        // 不再被指代词/「刚才」抢先路由到写路径；但显式写动词优先于查询信号，
+        // 确保「把刚才那笔删了」这类句子仍走 MUTATION。
+        val softQuery = QUERY_TOPIC.containsMatchIn(normalized) && QUESTION_TONE.containsMatchIn(normalized)
+        val analysisQuery = QUERY_TOPIC.containsMatchIn(normalized) && ANALYSIS_QUERY_HINT.containsMatchIn(normalized)
+        val followUpInherit = context.previousRoute == AgentRoute.QUERY && FOLLOW_UP_QUERY.containsMatchIn(normalized)
+        if ((STRONG_QUERY.containsMatchIn(normalized) || softQuery || analysisQuery || followUpInherit) &&
+            !MUTATION_WRITE_VERB.containsMatchIn(normalized)
+        ) {
+            return queryDecision(normalized, nowMillis, zone, context)
+        }
+        // 明确的删改意图（显式写动词 / 指代词）在查询判定之后再复核。
         if (MUTATION_INTENT.containsMatchIn(normalized)) {
             return AgentDecision(AgentRoute.MUTATION)
         }
@@ -59,12 +72,6 @@ object AgentRouter {
         // 否则一个裸数字不构成记账意图。
         if (context.previousRoute == AgentRoute.MUTATION && CONTINUATION_RECORD.containsMatchIn(normalized)) {
             return AgentDecision(AgentRoute.MUTATION)
-        }
-        val softQuery = QUERY_TOPIC.containsMatchIn(normalized) && QUESTION_TONE.containsMatchIn(normalized)
-        val analysisQuery = QUERY_TOPIC.containsMatchIn(normalized) && ANALYSIS_QUERY_HINT.containsMatchIn(normalized)
-        val followUpInherit = context.previousRoute == AgentRoute.QUERY && FOLLOW_UP_QUERY.containsMatchIn(normalized)
-        if (STRONG_QUERY.containsMatchIn(normalized) || softQuery || analysisQuery || followUpInherit) {
-            return queryDecision(normalized, nowMillis, zone, context)
         }
         // 非支出语义优先于裸金额识别：这些句子里的数字不是本笔消费。
         if (NON_EXPENSE_INTENT.containsMatchIn(normalized)) {
@@ -116,10 +123,16 @@ object AgentRouter {
         )
     }
 
-    private val MUTATION_INTENT = Regex(
-        "删除|删掉|删了|取消|不要了|改成|改为|修改|更改|调整|移到|挪到|改到|记到|记成|" +
-            "这笔|那笔|它们|他们|这些|那些|刚才|上一批",
-    )
+    private const val MUTATION_WRITE_WORDS =
+        "删除|删掉|删了|取消|不要了|改成|改为|修改|更改|调整|移到|挪到|改到|记到|记成"
+
+    private const val MUTATION_PRONOUN_WORDS = "这笔|那笔|它们|他们|这些|那些|刚才|上一批"
+
+    /** 显式写动词：即使句中带查询词（如"预算"）也优先走写管线（v3.9.4）。 */
+    private val MUTATION_WRITE_VERB = Regex(MUTATION_WRITE_WORDS)
+
+    /** 显式写动词 + 指代词的合集；指代词单独出现不再无条件抢先（v3.9.4）。 */
+    private val MUTATION_INTENT = Regex("$MUTATION_WRITE_WORDS|$MUTATION_PRONOUN_WORDS")
 
     private val STRONG_QUERY = Regex(
         "多少|几笔|几次|一共|总共|总计|合计|统计|汇总|平均|排行|最常|占比|分布|趋势|" +

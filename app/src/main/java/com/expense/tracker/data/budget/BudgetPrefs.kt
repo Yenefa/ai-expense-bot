@@ -2,8 +2,10 @@ package com.expense.tracker.data.budget
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -12,7 +14,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
-private val Context.budgetDataStore: DataStore<Preferences> by preferencesDataStore(name = "budget_prefs")
+// 文件损坏时替换为空 Preferences，保证预算流仍可订阅。
+private val Context.budgetDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "budget_prefs",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 data class BudgetSnapshot(
     val monthlyLimitCents: Long = 0L,

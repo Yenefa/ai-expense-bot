@@ -10,6 +10,7 @@ import com.expense.tracker.data.subscription.SubscriptionPrefs
 import com.expense.tracker.data.subscription.SubscriptionStatus
 import com.expense.tracker.data.subscription.SubscriptionStatusResponse
 import com.google.common.truth.Truth.assertThat
+import java.security.GeneralSecurityException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -124,8 +125,20 @@ class SubscriptionViewModelTest {
         assertThat(fixture.storage.value).isEqualTo("active-token")
     }
 
+    @Test fun keystoreReadFailureKeepsSubscriptionPageAliveAndClearsStaleEntitlement() = runTest {
+        val fixture = fixture(initialToken = "active-token", storageFailReads = true)
+
+        // 初始化协程完成清理后，陈旧权益元数据被移除；旧实现会在 currentToken() 抛异常。
+        fixture.store.data.first { it[SubscriptionPrefs.EXPIRES_AT] == null }
+        val state = fixture.vm.uiState.first { it.status == SubscriptionStatus.INACTIVE }
+
+        assertThat(fixture.storage.value).isEmpty()
+        assertThat(state.credentialAvailable).isFalse()
+    }
+
     private suspend fun fixture(
         initialToken: String? = null,
+        storageFailReads: Boolean = false,
         redeemer: suspend (String, String) -> RedeemResponse = { _, _ ->
             RedeemResponse("ACTIVE", "opaque-token", 9_000L)
         },
@@ -134,10 +147,13 @@ class SubscriptionViewModelTest {
         },
         onActivated: suspend () -> Unit = {},
     ): Fixture {
+        val store = TestStore()
         val storage = TestTokenStorage()
-        val prefs = SubscriptionPrefs(TestStore(), storage, clock = { 1_000L })
+        val prefs = SubscriptionPrefs(store, storage, clock = { 1_000L })
         prefs.installationId()
         if (initialToken != null) prefs.activateServerToken(initialToken, 9_000L)
+        // 在 ViewModel 构造前注入读取失败，模拟 Keystore 条目失效。
+        storage.failReads = storageFailReads
         return Fixture(
             vm = SubscriptionViewModel(
                 prefs = prefs,
@@ -147,12 +163,14 @@ class SubscriptionViewModelTest {
                 healthPollEnabled = false,
             ),
             storage = storage,
+            store = store,
         )
     }
 
     private data class Fixture(
         val vm: SubscriptionViewModel,
         val storage: TestTokenStorage,
+        val store: TestStore,
     )
 }
 
@@ -167,7 +185,13 @@ private class TestStore : DataStore<Preferences> {
 }
 
 private class TestTokenStorage(var value: String = "") : ApiKeyStorage {
-    override fun read(): String = value
+    var failReads = false
+
+    override fun read(): String {
+        if (failReads) throw GeneralSecurityException("keystore entry invalidated")
+        return value
+    }
+
     override fun write(value: String) {
         this.value = value
     }

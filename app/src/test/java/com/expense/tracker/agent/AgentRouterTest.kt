@@ -21,6 +21,19 @@ class AgentRouterTest {
     }
 
     @Test
+    fun `指代词的纯查询句不再误入写路径`() {
+        // v3.9.4 路由顺序修复：查询信号先于指代词/「刚才」判定，纯查询只读零风险
+        assertThat(AgentRouter.route("这些一共花了多少", now, zone).route).isEqualTo(AgentRoute.QUERY)
+        assertThat(AgentRouter.route("刚才那批多少钱", now, zone).route).isEqualTo(AgentRoute.QUERY)
+    }
+
+    @Test
+    fun `指代词加显式写动词仍走写路径`() {
+        assertThat(AgentRouter.route("把刚才那笔删了", now, zone).route).isEqualTo(AgentRoute.MUTATION)
+        assertThat(AgentRouter.route("这笔改成20", now, zone).route).isEqualTo(AgentRoute.MUTATION)
+    }
+
+    @Test
     fun `带金额的口述走记账管线`() {
         assertThat(AgentRouter.route("打车花了23块5", now, zone).route).isEqualTo(AgentRoute.MUTATION)
         assertThat(AgentRouter.route("昨天午饭35块 咖啡18元", now, zone).route).isEqualTo(AgentRoute.MUTATION)

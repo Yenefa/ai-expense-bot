@@ -5,6 +5,25 @@
 > - 每次交付：versionCode +1（永不回退），versionName 语义化（修复=修订+1，新功能=次版本+1）
 > - 每次版本变更必须在此追加记录，并在 APK 文件名中携带版本号与日期
 
+## 3.14.2 (versionCode 46) — 2026-09-11
+
+**第二轮深度审计修复（12 项，含 2 条 High）**
+
+- **截图导入不再崩溃**：未配置 AI 服务（无订阅/无 Key）时返回明确错误提示，而非未捕获异常（`AppContainer` + `BillImportViewModel` 双层防护）
+- **真实平台账单可导入**：官方导出的微信/支付宝 CSV 带前置元信息行，现在会定位真正的表头行再解析（`PlatformCsvImporter`）
+- **续记日期不再漂移**：历史消息中的「昨天/前天」按该消息自身时间解析，而非按当前时间重算（`ChineseDateResolver` + `ChatLlmCoordinator` 传递消息时间戳）
+- **指代词纯查询不再误入写路径**：查询规则先于代词型 MUTATION 判定（「这些一共花了多少」→ QUERY；「把刚才那笔删了」仍 MUTATION）
+- **LlmClient 加固**：协程取消即断（enqueue + suspendCancellableCoroutine）、connect/read/call 超时、瞬时故障单次重试（400ms）、响应体 2MB 上限
+- **OCR 内存**：派生位图懒创建 + finally 回收，峰值从最多 4 张大图降为 2 张
+- **DataStore 抗损坏**：全部 delegate 增加 corruptionHandler；长期记忆 JSON 解码失败时保留原始数据、拒绝覆写
+- **订阅页防崩**：Keystore 条目失效/读取异常不再导致页面崩溃，自动清理失效凭证
+- **口语金额**：「23块5」「3块半」正确解析；「今天下午3.5元咖啡」不再被改写为 5 元
+- **数据库索引**：新增 migration 5→6（expenses.occurredAt/deletedAt、chat_messages.createdAt）
+- **CSV 去重修正**：软删除后可重新导入（去重基线改为活跃记录）
+- **文档**：补充 force-stop（强制停止）后 WorkManager 调度语义说明
+
+测试：372 → **398 个 JVM 单测全部通过**（+26，覆盖导入崩溃、preamble CSV、日期漂移、路由重排、HTTP 取消/重试/限长、金额口语、DataStore/Keystore 异常、软删重导等）。
+
 ## 3.14.1 (versionCode 45) — 2026-09-11
 
 **深度审计修复（11 项报告 + 工程加固）**

@@ -50,8 +50,8 @@ android {
         // - versionCode 每次交付 +1，永不回退
         // - versionName 语义化：主版本.次版本.修订（修复=修订+1，新功能=次版本+1）
         // - 每次版本变更必须同步更新 CHANGELOG.md
-        versionCode = 45
-        versionName = "3.14.1"
+        versionCode = 46
+        versionName = "3.14.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",

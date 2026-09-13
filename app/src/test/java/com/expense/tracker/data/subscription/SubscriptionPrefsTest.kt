@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import com.expense.tracker.data.prefs.ApiKeyStorage
 import com.google.common.truth.Truth.assertThat
+import java.security.GeneralSecurityException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -116,6 +117,45 @@ class SubscriptionPrefsTest {
         assertThat(snapshot.toString()).doesNotContain("never-print-token")
         assertThat(snapshot.credentialAvailable).isTrue()
     }
+
+    @Test fun keystoreReadFailureReturnsNullAndClearsStaleMetadata() = runBlocking {
+        val store = activatedStore()
+        val prefs = SubscriptionPrefs(store, ThrowingTokenStorage(), clock = { 1_000L })
+
+        val token = prefs.currentToken()
+
+        assertThat(token).isNull()
+        assertThat(store.current[SubscriptionPrefs.EXPIRES_AT]).isNull()
+        assertThat(store.current[SubscriptionPrefs.TOKEN_FORMAT_VERSION]).isNull()
+    }
+
+    @Test fun keystoreReadFailureYieldsNoActiveAccessInsteadOfCrashing() = runBlocking {
+        val store = activatedStore()
+        val prefs = SubscriptionPrefs(store, ThrowingTokenStorage(), clock = { 1_000L })
+
+        val access = prefs.activeAccess(nowMillis = 1_000L)
+
+        assertThat(access).isNull()
+        assertThat(store.current[SubscriptionPrefs.EXPIRES_AT]).isNull()
+    }
+
+    @Test fun snapshotReportsKeystoreFailureWithoutThrowing() = runBlocking {
+        val prefs = SubscriptionPrefs(activatedStore(), ThrowingTokenStorage(), clock = { 1_000L })
+
+        val snapshot = prefs.snapshot.first()
+
+        assertThat(snapshot.storageError).isTrue()
+        assertThat(snapshot.credentialAvailable).isFalse()
+        assertThat(snapshot.status).isEqualTo(SubscriptionStatus.ACTIVE)
+    }
+
+    /** 处于已激活（版本 2 + 未过期）状态的存储，用于触发 tokenStorage.read()。 */
+    private fun activatedStore() = FakeStore(
+        mutablePreferencesOf(
+            SubscriptionPrefs.TOKEN_FORMAT_VERSION to SubscriptionPrefs.CURRENT_TOKEN_FORMAT_VERSION,
+            SubscriptionPrefs.EXPIRES_AT to 9_000L,
+        ),
+    )
 }
 
 private class FakeStore(initial: Preferences = mutablePreferencesOf()) : DataStore<Preferences> {
@@ -135,4 +175,11 @@ private class MemoryTokenStorage(var value: String = "") : ApiKeyStorage {
     override fun write(value: String) {
         this.value = value
     }
+}
+
+/** 模拟 Keystore 条目被系统失效：读取抛 GeneralSecurityException。 */
+private class ThrowingTokenStorage : ApiKeyStorage {
+    override fun read(): String = throw GeneralSecurityException("keystore entry invalidated")
+
+    override fun write(value: String) = Unit
 }
