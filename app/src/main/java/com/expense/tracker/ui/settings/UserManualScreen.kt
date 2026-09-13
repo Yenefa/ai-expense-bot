@@ -67,7 +67,7 @@ fun UserManualScreen(onClose: () -> Unit) {
 
             Spacer(Modifier.size(16.dp))
             Text(
-                "欢迎使用 Y.E cost — 一款对话式智能记账 Android App。财务数据只存在你的手机本地；启用云端 LLM 时，当前请求所需的上下文会发送给你配置的模型服务。",
+                "欢迎使用 Y.E cost — 一款对话式智能记账 Android App。财务数据只存在你的手机本地，且不进入系统云备份；启用云端 LLM 时，当前请求所需的上下文会发送给你配置的模型服务。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = AppColors.TextSecondary,
             )
@@ -162,7 +162,8 @@ fun UserManualScreen(onClose: () -> Unit) {
                 emoji = "🔒",
                 title = "数据安全",
                 lines = listOf(
-                    "记账数据存在手机本地 SQLite（/data/data 私有目录）",
+                    "记账数据存在手机本地 SQLite（/data/data 私有目录），且不进入系统云备份",
+                    "账目与预算不进入系统云备份；换机（Android 12+）由系统在设备之间直接传输，长期记忆与 API Key 请用完整 JSON 备份恢复",
                     "长期记忆（如月收入/储蓄目标）只在你确认后才会保存；取消或过期一律不写入",
                     "API Key 由 Android Keystore 加密保存在手机本地，仅在发起 AI 请求时随请求发送给你配置的模型服务，且不会写入完整备份文件",
                     "App 不收集、不联网上传任何用户行为数据",

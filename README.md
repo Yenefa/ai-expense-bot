@@ -283,6 +283,13 @@ app/src/main/java/com/expense/tracker/
 | 长期记忆（UserProfile） | `files/datastore/user_profile_prefs.preferences_pb`（排除系统备份/设备迁移） | 同签名升级保留；可用完整 JSON 备份（v3）恢复；设置内可随时删除 |
 | 导出的 schema | `app/schemas/com.expense.tracker.data.db.AppDatabase/N.json`（git 跟踪） | - |
 
+> **系统备份口径（v3.15.1 起）**
+>
+> - **不上传云备份**：账目与聊天记录（`expense.db`）、预算（`budget_prefs`）、长期记忆（`user_profile_prefs`）、主动提醒数据（`proactive_prefs`）、API Key 与订阅凭据。
+> - **换机设备迁移（Android 12+）**：保留账目与预算（设备对设备直传，不经服务器）；长期记忆与凭据不随系统迁移，请用「完整备份（JSON）」恢复。
+> - **Android 8–11**：系统不区分「云备份」与「设备迁移」（平台限制），因此换机也不会自动带上账目与预算，请使用 App 内完整备份。
+> - 该边界由 `app/src/main/res/xml/backup_rules.xml`、`app/src/main/res/xml/data_extraction_rules.xml` 定义，并由 `BackupPolicyTest` 在 CI 中看守。
+
 Schema 升级策略：每个版本都导出 schema JSON 到 git，并为所有版本升级显式注册 `Migration`。缺少迁移时应用会拒绝打开数据库，绝不会通过清空用户数据来兜底。
 
 ---

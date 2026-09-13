@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
+    <!-- 凭据与本地偏好：不进入系统备份/迁移 -->
     <exclude domain="sharedpref" path="secure_api_key.xml" />
     <exclude domain="sharedpref" path="secure_subscription_credential.xml" />
     <exclude domain="file" path="datastore/user_prefs.preferences_pb" />
     <exclude domain="file" path="datastore/subscription_prefs.preferences_pb" />
     <exclude domain="file" path="datastore/user_profile_prefs.preferences_pb" />
     <exclude domain="file" path="datastore/proactive_prefs.preferences_pb" />
+    <!-- 财务数据（v3.15.1）：账目/聊天/周期账单（expense.db 及 WAL 边车）与预算不进入系统备份。
+         Android 8–11 只有这一套规则，云备份与设备迁移共用，故换机也不会自动带上（平台限制）。 -->
+    <exclude domain="database" path="expense.db" />
+    <exclude domain="database" path="expense.db-wal" />
+    <exclude domain="database" path="expense.db-shm" />
+    <exclude domain="database" path="expense.db-journal" />
+    <exclude domain="file" path="datastore/budget_prefs.preferences_pb" />
 </full-backup-content>

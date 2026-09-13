@@ -438,3 +438,35 @@
 - B：界面截图补拍（清单 28 项，需真机）＋ 著作权人身份材料；开发完成日期待著作权人核实
 - C：云自动备份是否排除 `expense.db`（当前包含；记忆/偏好类 DataStore 均已排除）
 - D：后续候选 主动提醒按分类独立冷却 / 上架正式签名
+
+---
+
+# AGENT_LOG.md — 2026-09-13 v3.15.1 隐私边界收紧（AI 执行线，owner 决策 C）
+
+## 背景 / owner 决策
+- owner 就「云自动备份是否排除 expense.db」选择 **C**：云备份排除财务数据、Android 12+ 保留设备迁移；并确认 **budget_prefs 一起排除**
+- 现状问题（本轮修正）：账目 + 聊天记录（最大最敏感）进云备份，而长期记忆 / 凭据早已排除 → 口径冲突 + 恢复不自洽（账目回来、记忆不回）+ DB 撑过 25MB 配额会**整包静默失败**
+
+## 交付
+- `backup_rules.xml`（Android 8–11：云备份与设备迁移共用）：新增 `expense.db` / `-wal` / `-shm` / `-journal` 与 `datastore/budget_prefs.preferences_pb` 排除
+- `data_extraction_rules.xml`：`cloud-backup` 加同样排除；`device-transfer` **不排除**账目与预算（12+ 换机保留）
+- `BackupPolicyTest`（新增，JVM，**进 CI**）：云备份必须排除财务数据与凭据、设备迁移必须保留账目与预算、清单必须声明两套规则资源
+- `tools/test-api-key-backup-rules.ps1`：**收编为薄封装**（只调用 `BackupPolicyTest`），期望清单只保留 Kotlin 一处（owner 决定：按 Kotlin 来）；反向断言（财务数据不得出现在 device-transfer）落在 Kotlin 测试里
+- 文案三处同步：README「🗂 数据安全」新增系统备份口径段；App 内置说明书「数据安全」与欢迎语；官网隐私卡 LEDGER / REMINDERS
+- 版本 v3.15.1 / versionCode 48（修订版）
+
+## 未做 / 边界
+- 长期记忆与主动提醒数据**仍按原样**排除 device-transfer（owner 本轮只要求「账目 + 预算一起排除」；换机用 JSON 备份恢复，已在文案写明）
+- 未修改评测口径、数据集与阈值
+- 官网**未部署**：本 PR 只改网站源码的隐私卡；出包与部署等 owner APPROVED 后一并做
+
+## 验收（本地）
+- JVM 402 → **405，0 failed**（+3 备份契约；先写测试见红，再改规则见绿）
+- 契约脚本：pwsh 7 与 Windows PowerShell 5.1 均 PASS；**负向对照**（把 `expense.db` 从 cloud-backup 移除）如期报错 —— 证明能拦住回归
+- `lintDebug` 通过
+- **Human Review PENDING**：分支 `fix/cloud-backup-scope`（堆叠在 `feat/merchant-anomaly-baseline` 之上），PR base 指向 v3.15.0 分支，待其合并后改指 dev
+
+## 待办（更新）
+- A：真实模型 3 轮复测（需 `EXPENSEBENCH_API_KEY`）
+- B：界面截图补拍（28 项，需真机）＋ 著作权人身份材料；发表状态已按 owner 定为「未发表」（**线上公开下载页仍在，建议 owner 复核该口径**）
+- D：后续候选 主动提醒按分类独立冷却 / 上架正式签名
