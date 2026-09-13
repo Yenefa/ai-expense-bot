@@ -76,6 +76,21 @@ $ANDROID_HOME/build-tools/<version>/apksigner verify --verbose --print-certs \
 期望结果：输出 `Verifies`，且 signer 证书的 SHA-256 指纹与第 1 步 `keytool -list -v` 中你的 release 证书一致。
 若出现 `DOES NOT VERIFY` 或证书显示 `CN=Android Debug`，说明签名未生效或仍是 debug 证书，请回到第 2 步检查四个凭据是否齐全。
 
+## 5. 干跑验证记录（2026-09-13，v3.15.1）
+
+用**仓库外的一次性临时 keystore** 完整跑过一遍，结论：本文档第 1–4 节的流程与产物命名全部属实。验证后临时 keystore 与产物均已删除，仓库内不含任何 `.jks` / `.keystore`。
+
+| 场景 | 实测结果 |
+|---|---|
+| 四个凭据齐全 + `-PYE_COST_SUBSCRIPTION_API_BASE_URL` | 产出 **`app-release.apk`**（已签名，`validateSigningRelease` 执行）；`apksigner verify` → `Verifies`，证书指纹与所用 keystore 逐位一致，且**不是** `CN=Android Debug` |
+| 缺任一凭据 | 产出 **`app-release-unsigned.apk`**，不生成 `app-release.apk`；`apksigner verify` → `DOES NOT VERIFY / Missing META-INF/MANIFEST.MF`；构建不失败，**未回退 debug 签名** |
+
+补充实测细节：
+
+- **签名方案取决于打包路径**：走 Gradle `signingConfigs.release` 时，AGP 按 `minSdk`（26 ≥ 24）默认只启用 **v2**（`v1` / `v3` 均为 false）；走 `apksigner sign` 手工签则产出 **v2 + v3**。对 minSdk 26 两者都可用，且签名证书相同 → 覆盖升级兼容。
+- **内测分发既有路径**（`assembleRelease` → `zipalign -p 4` → `apksigner sign`，debug keystore）实测证书为 `CN=Android Debug`（SHA-256 `74cfab9a…c5e23`），与历史发布包**完全一致**，确认可覆盖升级。
+- 正式上架时该证书与正式 release 证书不同，用户需卸载重装（见本文档开头的说明）。
+
 ## ⚠️ 备份（最重要）
 
 - **务必备份 keystore 文件与两个口令**（不少于两份异地/离线副本，口令存密码管理器）。keystore 一旦丢失且无法找回，就**再也无法签发可覆盖安装的升级包**：老用户只能先卸载旧版（本地数据清除）再安装新版。

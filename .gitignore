@@ -9,3 +9,5 @@ app/build/
 gradle-*.log
 # 下载站：APK 二进制不入库，部署时从构建产物复制
 website/downloads/*.apk
+# apksigner 的 v4 签名副产物（build-tools 35 起默认生成）
+website/downloads/*.idsig

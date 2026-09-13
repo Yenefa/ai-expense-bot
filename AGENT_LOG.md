@@ -470,3 +470,39 @@
 - A：真实模型 3 轮复测（需 `EXPENSEBENCH_API_KEY`）
 - B：界面截图补拍（28 项，需真机）＋ 著作权人身份材料；发表状态已按 owner 定为「未发表」（**线上公开下载页仍在，建议 owner 复核该口径**）
 - D：后续候选 主动提醒按分类独立冷却 / 上架正式签名
+
+---
+
+# AGENT_LOG.md — 2026-09-13 v3.15.1 合并 + 出包 + 正式签名链路干跑（AI 执行线，owner 授权「合并 + 出包」）
+
+## owner 授权与边界
+- owner：干跑记录留到发布时补写（选项 A）+「直接做」；经确认授权范围为 **合并 + 出包，网站部署等 owner 最后点头**
+- 因此本轮**未执行部署**，`website/` 只改了源码；旧的已发布 APK 链接保持不动
+
+## 合并
+- #3（v3.15.0 商户级异常基线）→ merge commit `b7b1ca0`
+- #4（v3.15.1 隐私边界）base 改指 dev 后合并 → merge commit `73ef035`
+- 两条特性分支已删除（本地 + 远端）；dev @ `73ef035`，versionCode 48 / versionName 3.15.1
+- dev 本地全量测试 **405 / 0 failed / 3 skipped**
+
+## 干跑：正式签名链路（不使用 owner 任何密钥）
+- 用**仓库外一次性临时 keystore**（验证后即删）跑通 `docs/release-signing.md` 全流程：
+  - 四凭据齐全 → 产出已签名 `app-release.apk`；`apksigner verify` 通过，证书为临时证书（**不是** `CN=Android Debug`）
+  - 缺任一凭据 → 产出 `app-release-unsigned.apk`，`DOES NOT VERIFY`，构建不失败、**不回退 debug 签名**
+- 新发现（已写入 `docs/release-signing.md` §5）：Gradle `signingConfigs.release` 路径产出 **v2-only**（AGP 按 minSdk 26 决定）；`apksigner` 手工签产出 **v2 + v3**。对 minSdk 26 均可用，证书相同 → 覆盖升级兼容
+- 仓库零污染：临时 keystore 与产物已删除；无 `.jks` / `.keystore` 入库；`gradle.properties` 未被改动（凭据全程只走进程环境变量）
+
+## 出包（内测分发既有路径）
+- `assembleRelease`（真实订阅地址、不带签名凭据）→ `zipalign -p 4` → `apksigner sign`（`$HOME/.android/debug.keystore`）
+- 产物：`website/downloads/Y.E-cost-v3.15.1-2026-09-13.apk`，55,374,337 B，SHA-256 `FB42E9618C7866425E82D8C66AA57EBF6A2FE7976EB4B51C342D5ED95BBE6F31`，v2 + v3 verified
+- **覆盖升级兼容**：新包签名证书 SHA-256 `74cfab9a…c5e23` 与 v3.14.2 已发布包**逐位一致**（同为 debug 测试证书）
+- 包内 `versionCode=48 / versionName=3.15.1`（`aapt2 dump badging` 实测）；旧包保留，未破坏旧链接
+
+## 下载站（已改源码，**未部署**）
+- `website/index.html`：3 处下载链接、LATEST 版本/日期、spec 的版本/内部版本/文件名/SHA-256、新增 v3.15.0 与 v3.15.1 两条发布说明、测试数 398→405、隐私细节措辞
+- 部署命令（待 owner 点头）：`MSYS_NO_PATHCONV=1 tcb hosting deploy website /ye-cost -e ilove-d5g0gzrpp375112b9`
+
+## 待办
+- owner：点头后执行部署 + 线上校验（index / APK / SHA 一致）
+- A：真实模型 3 轮复测（需 `EXPENSEBENCH_API_KEY`）
+- B：界面截图补拍（28 项）/ 著作权人身份材料 / 开发完成日期；「未发表」口径仍建议复核
