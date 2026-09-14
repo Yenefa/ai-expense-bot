@@ -570,6 +570,21 @@ ExpenseBench v2 旁路基线（`deepseek-v4.1-flash`，3 轮 × 110 条，见 PR
 - 真实模型 3 轮复测（qwen3.7-flash 口径）仍待 owner 提供可比端点
 - 软著材料：开发未冻结，暂不重生成（见 `软著材料/截图拍摄清单.md`）
 
-## 待办（不变）
-- A：真实模型 3 轮复测（需 `EXPENSEBENCH_API_KEY`）
-- B：界面截图补拍（28 项）/ 著作权人身份材料 / 开发完成日期；「未发表」口径仍建议复核
+---
+
+# AGENT_LOG.md — 2026-09-14 v3.15.2 发布物料 + 出包（owner「直接发布部署」）
+
+## 出包（内测分发既有路径）
+- `assembleRelease`（真实订阅地址、不带签名凭据）→ `zipalign -p 4` → `apksigner sign`（`$HOME/.android/debug.keystore`）
+- 产物：`website/downloads/Y.E-cost-v3.15.2-2026-09-14.apk`，55,374,337 B，SHA-256 `C088B914F34D725B1144B387D52F2EE1E88D1BCC576B5D528290FAA9CD0C44BA`
+- `aapt2 dump badging`：`versionCode=49 / versionName=3.15.2`；`apksigner verify` → **Verifies，v2 + v3 scheme**
+- **覆盖升级兼容**：签名证书 SHA-256 `74cfab9a…c5e23`，与 v3.14.2 / v3.15.1 已发布包**逐位一致**
+- `.idsig`（build-tools 35 的 v4 副产物）已删除；`.gitignore` 已覆盖该后缀
+
+## 下载站物料
+- `website/index.html`：3 处下载链接 → 新包；LATEST `2026.09.14 / v3.15.2`；spec 的版本 / 内部版本 49 / 文件名 / SHA-256；新增 v3.15.2 发布说明；测试数 405 → 406
+- 旧包（v3.15.1、v3.14.2）保留在 `downloads/`，不破坏旧链接
+
+## 部署与线上校验
+- `MSYS_NO_PATHCONV=1 tcb hosting deploy website /ye-cost -e ilove-d5g0gzrpp375112b9`
+- 线上校验结果见随后的部署记录条目
