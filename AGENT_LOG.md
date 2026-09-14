@@ -531,6 +531,45 @@
 - build-tools 35 的 `apksigner` 会生成 `.idsig` v4 副产物（旧版不产生）；已把 `website/downloads/*.idsig` 补进 `.gitignore`
 - 本条为纯记录提交（零代码/零行为改动），随发布一并落到 dev
 
+---
+
+# AGENT_LOG.md — 2026-09-14 v3.15.2 分类口径修正（食材/水果 → food，owner 裁定）
+
+## 来源
+ExpenseBench v2 旁路基线（`deepseek-v4.1-flash`，3 轮 × 110 条，见 PR #7）唯一残留失败根因：
+- ra-08「今天水果30块」、mtp-17「昨天买菜80块，今天水果30块」→ 实际 `shopping`，gold `food`
+- 「水果」3/3 轮稳定判 shopping → 口径分歧（非抖动）；「买菜」仅第 2 轮连带误判
+- owner 2026-09-14 裁定：**水果 → food**（gold 正确，修模型口径）
+
+## 根因
+`LlmPrompt` 的分类规则里**只有**「日用品、超市、理发/剪发等生活服务开支 → category=shopping」，**没有任何食材类指引**，模型据「超市」把买菜/水果一并归入 shopping。
+
+## 修复（先写测试见红，再实现见绿）
+- `LlmPrompt.systemPrompt`：新增 `- 食材、生鲜、蔬菜、水果、买菜 → category=food（从超市买的食材也算 food，只有日用品/生活用品才归 shopping）`
+- `LlmPrompt.billImportSystemPrompt`：新增 `- 食材、生鲜、蔬菜、水果归 food（从超市买的食材也算 food）。`（同一分类能力，两个提示词保持一致）
+- `LlmPromptContractTest`：新增 `promptsClassifyGroceriesFruitAndVegetablesAsFood`，钉住两处规则
+
+## 验收
+- JVM 405 → **406，0 failed**（+1 契约）；`lintDebug` 通过
+- **修复前后对比（同一数据集 sha、同一模型、同样三轮）**：
+
+| | E2E | 失败 |
+| --- | --- | --- |
+| 修复前（PR #7 基线） | 99.1%（109/110）× 3 轮 | ra-08 / mtp-17（水果） |
+| 修复后 | **100.0%（110/110）× 3 轮** | 无 |
+
+- 修复后三轮其余指标均 100%：Router 80/80、Query Recall 16/16、Tool 24/24、Mut Count 110/110、Date Binding 87/87、FMR 0/54；请求失败 0
+
+## 边界
+- **未改动**评测器、数据集 gold、阈值、冷却；gold 维持 `food`（owner 裁定）
+- 未改动 Router 别名表 `AgentCategories`（那是查询过滤用的宽召回表，与分类提取是两条链路）；`水果` 未在其中，属可选的后续优化
+- 旁路基线的三处非协议差异（模型不同 / 注入 `reasoning_effort=high` / 经本地代理注入 `x-opencode-session`）见 PR #7 报告
+- 版本 v3.15.2 / versionCode 49；README 版本表补齐了此前遗漏的 v3.15.1 行
+
+## 待办（不变）
+- 真实模型 3 轮复测（qwen3.7-flash 口径）仍待 owner 提供可比端点
+- 软著材料：开发未冻结，暂不重生成（见 `软著材料/截图拍摄清单.md`）
+
 ## 待办（不变）
 - A：真实模型 3 轮复测（需 `EXPENSEBENCH_API_KEY`）
 - B：界面截图补拍（28 项）/ 著作权人身份材料 / 开发完成日期；「未发表」口径仍建议复核

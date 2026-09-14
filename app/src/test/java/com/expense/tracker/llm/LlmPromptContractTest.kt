@@ -92,4 +92,15 @@ class LlmPromptContractTest {
         assertThat(prompt).contains("必须输出 update 动作")
         assertThat(prompt).contains("禁止用新增一笔代替修改")
     }
+
+    /** owner 裁定（2026-09-14）：水果/买菜/生鲜归 food，不能被「超市 → shopping」带偏。 */
+    @Test fun promptsClassifyGroceriesFruitAndVegetablesAsFood() {
+        val chatPrompt = LlmPrompt.systemPrompt()
+        val billPrompt = LlmPrompt.billImportSystemPrompt()
+
+        assertThat(chatPrompt).contains("食材、生鲜、蔬菜、水果")
+        assertThat(chatPrompt).contains("category=food")
+        assertThat(billPrompt).contains("食材、生鲜、蔬菜、水果")
+        assertThat(billPrompt).contains("归 food")
+    }
 }
