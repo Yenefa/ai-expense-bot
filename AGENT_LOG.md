@@ -588,3 +588,19 @@ ExpenseBench v2 旁路基线（`deepseek-v4.1-flash`，3 轮 × 110 条，见 PR
 ## 部署与线上校验
 - `MSYS_NO_PATHCONV=1 tcb hosting deploy website /ye-cost -e ilove-d5g0gzrpp375112b9`
 - 线上校验结果见随后的部署记录条目
+
+---
+
+# AGENT_LOG.md — 2026-09-14 v3.15.2 部署上线与线上校验
+
+## 部署
+- `tcb hosting deploy website /ye-cost -e ilove-d5g0gzrpp375112b9` → **5 个文件上传成功、0 失败**（index.html / 图标 / v3.14.2 + v3.15.1 + v3.15.2 三个 APK）
+
+## 线上校验（全部实测）
+- `https://…/ye-cost/` → **200**；页面含 `v3.15.2` / `2026.09.14` / `versionCode 49` / 新包名 / `C088B914…` / 新发布说明（带 `no-cache` + 时间戳绕过 CDN）
+- 三个 APK 全部 **200** 且 `Content-Length=55374337`：新包可下，**v3.15.1 / v3.14.2 旧链接均未破坏**
+- 新包**下载回本地比对 SHA-256 逐位一致**：`C088B914F34D725B1144B387D52F2EE1E88D1BCC576B5D528290FAA9CD0C44BA`
+
+## 状态
+- `dev` @ `18d5279`（v3.15.2 / versionCode 49）；PR #9 已合并
+- 覆盖升级链路连续：v3.14.2 → v3.15.1 → v3.15.2 三版**同一测试证书**，老用户可直接覆盖安装
