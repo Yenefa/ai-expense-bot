@@ -33,8 +33,14 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      # 注意：该 action 的默认 packages 为「tools platform-tools」，而 Google 已从 SDK 仓库
+      # 移除旧的 `tools` 包 —— 默认值会让 sdkmanager 报 "Failed to find package 'tools'"
+      # 并以 exit 1 失败（2026-09-15 起所有 CI 都会红）。这里显式只装仍然存在的包。
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools"
+          accept-android-sdk-licenses: true
 
       - name: Run unit tests and lint
         run: ./gradlew :app:testDebugUnitTest :app:lintDebug --console=plain --no-daemon
