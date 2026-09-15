@@ -11,8 +11,8 @@
 
 - Android 记账 App「Y.E cost」（`com.expense.tracker`）：Kotlin 1.9.22 + Jetpack Compose + Room + ML Kit OCR + LLM Agent
 - 仓库：https://github.com/Yenefa/ai-expense-bot（`dev` 分支）
-- 版本：v3.15.2（versionCode 49；已发布 v3.15.1 在 dev 与线上，本版为分类口径修正，分支 `fix/grocery-classification-food` PR 待 owner 审核）
-- 测试：**406 个 JVM 单测**（`./gradlew :app:testDebugUnitTest`，其中 2 个 LLM bench 与 1 个平台相关用例在缺省环境下 skip）；CI：GitHub Actions（test + lint）
+- 版本：v3.15.3（versionCode 50；v3.15.1 / v3.15.2 已发布上线，本版修复官方账单 CSV 导入，分支 `fix/platform-csv-import` PR 待 owner 审核）
+- 测试：**407 个 JVM 单测**（`./gradlew :app:testDebugUnitTest`，其中 2 个 LLM bench 与 1 个平台相关用例在缺省环境下 skip）；CI：GitHub Actions（test + lint）
 - 服务器：腾讯云 CloudBase 云函数 `ye-cost-api`（兑换码核销 + AI 代理 `hy3`），/health 在线
 
 ## ExpenseBench v2（当前阶段）
@@ -43,6 +43,8 @@
 - **v3.15.1 隐私边界收紧**（2026-09-13，分支 `fix/cloud-backup-scope`，堆叠于 v3.15.0）：账目/聊天（`expense.db` 及 WAL 边车）与预算排除系统云备份；Android 12+ 保留设备迁移；新增 CI 契约 `BackupPolicyTest`；405 单测；待 owner 审核
 - **v3.15.1 已上线**（2026-09-13）：合并后出内测签名 APK，下载站部署并线上校验（新包哈希与本地逐位一致、旧链接保留）；顺手修掉 dev CI 的一个 flaky（`SubscriptionViewModelTest`）
 - **v3.15.2 分类口径修正**（2026-09-14，分支 `fix/grocery-classification-food`）：提示词补「食材/生鲜/蔬菜/水果/买菜 → food」并消歧超市；来源为 deepseek-v4.1-flash 旁路基线唯一残留失败；修复后 3 轮 E2E 100%；406 单测；待 owner 审核
+- **v3.15.2 已发布上线**（2026-09-14）：出包 + 下载站部署 + 线上校验（哈希逐位一致、旧链接保留）
+- **v3.15.3 修复官方账单 CSV 导入**（2026-09-14，分支 `fix/platform-csv-import`）：入口判据 15 行窗口过窄导致长前置行的微信账单被误判；改为扫描全文；文件选择器补 octet-stream/x-csv；407 单测；待 owner 审核
 - LLM Bench 继续按需（不再自动跑）；真实模型 3 轮复测（新数据集 sha、分类修正、mt-02/03/16、mt-15）与 LLM 文案真实复测待 owner 指令
 - 后续候选：真实模型复测、主动提醒按分类独立冷却（当前异常/储蓄共用 7d）、上架准备（正式签名见 `docs/release-signing.md`）
 
