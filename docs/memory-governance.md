@@ -34,7 +34,7 @@ UserProfile Persist（MemoryGovernor.confirm —— 唯一写入口）
 ## 3. MemoryGovernanceBench
 
 - 数据集：`app/src/test/resources/expensebench/memory-cases.jsonl`（36 条：四类各 6 + 拒绝集 12）
-- 运行：`./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.bench.LocalMemoryGovernanceBenchTest"`（纯本地、零网络）
+- 运行：`./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.bench.LocalMemoryGovernanceBenchTest"`（纯本地、零网络）
 - 报告：`docs/memory-governance-local-report.md`
 - 被测管线：真实 `ExpenseAgent` + 真实 `MemoryGovernor` + stub LLM（证明提案轮 llmCalls = 0）
 
@@ -57,7 +57,7 @@ UserProfile Persist（MemoryGovernor.confirm —— 唯一写入口）
 ## 5. 复现
 
 ```bash
-./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.memory.*" \
+./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.memory.*" \
   --tests "com.expense.tracker.bench.LocalMemoryGovernanceBenchTest"
 ```
 

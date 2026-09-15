@@ -26,7 +26,7 @@ import org.junit.Test
  * EXPENSEBENCH_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1 \
  * EXPENSEBENCH_MODEL=qwen3.7-plus \
  * EXPENSEBENCH_CONCURRENCY=4 \
- * ./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.bench.LlmExpenseBenchTest"
+ * ./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.bench.LlmExpenseBenchTest"
  * ```
  * 报告写 `docs/expensebench-llm-report-<model>.md`；EXPENSEBENCH_LIMIT 可先跑前 N 条冒烟。
  * 可复现协议见 docs/expensebench.md（temperature=0 固定 + 数据集/prompt 哈希入报告）。

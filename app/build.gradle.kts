@@ -59,6 +59,24 @@ android {
             "\"$escapedSubscriptionApiBaseUrl\"",
         )
     }
+    // 渠道（2026-09-15）：public = 对外版本；personal = 自用版。
+    // 关键：无障碍读屏的代码与清单声明只放在 src/personal/，public 包内**根本不存在**，
+    // 商店审核扫描不到 AccessibilityService 声明，也就无需为其做用途申报。
+    flavorDimensions += "channel"
+    productFlavors {
+        create("public") {
+            dimension = "channel"
+            // 对外版本：applicationId 保持 com.expense.tracker
+            buildConfigField("boolean", "PERSONAL_BUILD", "false")
+        }
+        create("personal") {
+            dimension = "channel"
+            // 自用版：独立包名 → 可与公共版**同时安装**，数据互不干扰（换数据走 JSON 备份恢复）
+            applicationIdSuffix = ".personal"
+            versionNameSuffix = "-personal"
+            buildConfigField("boolean", "PERSONAL_BUILD", "true")
+        }
+    }
     signingConfigs {
         // 仅当四个凭据全部提供时才创建 release 签名配置；
         // 否则保持未签名（不回退 debug 签名），保证无凭据环境仍可 assembleRelease。
@@ -97,7 +115,9 @@ android {
 }
 
 tasks.configureEach {
-    if (name in setOf("assembleRelease", "bundleRelease", "lintRelease")) {
+    // 加渠道后 release 任务名变成 assemblePublicRelease / assemblePersonalRelease 等；
+    // 这里按后缀匹配，避免守卫因为改名而静默失效（release 必须带订阅地址）。
+    if (Regex("^(assemble|bundle|lint).*Release$").matches(name)) {
         doFirst {
             if (subscriptionApiBaseUrl.isBlank()) {
                 throw GradleException(

@@ -52,7 +52,7 @@ EXPENSEBENCH_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1 \
 EXPENSEBENCH_MODEL=qwen3.7-flash \
 EXPENSEBENCH_CONCURRENCY=4 \
 # EXPENSEBENCH_LIMIT=10 可先冒烟
-./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.bench.LlmAgentBehaviorBenchTest"
+./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.bench.LlmAgentBehaviorBenchTest"
 ```
 
 - 删除确认门不会被 bench 自动确认（保持人类治理语义：拟删除只记 pending，不落库）

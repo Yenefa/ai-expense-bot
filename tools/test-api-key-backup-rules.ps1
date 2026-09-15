@@ -24,7 +24,7 @@ $gradleWrapper = if ($isWindowsHost) { ".\gradlew.bat" } else { "./gradlew" }
 
 Push-Location $ProjectRoot
 try {
-    & $gradleWrapper :app:testDebugUnitTest --tests "com.expense.tracker.privacy.BackupPolicyTest" --console=plain
+    & $gradleWrapper :app:testPublicDebugUnitTest --tests "com.expense.tracker.privacy.BackupPolicyTest" --console=plain
     if ($LASTEXITCODE -ne 0) {
         throw "BackupPolicyTest failed (exit $LASTEXITCODE)"
     }

@@ -26,7 +26,7 @@
 ## 3. ProactiveInsightBench
 
 - 数据集：`app/src/test/resources/expensebench/proactive-cases.jsonl`（38 条六桶：should_alert 14 / no_trigger 5 / suppressed_cold_start 6 / suppressed_cooldown 5 / suppressed_daily_budget 5 / suppressed_disabled 3）
-- 运行：`./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.bench.LocalProactiveInsightBenchTest"`（纯本地、零网络）
+- 运行：`./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.bench.LocalProactiveInsightBenchTest"`（纯本地、零网络）
 - 报告：`docs/proactive-insight-local-report.md`
 
 | 指标 | 口径 | 目标 |
@@ -57,7 +57,7 @@
 ## 6. 复现
 
 ```bash
-./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.proactive.*" \
+./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.proactive.*" \
   --tests "com.expense.tracker.bench.LocalProactiveInsightBenchTest"
 ```
 

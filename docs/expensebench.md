@@ -40,7 +40,7 @@ EXPENSEBENCH_API_KEY=sk-xxx \
 EXPENSEBENCH_BASE_URL=https://api.deepseek.com \
 EXPENSEBENCH_MODEL=deepseek-chat \
 # EXPENSEBENCH_LIMIT=10 可先跑前 10 条冒烟
-./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.bench.LlmExpenseBenchTest"
+./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.bench.LlmExpenseBenchTest"
 ```
 
 - 未设置 API Key 时自动跳过（`Assume`），不影响常规 CI
