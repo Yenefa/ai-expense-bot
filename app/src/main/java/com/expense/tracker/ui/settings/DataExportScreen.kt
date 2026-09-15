@@ -496,14 +496,6 @@ private fun displayDate(timeMs: Long): String {
     return fmt.format(Date(timeMs))
 }
 
-/** 读取 CSV 文本：优先 UTF-8（含 BOM），失败则按 GBK（微信导出常见编码）。 */
-private fun readCsvText(input: java.io.InputStream): String {
-    val bytes = input.readBytes()
-    val utf8 = runCatching {
-        val text = String(bytes, Charsets.UTF_8)
-        if (text.contains('\uFFFD')) throw IllegalArgumentException("not utf8")
-        text
-    }.getOrNull()
-    return utf8?.trimStart('\uFEFF')
-        ?: String(bytes, java.nio.charset.Charset.forName("GBK")).trimStart('\uFEFF')
-}
+/** 读取 CSV 文本：解码与「压缩包」提示统一由 `CsvExpenseImporter.decodeCsvBytes` 负责（有单元测试覆盖）。 */
+private fun readCsvText(input: java.io.InputStream): String =
+    com.expense.tracker.data.importer.CsvExpenseImporter.decodeCsvBytes(input.readBytes())

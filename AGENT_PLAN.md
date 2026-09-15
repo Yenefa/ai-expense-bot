@@ -11,8 +11,8 @@
 
 - Android 记账 App「Y.E cost」（`com.expense.tracker`）：Kotlin 1.9.22 + Jetpack Compose + Room + ML Kit OCR + LLM Agent
 - 仓库：https://github.com/Yenefa/ai-expense-bot（`dev` 分支）
-- 版本：v3.15.3（versionCode 50；v3.15.1 / v3.15.2 已上线；v3.15.3 官方账单 CSV 导入修复已合并 dev、**待发布**；正在做 public / personal 双渠道）
-- 测试：**407 个 JVM 单测**（`./gradlew :app:testPublicDebugUnitTest`，其中 2 个 LLM bench 与 1 个平台相关用例在缺省环境下 skip）；CI：GitHub Actions（test + lint）
+- 版本：v3.15.3（versionCode 50；v3.15.1 / v3.15.2 已上线；v3.15.3 官方账单 CSV 导入三处修复已合并 dev、**待发布**；public / personal 双渠道骨架已合并）
+- 测试：**410 个 JVM 单测**（`./gradlew :app:testPublicDebugUnitTest`，其中 2 个 LLM bench 与 1 个平台相关用例在缺省环境下 skip）；CI：GitHub Actions（test + lint）
 - 服务器：腾讯云 CloudBase 云函数 `ye-cost-api`（兑换码核销 + AI 代理 `hy3`），/health 在线
 
 ## ExpenseBench v2（当前阶段）

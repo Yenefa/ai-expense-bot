@@ -677,3 +677,37 @@ owner 看到竞品（「钱包AI记账」）用**无障碍读屏**做自动记�
 4. **两渠道出包 + 下载站**（公共版主推；自用版单独入口 + 无障碍用途与风险披露）
 
 > 版本号未变（本 PR 为结构性改动、不改公共版行为）；自动记账功能落地时统一 bump 到 v3.16.0。
+
+---
+
+# AGENT_LOG.md — 2026-09-15 官方账单 CSV 导入：另外两个缺陷（owner 真机截图）
+
+## 报障证据
+owner 发来两张真机截图，是**两个不同的错误**：
+1. `导入失败：CSV 存在未闭合的引号（第 256 行）`
+2. `导入失败：CSV 缺少字段：id, amount, categoryId, note, oc…`
+
+② 是上一轮修的 15 行窗口缺陷（owner 手机上还是 v3.15.2，没装到修复版）；**① 是另一条独立缺陷，本轮修**。
+
+## 缺陷 2：CSV 引号处理不符合 RFC 4180
+- **根因**：`CsvExpenseImporter.parseRecords` 把**任何位置**出现的 `"` 都当成引号开关（`'"' -> inQuotes = true`）。RFC 4180 只允许**字段开头**的 `"` 起始引用，字段中间出现的 `"` 是普通字符。于是备注 / 商品名里只要有一个**落单**引号，状态机就一路错位到文件末尾 → `require(!inQuotes)` 抛错 → **整份账单被拒绝**，而数据本身完全没问题。
+- **修复**：`'"' -> if (field.isEmpty()) inQuotes = true else field.append('"')`（一行，RFC 正确行为）
+- **回归测试**：`strayQuoteInsideUnquotedFieldIsKeptLiteralAndDoesNotBreakTheFile`（先红后绿）
+
+## 缺陷 3：压缩包没有专门提示
+- 官方账单的邮件 / 消息附件常常是**带密码的 ZIP**，按文本解码只会得到乱码，用户看到的却是「缺少字段」这种毫不相干的错误。
+- 新增 `CsvExpenseImporter.decodeCsvBytes`：识别 ZIP 魔数（`PK`）→ 明确提示「这是压缩包（.zip），请先解压出 CSV 再导入」；顺带把 UTF-8 → GBK 回退从 UI 层挪进来，**首次获得单元测试覆盖**（此前 `readCsvText` 是 UI 私有函数，测不到）。
+- 单测：ZIP 识别 + GBK 回退各一条。
+
+## 验收
+- JVM 407 → **410，0 failed**；`lintPublicDebug` 通过
+- 三个缺陷各有回归测试：长前置行 / 落单引号 / ZIP 识别 + GBK 回退
+
+## 仍未确认的一点（需要 owner 一句话）
+三条修复覆盖了「长前置行」「落单引号」「压缩包」三种成因，但**我无法确认 owner 那份文件究竟属于哪种**。最省事的确认方式：
+- 告诉我是**哪个错误**对应**哪个平台**（微信 / 支付宝）；或
+- 把文件扩展名 + 第一行（表头）发我；或
+- 直接用仓库里既有的门控夹具测试复现：`CSV_IMPORT_FIXTURE=<文件路径> ./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.data.importer.CsvExpenseImporterTest"`
+
+## 版本
+- 归入**尚未发布**的 v3.15.3 / versionCode 50（本版还没出包，三个修复一起发，不额外 bump）
