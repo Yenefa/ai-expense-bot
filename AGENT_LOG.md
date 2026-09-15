@@ -638,3 +638,42 @@ fun looksLikePlatformCsv(text: String) = text.lineSequence().take(MARKER_SCAN_LI
 
 ## 版本
 - v3.15.3 / versionCode 50；分支 `fix/platform-csv-import`，PR 待 owner 审核；**未出包、未部署**
+
+---
+
+# AGENT_LOG.md — 2026-09-15 public / personal 双渠道骨架（owner：区分 applicationId + 自用版也上线 + 草案优先）
+
+## 背景与 owner 决策
+owner 看到竞品（「钱包AI记账」）用**无障碍读屏**做自动记账后提问，我给出的对比结论是「两条路都可行，差别在合规与隐私代价」。owner 拍板：**做两个版本** —— 公共版守规矩、自用版放开。三问答复：
+- ① applicationId **区分**（`.personal`）→ 两版可**同时安装**、数据互不干扰
+- ② 自用版**也上线**（我原建议不公开分发，owner 决定上；风险已知：自有站点不属于 Play 分发，policy 不适用，但会稀释「隐私优先」的品牌一致性）
+- ③ 自动记账**按推荐走草案优先**（先出待确认草案，直写做成显式开关）
+
+## 本轮交付（仅结构，不含自动记账功能）
+- `app/build.gradle.kts`：`flavorDimensions += "channel"` + `public` / `personal` 两个 flavor；后者 `applicationIdSuffix = ".personal"`、`versionNameSuffix = "-personal"`、`buildConfigField("boolean","PERSONAL_BUILD","true")`
+- `app/src/personal/res/values/strings.xml`：自用版 app_name = `Y.E cost 自用`（验证源码集隔离端到端可用）
+- `.github/workflows/ci.yml`：测试/lint 任务改为 `testPublicDebugUnitTest` / `lintPublicDebug`；release 编译检查**同时编译两个渠道**；产物路径同步
+- 全仓 `:app:testDebugUnitTest` → `:app:testPublicDebugUnitTest`（**9 处**：AGENT_PLAN、5 份协议 docs、`tools/test-api-key-backup-rules.ps1`、2 处 bench KDoc）；`docs/superpowers/plans/*` 为历史记录，**刻意不改**
+
+## ⚠️ 本轮抓到的一个隐蔽陷阱
+构建脚本里那条「release 必须带订阅地址」的守卫原来是 `if (name in setOf("assembleRelease","bundleRelease","lintRelease"))` —— **加渠道后这些任务名全部消失**（变成 `assemblePublicRelease` / `assemblePersonalRelease`），守卫会**静默失效**，等于把「release 必须带真实订阅地址」的护栏悄悄拆掉。已改为后缀正则 `^(assemble|bundle|lint).*Release$`，并做了**反向验证**：不带该属性时仍然 `BUILD FAILED: Release requires -YE_COST_SUBSCRIPTION_API_BASE_URL`。
+
+## 验收（全部实跑）
+- `:app:testPublicDebugUnitTest` → BUILD SUCCESSFUL（407 单测）
+- `:app:lintPublicDebug` → BUILD SUCCESSFUL
+- `:app:assemblePublicRelease :app:assemblePersonalRelease -P<订阅地址>` → BUILD SUCCESSFUL（两渠道都编译）
+- 守卫反向验证：去掉属性 → 如期 `Release requires …` 失败
+- 产物身份（`aapt2 dump badging`，清空 outputs 后重建）：
+
+| 渠道 | 包名 | versionName | 桌面名称 |
+| --- | --- | --- | --- |
+| public | `com.expense.tracker` | `3.15.3` | `Y.E cost` |
+| personal | `com.expense.tracker.personal` | `3.15.3-personal` | `Y.E cost 自用` |
+
+## 未做（后续同一条功能线，按顺序）
+1. **通知监听 + 待确认草案**（两渠道共用，进 `main`）—— 合规路径，公共版也保留
+2. **无障碍读屏**（只进 `src/personal/`，含清单声明与引导页）—— 公共版包内**根本不存在**
+3. **误记率 Bench**（真实通知/页面样本集，目标 0%）
+4. **两渠道出包 + 下载站**（公共版主推；自用版单独入口 + 无障碍用途与风险披露）
+
+> 版本号未变（本 PR 为结构性改动、不改公共版行为）；自动记账功能落地时统一 bump 到 v3.16.0。

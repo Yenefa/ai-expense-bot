@@ -51,7 +51,7 @@ import org.junit.Test
  * EXPENSEBENCH_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1 \
  * EXPENSEBENCH_MODEL=qwen3.7-flash \
  * EXPENSEBENCH_CONCURRENCY=4 \
- * ./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.bench.LlmAgentBehaviorBenchTest"
+ * ./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.bench.LlmAgentBehaviorBenchTest"
  * ```
  * 报告写 `docs/expensebench-v2-llm-report-<model>.md`；EXPENSEBENCH_LIMIT 可先冒烟。
  * 首要指标 False Mutation Rate（目标 0%）；协议见 docs/expensebench-v2.md。

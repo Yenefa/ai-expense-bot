@@ -35,7 +35,7 @@
 ## 4. MemoryConsumptionBench
 
 - 数据集：`app/src/test/resources/expensebench/memory-consumption-cases.jsonl`（38 条）
-- 运行：`./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.bench.LocalMemoryConsumptionBenchTest"`（纯本地、零网络）
+- 运行：`./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.bench.LocalMemoryConsumptionBenchTest"`（纯本地、零网络）
 - 报告：`docs/memory-consumption-local-report.md`
 - 桶：alias_application 8 / analysis_reads 8 / preference_analysis 4 / unauthorized 8 / deleted_reuse 6 / no_memory 4
 
@@ -54,7 +54,7 @@
 ## 6. 复现
 
 ```bash
-./gradlew :app:testDebugUnitTest --tests "com.expense.tracker.memory.*" \
+./gradlew :app:testPublicDebugUnitTest --tests "com.expense.tracker.memory.*" \
   --tests "com.expense.tracker.bench.LocalMemoryConsumptionBenchTest" \
   --tests "com.expense.tracker.data.export.*"
 ```

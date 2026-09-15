@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 自用版独立安装（applicationId 带 .personal 后缀），桌面上与公共版区分开 -->
+    <string name="app_name">Y.E cost 自用</string>
+</resources>

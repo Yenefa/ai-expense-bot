@@ -1,8 +1,8 @@
 # CI 工作流：Android/Kotlin 单元测试 + Lint + Release 编译检查
 # 触发：push 到 dev/main 分支、任意 pull_request、以及手动 workflow_dispatch
 # 内容：JDK 17 (temurin，开启 Gradle 缓存) + Android SDK，
-#       依次执行 :app:testDebugUnitTest（Debug 单元测试）、:app:lintDebug（Debug Lint）、
-#       :app:assembleRelease（Release 编译检查，仅编译不签名不发布）
+#       依次执行 :app:testPublicDebugUnitTest（公共版 Debug 单元测试）、:app:lintPublicDebug（Debug Lint）、
+#       :app:assemblePublicRelease + :app:assemblePersonalRelease（两个渠道的 Release 编译检查，仅编译不签名不发布）
 # 失败时上传测试报告 artifacts，便于定位问题；最小权限（contents: read）
 # 说明：不依赖任何 secrets；Release 构建传入占位 YE_COST_SUBSCRIPTION_API_BASE_URL，
 #       未提供 keystore 环境变量时签名配置回退为 unsigned
@@ -43,10 +43,11 @@ jobs:
           accept-android-sdk-licenses: true
 
       - name: Run unit tests and lint
-        run: ./gradlew :app:testDebugUnitTest :app:lintDebug --console=plain --no-daemon
+        run: ./gradlew :app:testPublicDebugUnitTest :app:lintPublicDebug --console=plain --no-daemon
 
       - name: Compile release build (unsigned)
-        run: ./gradlew :app:assembleRelease -PYE_COST_SUBSCRIPTION_API_BASE_URL=https://invalid.local --console=plain --no-daemon
+        # 两个渠道都必须能编译：personal 渠道若腐化，这里会立刻暴露
+        run: ./gradlew :app:assemblePublicRelease :app:assemblePersonalRelease -PYE_COST_SUBSCRIPTION_API_BASE_URL=https://invalid.local --console=plain --no-daemon
 
       - name: Upload test reports on failure
         if: failure()
@@ -54,6 +55,6 @@ jobs:
         with:
           name: test-reports
           path: |
-            app/build/reports/tests/testDebugUnitTest/**
-            app/build/test-results/testDebugUnitTest/**
+            app/build/reports/tests/testPublicDebugUnitTest/**
+            app/build/test-results/testPublicDebugUnitTest/**
           if-no-files-found: ignore
