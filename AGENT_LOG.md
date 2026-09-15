@@ -604,3 +604,37 @@ ExpenseBench v2 旁路基线（`deepseek-v4.1-flash`，3 轮 × 110 条，见 PR
 ## 状态
 - `dev` @ `18d5279`（v3.15.2 / versionCode 49）；PR #9 已合并
 - 覆盖升级链路连续：v3.14.2 → v3.15.1 → v3.15.2 三版**同一测试证书**，老用户可直接覆盖安装
+
+---
+
+# AGENT_LOG.md — 2026-09-14 v3.15.3 修复官方账单 CSV 导入（owner 报障）
+
+## 报障
+- owner：「支付宝和微信导出的账单怎么不支持导入了？」——已发布版本的核心功能，最高优先级
+
+## 根因（v3.14.2 引入）
+v3.14.2 为支持官方账单的「前置元信息行」加了入口判据，但**窗口只有 15 行**：
+
+```kotlin
+private const val MARKER_SCAN_LINES = 15   // ← v3.14.2 引入
+fun looksLikePlatformCsv(text: String) = text.lineSequence().take(MARKER_SCAN_LINES).any { ... }
+```
+
+而微信官方账单的前置内容（微信昵称 / 时间范围 / 导出类型 / 导出时间 / 笔数统计 / 注意事项 1–5 / 分隔线）**通常超过 15 行** → 判据返回 false → 文件被回落到「本应用导出 CSV」解析器 → 抛 `CSV 缺少字段：id, amount, categoryId, note, occurredAt, createdAt` → 用户看到的就是「不支持导入」。
+
+**最刺眼的不一致**：`looksLikePlatformCsv` 只扫 15 行，而 `parse()` 用 `indexOfFirst` 扫**全文**——入口判据比解析器更窄，等于把本来能解析的文件挡在门外。
+
+## 修复
+- `PlatformCsvImporter.looksLikePlatformCsv`：去掉 `.take(MARKER_SCAN_LINES)`，改为扫描全文（`any` 命中即短路，代价可忽略），并删除失效常量
+- `DataExportScreen` 的 CSV 选择器补 `application/octet-stream` / `application/x-csv`：官方账单经下载或文件管理器落盘后常被 provider 报成通用类型，只放 `text/*` 会让文件在选择器里**变灰不可选**
+
+## 验收（先写测试见红 → 修见绿）
+- JVM 406 → **407，0 failed**（+1：前置说明 18 行、表头落在第 19 行的长前置行回归）；`lintDebug` 通过
+- 红点证据：新测试先失败于「表头在第 19 行、超出旧 15 行窗口」
+
+## 未做（需 owner 确认后再动）
+- **加密 ZIP 未支持**：微信「下载账单」与支付宝「开具交易流水证明」的邮件附件可能是带密码的 ZIP，需先解压出 CSV；App 目前既不解压也不提示。若 owner 的账单就是 ZIP，需要另做（解压 + 密码输入 + 明确提示）
+- 未改任何解析口径、分类规则与评测
+
+## 版本
+- v3.15.3 / versionCode 50；分支 `fix/platform-csv-import`，PR 待 owner 审核；**未出包、未部署**

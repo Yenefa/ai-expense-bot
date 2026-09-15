@@ -222,7 +222,15 @@ fun DataExportScreen(onClose: () -> Unit) {
                 enabled = !busy,
                 onClick = {
                     importLauncher.launch(
-                        arrayOf("text/*", "application/csv", "application/vnd.ms-excel"),
+                        // 官方账单经下载/文件管理器落盘后常被 provider 报成 application/octet-stream，
+                        // 只放 text/* 会让文件在选择器里变灰（用户看到的就是「不支持导入」）。
+                        arrayOf(
+                            "text/*",
+                            "application/csv",
+                            "application/x-csv",
+                            "application/vnd.ms-excel",
+                            "application/octet-stream",
+                        ),
                     )
                 },
             )

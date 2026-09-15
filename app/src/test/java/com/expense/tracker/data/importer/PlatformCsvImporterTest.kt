@@ -129,4 +129,43 @@ class PlatformCsvImporterTest {
         assertThat(bad.expenses).isEmpty()
         assertThat(bad.issues.joinToString()).contains("金额无效")
     }
+
+    /**
+     * 回归：官方导出的前置说明（昵称 / 时间范围 / 导出类型 / 笔数统计 / 注意事项 / 分隔线）
+     * 常超过 15 行。检测窗口若截断在前 15 行，入口会误判为「非平台账单」并回落到本应用 CSV 解析器，
+     * 用户看到的就是「CSV 缺少字段：id, amount, ...」——即「账单不支持导入」。
+     */
+    @Test
+    fun wechatBillWithLongOfficialPreambleIsStillDetected() {
+        val preamble = buildString {
+            appendLine("微信支付账单明细")
+            appendLine("微信昵称：[演示用户]")
+            appendLine("起始时间：[2026-08-01 00:00:00] 终止时间：[2026-08-31 23:59:59]")
+            appendLine("导出类型：[全部]")
+            appendLine("导出时间：[2026-09-01 10:00:00]")
+            appendLine()
+            appendLine("共 12 笔记录")
+            appendLine("收入：2 笔 100.00 元")
+            appendLine("支出：10 笔 258.30 元")
+            appendLine("中性交易：0 笔 0.00 元")
+            appendLine("注：")
+            appendLine("1. 本账单仅展示微信支付相关交易。")
+            appendLine("2. 账单中的金额单位为人民币元。")
+            appendLine("3. 本账单仅供参考，以实际交易为准。")
+            appendLine("4. 如需用于报销，请以支付凭证为准。")
+            appendLine("5. 若对账单有疑问，请联系客服。")
+            appendLine()
+            appendLine("----------------------微信支付账单明细列表--------------------")
+        }
+        val csv = preamble +
+            "交易时间,交易类型,交易对方,商品,收/支,金额(元),支付方式,当前状态,交易单号,商户单号,备注\n" +
+            "2026-08-06 09:15:23,商户消费,蜜雪冰城,柠檬水,支出,8.00,零钱,支付成功,2026080622001,1001,\n"
+
+        val headerLineIndex = csv.lines().indexOfFirst { it.startsWith("交易时间") }
+        assertThat(headerLineIndex).isGreaterThan(15) // 表头确实在旧扫描上限之外
+        assertThat(PlatformCsvImporter.looksLikePlatformCsv(csv)).isTrue()
+        val result = PlatformCsvImporter.parse(csv, zone)
+        assertThat(result.expenses).hasSize(1)
+        assertThat(result.expenses[0].amountCents).isEqualTo(800L)
+    }
 }

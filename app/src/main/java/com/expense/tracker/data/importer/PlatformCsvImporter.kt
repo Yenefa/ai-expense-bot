@@ -25,9 +25,6 @@ object PlatformCsvImporter {
     private val wechatMarker = listOf("交易时间", "交易类型", "交易对方")
     private val alipayMarker = listOf("交易号", "商家订单号", "交易创建时间", "收/支")
 
-    /** 前置元信息扫描行数：官方账单通常在前几行说明导出时间/筛选条件。 */
-    private const val MARKER_SCAN_LINES = 15
-
     private fun normalizeHeader(value: String, index: Int): String =
         if (index == 0) value.trim().trimStart('\uFEFF') else value.trim()
 
@@ -43,11 +40,12 @@ object PlatformCsvImporter {
     /**
      * 文本是否像平台账单；用于在导入入口自动切换解析器。
      * 官方导出的账单常带「微信支付账单明细…/支付宝交易记录明细…」等前置元信息行，
-     * 所以这里扫描前 [MARKER_SCAN_LINES] 行寻找真正的表头，而不是只看第一行。
+     * 且**行数不定**（微信官方账单的导出信息 + 笔数统计 + 注意事项通常就超过 15 行），
+     * 所以这里**扫描全文**寻找表头，与 [parse] 的定位逻辑保持一致；
+     * 入口判据绝不能比解析器更窄，否则文件会被误判为「非平台账单」而回落到本应用 CSV 解析器。
      */
     fun looksLikePlatformCsv(text: String): Boolean =
         text.lineSequence()
-            .take(MARKER_SCAN_LINES)
             .any { line -> detect(headerFields(line)) != Platform.UNKNOWN }
 
     fun parse(csv: String, zone: ZoneId = ZoneId.systemDefault()): CsvImportResult {
