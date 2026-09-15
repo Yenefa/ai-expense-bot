@@ -91,6 +91,28 @@ object CsvExpenseImporter {
         return CsvImportResult(expenses, issues)
     }
 
+    /**
+     * 解码 CSV 字节：优先 UTF-8（含 BOM），失败回退 GBK（微信/支付宝导出常见编码）。
+     * 压缩包直接给出明确提示：官方账单的邮件/消息附件常常是**带密码的 ZIP**，
+     * 若按文本解码只会得到乱码，用户看到的却是「缺少字段」这类风马牛不相及的错误。
+     */
+    internal fun decodeCsvBytes(bytes: ByteArray): String {
+        require(!looksLikeZip(bytes)) { "这是压缩包（.zip），请先解压出 CSV 再导入" }
+        val utf8 = runCatching {
+            val text = String(bytes, Charsets.UTF_8)
+            if (text.contains('\uFFFD')) throw IllegalArgumentException("not utf8")
+            text
+        }.getOrNull()
+        return utf8?.trimStart('\uFEFF')
+            ?: String(bytes, java.nio.charset.Charset.forName("GBK")).trimStart('\uFEFF')
+    }
+
+    /** ZIP 魔数：PK\x03\x04（本地文件头）/ PK\x05\x06（空压缩包）/ PK\x07\x08（跨卷）。 */
+    internal fun looksLikeZip(bytes: ByteArray): Boolean =
+        bytes.size >= 4 &&
+            bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() &&
+            (bytes[2] == 0x03.toByte() || bytes[2] == 0x05.toByte() || bytes[2] == 0x07.toByte())
+
     internal data class CsvRecord(
         val fields: List<String>,
         val recordNumber: Int,
@@ -135,7 +157,9 @@ object CsvExpenseImporter {
                 }
             } else {
                 when (char) {
-                    '"' -> inQuotes = true
+                    // RFC 4180：只有**字段开头**的 `"` 起始引用；字段中间出现的 `"` 是普通字符。
+                    // 旧实现把任何位置的 `"` 都当引号开关，账单里一个落单引号就能让整份文件被判「未闭合」而整体拒绝导入。
+                    '"' -> if (field.isEmpty()) inQuotes = true else field.append('"')
                     ',' -> {
                         fields += field.toString()
                         field.setLength(0)
